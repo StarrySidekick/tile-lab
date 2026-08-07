@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tile Lab — a Carcassonne-style sandbox</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main>
+    <canvas id="board"></canvas>
+
+    <aside id="panel">
+      <header>
+        <h1>Tile Lab</h1>
+        <p id="phase">—</p>
+      </header>
+
+      <section class="hand">
+        <canvas id="preview" width="120" height="120"></canvas>
+        <div class="hand-meta">
+          <div id="tileName">—</div>
+          <div class="dim"><span id="deckCount">0</span> tiles left</div>
+          <div class="btns">
+            <button id="rotate">Rotate <kbd>R</kbd></button>
+            <button id="skip">Skip meeple <kbd>Space</kbd></button>
+          </div>
+        </div>
+      </section>
+
+      <section id="scores"></section>
+
+      <section class="tools">
+        <h2>Sandbox</h2>
+        <label><input type="checkbox" id="freePlace" /> Free placement (ignore edge matching)</label>
+        <label><input type="checkbox" id="debug" /> Feature overlay <kbd>D</kbd></label>
+        <label class="row">Force next tile
+          <select id="forceTile"><option value="">— random —</option></select>
+        </label>
+        <label class="row">Players
+          <select id="playerCount">
+            <option>2</option><option>3</option><option>4</option><option>5</option>
+          </select>
+        </label>
+        <label class="row">Seed <input id="seed" placeholder="blank = random" /></label>
+        <button id="newGame" class="primary">New game</button>
+      </section>
+
+      <section class="log-wrap">
+        <h2>Log</h2>
+        <div id="log"></div>
+      </section>
+
+      <footer class="dim">
+        drag to pan · scroll to zoom · right-click or <kbd>R</kbd> to rotate · <kbd>C</kbd> recenters
+      </footer>
+    </aside>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
