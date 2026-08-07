@@ -1,10 +1,13 @@
 # Tile Lab
 
+**Play it: <https://starrysidekick.github.io/tile-lab/>**
+· [tile atlas](https://starrysidekick.github.io/tile-lab/atlas.html)
+
 A Carcassonne-style tile game built to be **fast to iterate on**. No build step, no
 dependencies, no image assets — plain ES modules and a canvas. Edit a file, hit
 refresh, keep playing.
 
-## Run it
+## Run it locally
 
 **Double-click `Play Tile Lab.command`.** It starts a local server and opens the
 game. Closing that Terminal window stops it. Running it twice is harmless — the
