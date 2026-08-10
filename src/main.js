@@ -7,13 +7,23 @@ import { Renderer } from './render.js';
 import { drawTile, PLAYER_COLORS } from './art.js';
 import { THEME } from './theme.js';
 import { TILE_TYPES, GROUPS, CITY_LANDMARKS } from './tiles.js';
+import { Sfx, SOUND_NAMES } from './audio.js';
 
 const canvas = document.getElementById('board');
 const renderer = new Renderer(canvas);
 const $ = (id) => document.getElementById(id);
+const sfx = new Sfx();
 
 let enabledGroups = new Set(DEFAULT_GROUPS.classic);
-let game = new Game({ players: 2, groups: [...enabledGroups] });
+let game;
+
+/** Every Game is fresh, so sound has to be re-subscribed each time. */
+function bind(g) {
+  g.on((kind) => sfx.play(kind));
+  return g;
+}
+
+game = bind(new Game({ players: 2, groups: [...enabledGroups] }));
 
 // --- new game ---------------------------------------------------------------
 
@@ -22,11 +32,11 @@ function newGame() {
   const players = Number($('playerCount').value);
   const seedRaw = $('seed').value.trim();
   const seed = seedRaw === '' ? null : hashSeed(seedRaw);
-  game = new Game({
+  game = bind(new Game({
     players, seed, mode,
     meeples: $('useMeeples').checked,
     groups: [...enabledGroups],
-  });
+  }));
   game.free = $('freePlace').checked;
   renderer.centerOn(0, 0);
   renderer.cam.zoom = 96;
@@ -54,6 +64,14 @@ function onModeChange() {
 // --- pointer ----------------------------------------------------------------
 
 let drag = null;
+
+/** Is this cell touching the played area? Used to decide whether to buzz. */
+function nearBoard(c) {
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) if (game.board.get(c.x + dx, c.y + dy)) return true;
+  }
+  return false;
+}
 
 canvas.addEventListener('pointerdown', (e) => {
   canvas.setPointerCapture(e.pointerId);
@@ -93,7 +111,9 @@ canvas.addEventListener('pointerup', (e) => {
   switch (game.phase) {
     case 'place': {
       const c = renderer.cellAt(sx, sy);
-      game.placeAt(c.x, c.y);
+      // Only complain if they aimed at a real but illegal square — clicking
+      // empty space well off the board shouldn't buzz at you.
+      if (!game.placeAt(c.x, c.y) && !game.board.get(c.x, c.y) && nearBoard(c)) sfx.play('deny');
       break;
     }
     case 'meeple': {
@@ -158,6 +178,24 @@ for (const t of TILE_TYPES) {
   o.textContent = `${t.id} — ${t.name}`;
   $('forceTile').appendChild(o);
 }
+
+// --- sound controls ---------------------------------------------------------
+
+$('sound').onchange = (e) => {
+  sfx.enabled = e.target.checked;
+  if (sfx.enabled) sfx.play('meeple');   // confirm it's back on
+};
+$('volume').oninput = (e) => {
+  sfx.setVolume(Number(e.target.value));
+};
+for (const name of SOUND_NAMES) {
+  const o = document.createElement('option');
+  o.value = name;
+  o.textContent = name;
+  $('testSound').appendChild(o);
+}
+$('testSound').onchange = (e) => { if (e.target.value) sfx.play(e.target.value); };
+$('testSound').onclick = (e) => { if (e.target.value) sfx.play(e.target.value); };
 
 function renderGroups() {
   $('groups').innerHTML = GROUPS.map((g) => `
@@ -302,4 +340,4 @@ onModeChange();
 frame();
 
 // Handy for poking at state from the devtools console while iterating.
-window.LAB = { get game() { return game; }, renderer, newGame, THEME };
+window.LAB = { get game() { return game; }, renderer, newGame, THEME, sfx };

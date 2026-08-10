@@ -52,6 +52,7 @@ export class Game {
     this.log = [];
     this.free = false;
     this.forcedNext = null;
+    this.listeners = [];
 
     this.board.place(0, 0, TILES[RULES.startTile], 0);
     this.expedition = mode === 'expedition' ? new Expedition(this) : null;
@@ -68,6 +69,10 @@ export class Game {
     this.log.unshift(msg);
     if (this.log.length > 80) this.log.pop();
   }
+
+  /** Subscribe to gameplay events (sound, and anything else later). */
+  on(fn) { this.listeners.push(fn); return this; }
+  emit(kind, data = {}) { for (const fn of this.listeners) fn(kind, data); }
 
   // --- turn structure -------------------------------------------------------
 
@@ -114,6 +119,8 @@ export class Game {
   rotate(dir = 1) {
     if (this.phase === 'place') this.rot = (this.rot + dir + 4) % 4;
     else if (this.phase === 'cave-place' && this.cave) this.cave.rot = (this.cave.rot + dir + 4) % 4;
+    else return;
+    this.emit('rotate');
   }
 
   canPlaceAt(x, y) {
@@ -125,6 +132,7 @@ export class Game {
     if (!this.canPlaceAt(x, y)) return false;
     this.lastPlaced = this.board.place(x, y, this.tile, this.rot);
     this.say(`${this.player.name} played ${this.tile.id} at (${x}, ${y}).`);
+    this.emit('place');
 
     if (this.mode === 'expedition') {
       this.phase = 'move';
@@ -158,6 +166,7 @@ export class Game {
     this.board.addMeeple(x, y, featIdx, this.current);
     this.player.meeples--;
     this.say(`${this.player.name} claimed the ${type.feats[featIdx].type}.`);
+    this.emit('meeple');
     this.endTurn();
     return true;
   }
@@ -204,6 +213,7 @@ export class Game {
     if (!cave.board.canPlace(x, y, cave.tile, cave.rot)) return false;
     cave.board.place(x, y, cave.tile, cave.rot);
     cave.tile = null;
+    this.emit('place');
     this.phase = 'cave-move';
     return true;
   }
@@ -256,6 +266,7 @@ export class Game {
   nextPlayer() {
     this.current = (this.current + 1) % this.players.length;
     this.startTurn();
+    if (this.phase !== 'over') this.emit('turn');
   }
 
   /**
@@ -274,6 +285,7 @@ export class Game {
       const who = winners.map((p) => this.players[p].name).join(' & ');
       const n = d.tiles.size;
       this.say(`${final ? 'Endgame: ' : ''}${d.type} of ${n} tile${n > 1 ? 's' : ''} → ${who} +${pts}`);
+      this.emit('score', { points: pts });
     } else if (!final) {
       this.say(`A ${d.type} closed with nobody on it.`);
     }
@@ -295,6 +307,7 @@ export class Game {
     const best = Math.max(...this.players.map((p) => p.score));
     const winners = this.players.filter((p) => p.score === best).map((p) => p.name);
     this.say(`Game over — ${winners.join(' & ')} wins with ${best}.`);
+    this.emit('over');
   }
 }
 

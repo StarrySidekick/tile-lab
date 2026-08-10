@@ -149,6 +149,37 @@ greens, grey-brown stone, and a dusk vignette with a faint amber wash over the
 whole frame. Saturation stays low so the gold accents and twilight teal are the
 only things that read as bright.
 
+### Sound
+
+Placeholder effects are **synthesised at runtime** — oscillators, filtered noise
+and envelopes, no audio files. That keeps the no-assets rule and means you can
+retune a sound by editing a number instead of re-recording. Voicing leans warm
+and muted to match the palette: triangle waves through lowpass filters rather
+than bright square/saw.
+
+All 14 voices live in the `VOICES` table at the bottom of `src/audio.js`:
+
+`place` `rotate` `meeple` `score` `step` `warp` `landmark` `rest`
+`caveEnter` `caveExit` `treasure` `deny` `turn` `over`
+
+Frequent sounds are deliberately tiny (a rotate tick peaks around 0.03) and
+rewards are loud (treasure ~0.33), so the constant ones stay out of the way.
+Use the **Test** dropdown in the panel to audition any of them.
+
+**Real audio files override the placeholders.** Drop files into `assets/sfx/`
+and list them in `assets/sfx/manifest.json`:
+
+```json
+{ "place": "tile-clack.wav", "score": "chime.mp3" }
+```
+
+Anything not listed keeps its synth voice, so you can replace the set one sound
+at a time and A/B against the placeholder. A missing manifest is not an error.
+
+Sound is driven by gameplay events rather than by the UI poking at it — `Game`
+emits (`game.on(fn)`) and `main.js` maps events to voices, so the engine stays
+free of audio and the same events can drive animation later.
+
 ### Sandbox tools
 
 - **Free placement** — ignore edge matching, so you can build any board state

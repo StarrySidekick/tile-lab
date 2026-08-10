@@ -143,6 +143,7 @@ export class Expedition {
     if (!this.canRest(pawn)) return false;
     pawn.resting = true;
     this.game.say(`${this.game.players[pawn.player].name} rests at the village.`);
+    this.game.emit('rest');
     return true;
   }
 
@@ -153,6 +154,7 @@ export class Expedition {
     pawn.x = x; pawn.y = y;
     const name = this.game.players[pawn.player].name;
     this.game.say(dest.warp ? `${name} warps between watchtowers.` : `${name} moves to (${x}, ${y}).`);
+    this.game.emit(dest.warp ? 'warp' : 'step');
     this.resolve(pawn);
     return true;
   }
@@ -179,6 +181,7 @@ export class Expedition {
       if (info.score) {
         player.score += info.score;
         this.game.say(`${player.name} claims the ${info.label} +${info.score}`);
+        this.game.emit('landmark', { kind: m.kind });
       }
 
       if (CITY_LANDMARKS.includes(m.kind)) {
@@ -213,6 +216,7 @@ export class Expedition {
     this.caves.set(pawn.player, cave);
     this.drawCaveTile(cave);
     this.game.say(`${this.game.players[pawn.player].name} descends into the cave.`);
+    this.game.emit('caveEnter');
   }
 
   drawCaveTile(cave) {
@@ -251,6 +255,7 @@ export class Expedition {
       if (info.score) {
         player.score += info.score;
         this.game.say(`${player.name} finds a ${info.label} in the cave +${info.score}`);
+        this.game.emit('treasure', { kind: m.kind });
       }
       if (m.kind === 'shaft') this.leaveCave(cave, 'climbs out through a shaft');
     });
@@ -268,5 +273,6 @@ export class Expedition {
     pawn.y = cave.entry.y;
     this.caves.delete(pawn.player);
     this.game.say(`${this.game.players[pawn.player].name} ${how}.`);
+    this.game.emit('caveExit');
   }
 }
