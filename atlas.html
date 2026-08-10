@@ -6,60 +6,90 @@
   <title>Tile Lab — atlas</title>
   <link rel="stylesheet" href="./style.css" />
   <style>
-    body { overflow: auto; }
-    .atlas { padding: 24px; max-width: 1100px; margin: 0 auto; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 16px; }
-    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
-    .card canvas { width: 100%; aspect-ratio: 1; border-radius: 4px; display: block; }
+    /* style.css locks the game viewport; the atlas is a normal scrolling page. */
+    html, body { overflow: auto; height: auto; }
+    .atlas { padding: 24px; max-width: 1150px; margin: 0 auto; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 15px; margin-bottom: 30px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 8px; }
+    .card canvas { width: 100%; aspect-ratio: 1; border-radius: 3px; display: block; }
     .card h3 { margin: 7px 0 2px; font-size: 12px; }
     .card p { margin: 0; font-size: 10.5px; color: var(--dim); line-height: 1.4; }
-    .edges { font: 10px ui-monospace, monospace; color: var(--accent); }
-    a { color: var(--accent); }
+    .edges { font: 10px ui-monospace, monospace; color: var(--accent); letter-spacing: 1px; }
+    .marks { color: var(--teal) !important; }
+    h2.group { border: none; font-size: 12px; margin-top: 6px; }
+    .note { margin: 0 0 12px; font-size: 11.5px; color: var(--dim); }
   </style>
 </head>
 <body>
   <div class="atlas">
     <h1>Tile atlas</h1>
-    <p class="dim">
-      All tile types at rotation 0, with meeple anchors marked. Edges read N E S W
-      (c=city, r=road, f=field). <a href="./index.html">← back to the game</a>
+    <p class="note">
+      Every tile type at rotation 0. Coloured figures mark meeple anchors (one per
+      feature). Edges read N E S W — <code>c</code> city, <code>r</code> road,
+      <code>f</code> field. <a href="./index.html">← back to the game</a>
     </p>
-    <div class="grid" id="grid"></div>
+    <div id="out"></div>
   </div>
 
   <script type="module">
-    import { TILE_TYPES } from './src/tiles.js';
+    import { TILE_TYPES, CAVE_TYPES, GROUPS } from './src/tiles.js';
     import { drawTile, drawMeeple, PLAYER_COLORS } from './src/art.js';
 
-    const grid = document.getElementById('grid');
+    const out = document.getElementById('out');
     const SIZE = 240;
 
-    for (const t of TILE_TYPES) {
-      const card = document.createElement('div');
-      card.className = 'card';
+    function card(t, cave) {
+      const el = document.createElement('div');
+      el.className = 'card';
       const cv = document.createElement('canvas');
       cv.width = cv.height = SIZE;
-      card.appendChild(cv);
+      el.appendChild(cv);
 
       const ctx = cv.getContext('2d');
       ctx.save();
       ctx.scale(SIZE, SIZE);
-      drawTile(ctx, t);
+      drawTile(ctx, t, { cave });
       ctx.restore();
-      // Meeple anchors, one per feature, so mis-placed spots are obvious.
       t.spots.forEach(([sx, sy], i) => {
-        drawMeeple(ctx, sx * SIZE, sy * SIZE, SIZE * 0.16, PLAYER_COLORS[i % PLAYER_COLORS.length]);
+        drawMeeple(ctx, sx * SIZE, sy * SIZE, SIZE * 0.15, PLAYER_COLORS[i % PLAYER_COLORS.length]);
       });
 
       const feats = t.feats
         .map((f) => f.type[0].toUpperCase() + (f.sides.length ? f.sides.join('') : '') + (f.shield ? '+' : ''))
-        .join(' ');
-      card.insertAdjacentHTML('beforeend', `
+        .join(' ') || '—';
+      const marks = t.marks.map((m) => m.kind).join(', ');
+      el.insertAdjacentHTML('beforeend', `
         <h3>${t.id} &times;${t.n}</h3>
         <p>${t.name}</p>
         <p class="edges">${t.edges.join(' ')}</p>
-        <p>${feats}</p>`);
-      grid.appendChild(card);
+        <p>${feats}</p>
+        ${marks ? `<p class="marks">◆ ${marks}</p>` : ''}`);
+      return el;
+    }
+
+    function section(title, note, list, cave = false) {
+      out.insertAdjacentHTML('beforeend', `<h2 class="group">${title}</h2><p class="note">${note}</p>`);
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      for (const t of list) grid.appendChild(card(t, cave));
+      out.appendChild(grid);
+    }
+
+    // ?group=outposts shows one group on its own — handy on a small screen.
+    const only = new URLSearchParams(location.search).get('group');
+
+    const links = ['all', ...GROUPS.map((g) => g.id), 'cave']
+      .map((g) => `<a href="?group=${g}"${(only || 'all') === g ? ' style="color:var(--accent)"' : ''}>${g}</a>`)
+      .join(' · ');
+    out.insertAdjacentHTML('beforeend', `<p class="note">Show: ${links}</p>`);
+
+    for (const g of GROUPS) {
+      if (only && only !== 'all' && only !== g.id) continue;
+      const list = TILE_TYPES.filter((t) => t.group === g.id);
+      if (list.length) section(g.name, g.note, list);
+    }
+    if (!only || only === 'all' || only === 'cave') {
+      section('Cave pool', 'Only drawn inside caves. Passages connect like roads; everything else is solid rock.', CAVE_TYPES, true);
     }
   </script>
 </body>

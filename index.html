@@ -21,14 +21,36 @@
         <div class="hand-meta">
           <div id="tileName">—</div>
           <div class="dim"><span id="deckCount">0</span> tiles left</div>
-          <div class="btns">
-            <button id="rotate">Rotate <kbd>R</kbd></button>
-            <button id="skip">Skip meeple <kbd>Space</kbd></button>
-          </div>
+          <div class="btns" id="actions"></div>
         </div>
       </section>
 
       <section id="scores"></section>
+
+      <section class="tools">
+        <h2>Game</h2>
+        <label class="row">Mode
+          <select id="mode">
+            <option value="classic">Classic</option>
+            <option value="expedition">Expedition</option>
+          </select>
+        </label>
+        <label id="meepleRow"><input type="checkbox" id="useMeeples" checked /> Use meeples</label>
+        <label class="row">Players
+          <select id="playerCount">
+            <option>2</option><option>3</option><option>4</option><option>5</option>
+          </select>
+        </label>
+        <label class="row">Seed <input id="seed" placeholder="blank = random" /></label>
+        <button id="newGame" class="primary">New game</button>
+        <p class="hint" id="modeHint"></p>
+      </section>
+
+      <section class="tools">
+        <h2>Tile pool</h2>
+        <div id="groups"></div>
+        <p class="hint">Changes apply on the next new game.</p>
+      </section>
 
       <section class="tools">
         <h2>Sandbox</h2>
@@ -37,13 +59,6 @@
         <label class="row">Force next tile
           <select id="forceTile"><option value="">— random —</option></select>
         </label>
-        <label class="row">Players
-          <select id="playerCount">
-            <option>2</option><option>3</option><option>4</option><option>5</option>
-          </select>
-        </label>
-        <label class="row">Seed <input id="seed" placeholder="blank = random" /></label>
-        <button id="newGame" class="primary">New game</button>
       </section>
 
       <section class="log-wrap">
@@ -53,6 +68,7 @@
 
       <footer class="dim">
         drag to pan · scroll to zoom · right-click or <kbd>R</kbd> to rotate · <kbd>C</kbd> recenters
+        · <a href="./atlas.html">tile atlas</a>
       </footer>
     </aside>
   </main>

@@ -1,0 +1,272 @@
+// ---------------------------------------------------------------------------
+// Expedition mode.
+//
+// A different use of meeples: instead of staking a claim on a feature and
+// leaving it there, each player has PAWNS that walk the map. Every turn you
+// place a tile, then move a pawn. The board isn't a scoring grid any more —
+// it's terrain you're building in front of yourself as you travel.
+//
+// Landmarks are claimed by the FIRST pawn to reach them, which is what turns
+// tile placement into a race: you're laying track toward the thing you want
+// while trying not to lay track toward the thing they want.
+//
+//   stable   → your pawn is mounted for good, and moves 2 tiles instead of 1
+//   village  → rest here a turn (face-down) to raise a second pawn
+//   tower    → once two are standing, pawns may warp between any of them
+//   cave     → drop into a private sub-map with its own tile pool and treasure
+//   market / keep / library / armoury → city landmarks; collect all four for a bonus
+// ---------------------------------------------------------------------------
+
+import { Board, keyOf } from './board.js';
+import { TILES, MARKS, CITY_LANDMARKS, buildCaveDeck, rotPoint, SIDE_STEP } from './tiles.js';
+
+export const EXPEDITION_RULES = {
+  baseMoves: 1,
+  mountedMoves: 2,
+  setBonus: 8,            // for collecting all four city landmarks
+  caveTurnLimit: 0,       // 0 = explore until you leave or the cave deck runs dry
+  movementRequiresRoad: false, // knob: gate movement on road connections instead
+};
+
+export class Expedition {
+  constructor(game) {
+    this.game = game;
+    this.pawns = [];
+    this.nextId = 1;
+    this.claimed = new Set();                 // "x,y#markIndex" already scored
+    this.collections = game.players.map(() => new Set());
+    this.caves = new Map();                   // player id -> cave session
+    this.selected = null;                     // pawn being moved this turn
+    this.moved = false;
+
+    for (const p of game.players) this.spawn(p.id, 0, 0);
+  }
+
+  spawn(player, x, y) {
+    const pawn = { id: this.nextId++, player, x, y, mounted: false, resting: false, inCave: false };
+    this.pawns.push(pawn);
+    return pawn;
+  }
+
+  pawnsOf(player) { return this.pawns.filter((p) => p.player === player && !p.inCave); }
+  pawnsAt(x, y) { return this.pawns.filter((p) => !p.inCave && p.x === x && p.y === y); }
+  caveOf(player) { return this.caves.get(player) || null; }
+
+  moveAllowance(pawn) {
+    return pawn.mounted ? EXPEDITION_RULES.mountedMoves : EXPEDITION_RULES.baseMoves;
+  }
+
+  // --- landmarks ------------------------------------------------------------
+
+  /** Landmarks on a placed cell, with rotation applied to their positions. */
+  marksAt(cell) {
+    if (!cell) return [];
+    return cell.type.marks.map((m, i) => ({
+      kind: m.kind,
+      index: i,
+      spot: rotPoint(cell.type.markSpots[i], cell.rot),
+      claimed: this.claimed.has(`${keyOf(cell.x, cell.y)}#${i}`),
+    }));
+  }
+
+  towers() {
+    const out = [];
+    for (const cell of this.game.board.cells.values()) {
+      cell.type.marks.forEach((m) => { if (m.kind === 'tower') out.push({ x: cell.x, y: cell.y }); });
+    }
+    return out;
+  }
+
+  // --- movement -------------------------------------------------------------
+
+  /**
+   * Every tile a pawn could finish this turn on: a breadth-first walk over
+   * placed tiles up to its allowance, plus tower-to-tower warps.
+   */
+  reachable(pawn) {
+    const board = this.game.board;
+    const out = new Map();
+    const limit = this.moveAllowance(pawn);
+    const seen = new Set([keyOf(pawn.x, pawn.y)]);
+    let frontier = [{ x: pawn.x, y: pawn.y }];
+
+    for (let step = 1; step <= limit; step++) {
+      const next = [];
+      for (const cur of frontier) {
+        for (let s = 0; s < 4; s++) {
+          const [dx, dy] = SIDE_STEP[s];
+          const nx = cur.x + dx, ny = cur.y + dy;
+          const k = keyOf(nx, ny);
+          if (seen.has(k) || !board.cells.has(k)) continue;
+          if (EXPEDITION_RULES.movementRequiresRoad) {
+            const from = board.get(cur.x, cur.y);
+            if (board.edgeAt(from, s) !== 'r') continue;
+          }
+          seen.add(k);
+          out.set(k, { x: nx, y: ny, steps: step, warp: false });
+          next.push({ x: nx, y: ny });
+        }
+      }
+      frontier = next;
+    }
+
+    // Warping: standing on a tower connects you to every other tower.
+    const here = board.get(pawn.x, pawn.y);
+    if (here && here.type.marks.some((m) => m.kind === 'tower')) {
+      for (const t of this.towers()) {
+        const k = keyOf(t.x, t.y);
+        if (k === keyOf(pawn.x, pawn.y) || out.has(k)) continue;
+        out.set(k, { x: t.x, y: t.y, steps: 0, warp: true });
+      }
+    }
+    return out;
+  }
+
+  /** Start of a player's movement phase: wake rested pawns, raise new ones. */
+  beginMovement(player) {
+    this.selected = null;
+    this.moved = false;
+    for (const pawn of this.pawns) {
+      if (pawn.player !== player || !pawn.resting) continue;
+      pawn.resting = false;
+      this.spawn(player, pawn.x, pawn.y);
+      this.game.say(`A second pawn is raised at the village (${pawn.x}, ${pawn.y}).`);
+    }
+  }
+
+  canRest(pawn) {
+    const cell = this.game.board.get(pawn.x, pawn.y);
+    return !!cell && cell.type.marks.some((m) => m.kind === 'village') && !pawn.resting;
+  }
+
+  rest(pawn) {
+    if (!this.canRest(pawn)) return false;
+    pawn.resting = true;
+    this.game.say(`${this.game.players[pawn.player].name} rests at the village.`);
+    return true;
+  }
+
+  move(pawn, x, y) {
+    const opts = this.reachable(pawn);
+    const dest = opts.get(keyOf(x, y));
+    if (!dest) return false;
+    pawn.x = x; pawn.y = y;
+    const name = this.game.players[pawn.player].name;
+    this.game.say(dest.warp ? `${name} warps between watchtowers.` : `${name} moves to (${x}, ${y}).`);
+    this.resolve(pawn);
+    return true;
+  }
+
+  /** Apply whatever the pawn just landed on. */
+  resolve(pawn) {
+    const cell = this.game.board.get(pawn.x, pawn.y);
+    if (!cell) return;
+    const player = this.game.players[pawn.player];
+
+    cell.type.marks.forEach((m, i) => {
+      const key = `${keyOf(cell.x, cell.y)}#${i}`;
+      const info = MARKS[m.kind] || { label: m.kind, score: 0 };
+
+      if (m.kind === 'stable' && !pawn.mounted) {
+        pawn.mounted = true;
+        this.game.say(`${player.name} is mounted — 2 tiles per turn from now on.`);
+      }
+
+      if (m.kind === 'cave') { this.enterCave(pawn, cell); return; }
+
+      if (this.claimed.has(key)) return;
+      this.claimed.add(key);
+      if (info.score) {
+        player.score += info.score;
+        this.game.say(`${player.name} claims the ${info.label} +${info.score}`);
+      }
+
+      if (CITY_LANDMARKS.includes(m.kind)) {
+        const set = this.collections[pawn.player];
+        set.add(m.kind);
+        if (set.size === CITY_LANDMARKS.length) {
+          player.score += EXPEDITION_RULES.setBonus;
+          this.game.say(`${player.name} completes the city set +${EXPEDITION_RULES.setBonus}`);
+        }
+      }
+    });
+  }
+
+  // --- caves ----------------------------------------------------------------
+
+  enterCave(pawn, cell) {
+    if (this.caves.has(pawn.player)) return;
+    const board = new Board();
+    board.place(0, 0, TILES['vc'], 0);          // entrance chamber
+    const cave = {
+      board,
+      deck: buildCaveDeck(this.game.rng),
+      entry: { x: cell.x, y: cell.y },
+      pawn,
+      pos: { x: 0, y: 0 },
+      tile: null,
+      rot: 0,
+      phase: 'place',
+      claimed: new Set(),
+    };
+    pawn.inCave = true;
+    this.caves.set(pawn.player, cave);
+    this.drawCaveTile(cave);
+    this.game.say(`${this.game.players[pawn.player].name} descends into the cave.`);
+  }
+
+  drawCaveTile(cave) {
+    while (cave.deck.length) {
+      const type = TILES[cave.deck.pop()];
+      if (cave.board.hasAnyPlacement(type)) {
+        cave.tile = type; cave.rot = 0; cave.phase = 'place';
+        return;
+      }
+    }
+    cave.tile = null;
+    cave.phase = 'move';                        // out of tiles — just walk out
+  }
+
+  caveReachable(cave) {
+    const out = new Map();
+    for (let s = 0; s < 4; s++) {
+      const [dx, dy] = SIDE_STEP[s];
+      const nx = cave.pos.x + dx, ny = cave.pos.y + dy;
+      if (cave.board.cells.has(keyOf(nx, ny))) out.set(keyOf(nx, ny), { x: nx, y: ny });
+    }
+    return out;
+  }
+
+  caveMove(cave, x, y) {
+    if (!this.caveReachable(cave).has(keyOf(x, y))) return false;
+    cave.pos = { x, y };
+    const cell = cave.board.get(x, y);
+    const player = this.game.players[cave.pawn.player];
+
+    cell.type.marks.forEach((m, i) => {
+      const key = `${keyOf(x, y)}#${i}`;
+      if (cave.claimed.has(key)) return;
+      cave.claimed.add(key);
+      const info = MARKS[m.kind] || { label: m.kind, score: 0 };
+      if (info.score) {
+        player.score += info.score;
+        this.game.say(`${player.name} finds a ${info.label} in the cave +${info.score}`);
+      }
+      if (m.kind === 'shaft') this.leaveCave(cave, 'climbs out through a shaft');
+    });
+    return true;
+  }
+
+  canLeaveCave(cave) {
+    return cave.pos.x === 0 && cave.pos.y === 0;
+  }
+
+  leaveCave(cave, how = 'returns to the surface') {
+    const pawn = cave.pawn;
+    pawn.inCave = false;
+    pawn.x = cave.entry.x;
+    pawn.y = cave.entry.y;
+    this.caves.delete(pawn.player);
+    this.game.say(`${this.game.players[pawn.player].name} ${how}.`);
+  }
+}

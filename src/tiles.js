@@ -3,77 +3,177 @@
 //
 // Sides are indexed clockwise from the top: 0=N 1=E 2=S 3=W.
 //
-// A tile is a list of FEATURES. A feature is a connected piece of stuff on the
-// tile that can be scored and can hold a meeple:
+// A tile is a list of FEATURES plus a list of MARKS.
 //
-//   { type: 'city' | 'road' | 'monastery', sides: [...], shield: bool }
+//   feature: { type: 'city' | 'road' | 'monastery', sides: [...], shield }
+//   mark:    { kind: 'stable' | 'village' | ... , on: featureIndex | null }
 //
-// `sides` lists which tile edges the feature reaches. Two road stubs that meet
-// at a village center are two SEPARATE features (that's what makes a 3-way
-// junction end three roads). A city drawn across two edges is ONE feature.
+// FEATURES are edge-connected things — they span tiles, merge with neighbours,
+// and score. `sides` lists which tile edges the feature reaches. Two road stubs
+// meeting at a village centre are two SEPARATE features; that's what makes a
+// 3-way junction terminate three roads.
 //
-// Everything else (edge letters, art, meeple spots) is derived from this, so
-// adding a new tile type is one line of data.
+// MARKS are point-of-interest landmarks that sit ON a tile and never span
+// tiles. They do nothing in Classic mode; they're what Expedition mode is
+// built around. `on` anchors a mark to a feature's spot (so a market sits
+// inside its city); null puts it at the tile centre.
+//
+// Everything else — edge letters, art, meeple anchors — is derived.
 // ---------------------------------------------------------------------------
 
 export const N = 0, E = 1, S = 2, W = 3;
 export const SIDE_NAMES = ['N', 'E', 'S', 'W'];
 export const opposite = (s) => (s + 2) % 4;
 
-/** Unit vector from tile center toward side s (y points down, screen-style). */
+/** Unit vector from tile centre toward side s (y points down, screen-style). */
 export const SIDE_VEC = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 /** Midpoint of side s in unit tile space (0..1). */
 export const SIDE_MID = [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]];
-/** Neighbor offset when stepping across side s. */
+/** Neighbour offset when stepping across side s. */
 export const SIDE_STEP = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 
 const city = (sides, shield = false) => ({ type: 'city', sides, shield });
 const road = (sides) => ({ type: 'road', sides });
 const abbey = () => ({ type: 'monastery', sides: [] });
+const mark = (kind, on = null) => ({ kind, on });
 
-// Standard 72-tile base game. `n` is how many copies are in the deck.
-export const TILE_TYPES = [
-  { id: 'A', n: 2, name: 'Monastery + road',        feats: [abbey(), road([S])] },
-  { id: 'B', n: 4, name: 'Monastery',               feats: [abbey()] },
-  { id: 'C', n: 1, name: 'City all round',          feats: [city([N, E, S, W], true)] },
-  { id: 'D', n: 4, name: 'City + road through',     feats: [city([N]), road([E, W])] },
-  { id: 'E', n: 5, name: 'City edge',               feats: [city([N])] },
-  { id: 'F', n: 2, name: 'City across (shield)',    feats: [city([E, W], true)] },
-  { id: 'G', n: 1, name: 'City across',             feats: [city([E, W])] },
-  { id: 'H', n: 3, name: 'Two cities opposite',     feats: [city([E]), city([W])] },
-  { id: 'I', n: 2, name: 'Two cities adjacent',     feats: [city([E]), city([S])] },
-  { id: 'J', n: 3, name: 'City + road bend E-S',    feats: [city([N]), road([E, S])] },
-  { id: 'K', n: 3, name: 'City + road bend W-S',    feats: [city([N]), road([W, S])] },
-  { id: 'L', n: 3, name: 'City + 3-way road',       feats: [city([N]), road([E]), road([S]), road([W])] },
-  { id: 'M', n: 2, name: 'City corner (shield)',    feats: [city([N, W], true)] },
-  { id: 'N', n: 3, name: 'City corner',             feats: [city([N, W])] },
-  { id: 'O', n: 2, name: 'City corner + road (sh)', feats: [city([N, W], true), road([E, S])] },
-  { id: 'P', n: 3, name: 'City corner + road',      feats: [city([N, W]), road([E, S])] },
-  { id: 'Q', n: 1, name: 'City 3-sided (shield)',   feats: [city([N, E, W], true)] },
-  { id: 'R', n: 3, name: 'City 3-sided',            feats: [city([N, E, W])] },
-  { id: 'S', n: 2, name: 'City 3-sided + road (sh)',feats: [city([N, E, W], true), road([S])] },
-  { id: 'T', n: 1, name: 'City 3-sided + road',     feats: [city([N, E, W]), road([S])] },
-  { id: 'U', n: 8, name: 'Road straight',           feats: [road([N, S])] },
-  { id: 'V', n: 9, name: 'Road bend',               feats: [road([W, S])] },
-  { id: 'W', n: 4, name: 'Road 3-way',              feats: [road([E]), road([S]), road([W])] },
-  { id: 'X', n: 1, name: 'Road 4-way',              feats: [road([N]), road([E]), road([S]), road([W])] },
+// ---------------------------------------------------------------------------
+// Tile groups. Toggle these on and off to change what's in the draw pile.
+// ---------------------------------------------------------------------------
+
+export const GROUPS = [
+  { id: 'base', name: 'Carcassonne base set', note: 'The original 72 tiles.', classic: true, expedition: true },
+  { id: 'roads', name: 'Road experiments', note: 'Continuous crossroads, dead-ends, double bends.', classic: false, expedition: false },
+  { id: 'cities', name: 'City experiments', note: 'Tunnels, four-way cities, twin corners.', classic: false, expedition: false },
+  { id: 'outposts', name: 'Outposts', note: 'Stables, villages, towers, cave mouths.', classic: false, expedition: true },
+  { id: 'citylife', name: 'City landmarks', note: 'Markets, keeps, libraries, armouries.', classic: false, expedition: true },
 ];
+
+export const TILE_TYPES = [
+  // --- base: the original 72 ------------------------------------------------
+  { id: 'A', n: 2, group: 'base', name: 'Monastery + road',        feats: [abbey(), road([S])] },
+  { id: 'B', n: 4, group: 'base', name: 'Monastery',               feats: [abbey()] },
+  { id: 'C', n: 1, group: 'base', name: 'City all round',          feats: [city([N, E, S, W], true)] },
+  { id: 'D', n: 4, group: 'base', name: 'City + road through',     feats: [city([N]), road([E, W])] },
+  { id: 'E', n: 5, group: 'base', name: 'City edge',               feats: [city([N])] },
+  { id: 'F', n: 2, group: 'base', name: 'City across (shield)',    feats: [city([E, W], true)] },
+  { id: 'G', n: 1, group: 'base', name: 'City across',             feats: [city([E, W])] },
+  { id: 'H', n: 3, group: 'base', name: 'Two cities opposite',     feats: [city([E]), city([W])] },
+  { id: 'I', n: 2, group: 'base', name: 'Two cities adjacent',     feats: [city([E]), city([S])] },
+  { id: 'J', n: 3, group: 'base', name: 'City + road bend E-S',    feats: [city([N]), road([E, S])] },
+  { id: 'K', n: 3, group: 'base', name: 'City + road bend W-S',    feats: [city([N]), road([W, S])] },
+  { id: 'L', n: 3, group: 'base', name: 'City + 3-way road',       feats: [city([N]), road([E]), road([S]), road([W])] },
+  { id: 'M', n: 2, group: 'base', name: 'City corner (shield)',    feats: [city([N, W], true)] },
+  { id: 'N', n: 3, group: 'base', name: 'City corner',             feats: [city([N, W])] },
+  { id: 'O', n: 2, group: 'base', name: 'City corner + road (sh)', feats: [city([N, W], true), road([E, S])] },
+  { id: 'P', n: 3, group: 'base', name: 'City corner + road',      feats: [city([N, W]), road([E, S])] },
+  { id: 'Q', n: 1, group: 'base', name: 'City 3-sided (shield)',   feats: [city([N, E, W], true)] },
+  { id: 'R', n: 3, group: 'base', name: 'City 3-sided',            feats: [city([N, E, W])] },
+  { id: 'S', n: 2, group: 'base', name: 'City 3-sided + road (sh)',feats: [city([N, E, W], true), road([S])] },
+  { id: 'T', n: 1, group: 'base', name: 'City 3-sided + road',     feats: [city([N, E, W]), road([S])] },
+  { id: 'U', n: 8, group: 'base', name: 'Road straight',           feats: [road([N, S])] },
+  { id: 'V', n: 9, group: 'base', name: 'Road bend',               feats: [road([W, S])] },
+  { id: 'W', n: 4, group: 'base', name: 'Road 3-way',              feats: [road([E]), road([S]), road([W])] },
+  { id: 'X', n: 1, group: 'base', name: 'Road 4-way',              feats: [road([N]), road([E]), road([S]), road([W])] },
+
+  // --- roads: not in the original -------------------------------------------
+  // Two through-roads that cross without meeting. Neither road ends here, so a
+  // crossroads no longer closes anything — it just gets longer.
+  { id: 'Ra', n: 3, group: 'roads', name: 'Crossroads (continuous)', feats: [road([N, S]), road([E, W])] },
+  // A road that simply stops. Seals its own field off from the rest.
+  { id: 'Rb', n: 3, group: 'roads', name: 'Road dead-end',           feats: [road([N])] },
+  // Two bends sharing a tile without touching.
+  { id: 'Rc', n: 3, group: 'roads', name: 'Double bend',             feats: [road([N, E]), road([S, W])] },
+  // A loop of road that pinches a field into a pocket.
+  { id: 'Rd', n: 2, group: 'roads', name: 'Road fork + bypass',      feats: [road([N, S]), road([E])] },
+
+  // --- cities: not in the original ------------------------------------------
+  { id: 'Ca', n: 2, group: 'cities', name: 'City tunnel',            feats: [city([N, S]), road([E, W])] },
+  { id: 'Cb', n: 1, group: 'cities', name: 'Four cities',            feats: [city([N]), city([E]), city([S]), city([W])] },
+  { id: 'Cc', n: 2, group: 'cities', name: 'Twin corner cities',     feats: [city([N, E]), city([S, W])] },
+
+  // --- outposts: Expedition landmarks ---------------------------------------
+  { id: 'Oa', n: 3, group: 'outposts', name: 'Stable',      feats: [road([N, S])],                       marks: [mark('stable')] },
+  { id: 'Ob', n: 3, group: 'outposts', name: 'Village',     feats: [road([E]), road([S]), road([W])],    marks: [mark('village')] },
+  { id: 'Oc', n: 3, group: 'outposts', name: 'Watchtower',  feats: [],                                   marks: [mark('tower')] },
+  { id: 'Od', n: 2, group: 'outposts', name: 'Tower + road',feats: [road([W, E])],                       marks: [mark('tower')] },
+  { id: 'Oe', n: 3, group: 'outposts', name: 'Cave mouth',  feats: [],                                   marks: [mark('cave')] },
+  { id: 'Of', n: 2, group: 'outposts', name: 'Cave + road', feats: [road([S])],                          marks: [mark('cave')] },
+
+  // --- citylife: landmarks inside cities ------------------------------------
+  { id: 'La', n: 2, group: 'citylife', name: 'Market',   feats: [city([N, W])],           marks: [mark('market', 0)] },
+  { id: 'Lb', n: 2, group: 'citylife', name: 'Keep',     feats: [city([N, E, W], true)],  marks: [mark('keep', 0)] },
+  { id: 'Lc', n: 2, group: 'citylife', name: 'Library',  feats: [city([E, W])],           marks: [mark('library', 0)] },
+  { id: 'Ld', n: 2, group: 'citylife', name: 'Armoury',  feats: [city([N, E])],           marks: [mark('armoury', 0)] },
+];
+
+// ---------------------------------------------------------------------------
+// Cave tiles — a separate pool used only inside caves. 'r' edges are passages,
+// 'f' edges are solid rock, so the exact same edge-matching rule carves out a
+// corridor network instead of a countryside.
+// ---------------------------------------------------------------------------
+
+export const CAVE_TYPES = [
+  { id: 'va', n: 6, group: 'cave', name: 'Passage',        feats: [road([N, S])] },
+  { id: 'vb', n: 6, group: 'cave', name: 'Passage bend',   feats: [road([W, S])] },
+  { id: 'vc', n: 4, group: 'cave', name: 'Passage fork',   feats: [road([E]), road([S]), road([W])] },
+  { id: 'vd', n: 2, group: 'cave', name: 'Chamber',        feats: [road([N]), road([E]), road([S]), road([W])], marks: [mark('hoard')] },
+  { id: 've', n: 5, group: 'cave', name: 'Dead end',       feats: [road([N])],                                  marks: [mark('trove')] },
+  { id: 'vf', n: 2, group: 'cave', name: 'Glowing spring', feats: [road([N, S])],                               marks: [mark('spring')] },
+  { id: 'vg', n: 3, group: 'cave', name: 'Shaft to surface',feats: [road([N])],                                 marks: [mark('shaft')] },
+];
+
+/** What each mark is worth / does. Referenced by Expedition and by the art. */
+export const MARKS = {
+  stable:  { label: 'Stable',   score: 1, note: 'Your pawn is mounted from now on — it moves 2 tiles.' },
+  village: { label: 'Village',  score: 1, note: 'Rest here a turn to raise a second pawn.' },
+  tower:   { label: 'Watchtower', score: 2, note: 'Once raised, pawns may warp between any two towers.' },
+  cave:    { label: 'Cave mouth', score: 0, note: 'Enter to explore a cave.' },
+  market:  { label: 'Market',   score: 2, note: 'City landmark.' },
+  keep:    { label: 'Keep',     score: 2, note: 'City landmark.' },
+  library: { label: 'Library',  score: 2, note: 'City landmark.' },
+  armoury: { label: 'Armoury',  score: 2, note: 'City landmark.' },
+  // cave-only
+  hoard:   { label: 'Hoard',    score: 5, note: 'Cave treasure.' },
+  trove:   { label: 'Trove',    score: 3, note: 'Cave treasure.' },
+  spring:  { label: 'Spring',   score: 2, note: 'Cave treasure.' },
+  shaft:   { label: 'Shaft',    score: 1, note: 'Climb out to the surface.' },
+};
+
+export const CITY_LANDMARKS = ['market', 'keep', 'library', 'armoury'];
 
 // --- derived data -----------------------------------------------------------
 
-for (const t of TILE_TYPES) {
-  // Edge letters: c=city, r=road, f=field. Used for the matching rule.
-  t.edges = ['f', 'f', 'f', 'f'];
-  t.shields = 0;
-  for (const f of t.feats) {
-    if (f.shield) t.shields++;
-    for (const s of f.sides) t.edges[s] = f.type === 'city' ? 'c' : 'r';
+function prepare(list) {
+  for (const t of list) {
+    t.feats = t.feats || [];
+    t.marks = t.marks || [];
+    // Edge letters: c=city, r=road, f=field/rock. Used for the matching rule.
+    t.edges = ['f', 'f', 'f', 'f'];
+    t.shields = 0;
+    for (const f of t.feats) {
+      if (f.shield) t.shields++;
+      for (const s of f.sides) t.edges[s] = f.type === 'city' ? 'c' : 'r';
+    }
+    t.spots = t.feats.map(featureSpot);
+    // A mark anchored to a feature borrows that feature's spot, pulled in from
+    // the rim so a tall landmark can't hang off the edge of its tile.
+    t.markSpots = t.marks.map((m) => {
+      const [x, y] = m.on == null ? [0.5, 0.5] : t.spots[m.on];
+      return [clamp(x, 0.30, 0.70), clamp(y, 0.32, 0.68)];
+    });
   }
-  // Where a meeple sits for each feature, in unit tile space.
-  t.spots = t.feats.map((f) => featureSpot(f));
+  return list;
 }
 
-export const TILES = Object.fromEntries(TILE_TYPES.map((t) => [t.id, t]));
+prepare(TILE_TYPES);
+prepare(CAVE_TYPES);
+
+export const TILES = Object.fromEntries([...TILE_TYPES, ...CAVE_TYPES].map((t) => [t.id, t]));
+
+// Declared as a function so it's hoisted above the prepare() calls that run
+// at module load — a const arrow here is a temporal-dead-zone crash.
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 /** Meeple anchor point for a feature, in unit tile space (0..1). */
 function featureSpot(f) {
@@ -97,12 +197,29 @@ export function rotPoint([x, y], rot) {
   return [0.5 + dx * c - dy * s, 0.5 + dx * s + dy * c];
 }
 
-/** Build a shuffled draw pile (start tile excluded). */
-export function buildDeck(rng = Math.random, startId = 'D') {
+/**
+ * Build a shuffled draw pile from the enabled groups.
+ * `groups` is a Set/array of group ids; the start tile is removed once.
+ */
+export function buildDeck(groups, rng = Math.random, startId = 'D') {
+  const on = new Set(groups);
   const deck = [];
-  for (const t of TILE_TYPES) for (let i = 0; i < t.n; i++) deck.push(t.id);
+  for (const t of TILE_TYPES) {
+    if (!on.has(t.group)) continue;
+    for (let i = 0; i < t.n; i++) deck.push(t.id);
+  }
   const idx = deck.indexOf(startId);
   if (idx >= 0) deck.splice(idx, 1);
+  return shuffle(deck, rng);
+}
+
+export function buildCaveDeck(rng = Math.random) {
+  const deck = [];
+  for (const t of CAVE_TYPES) for (let i = 0; i < t.n; i++) deck.push(t.id);
+  return shuffle(deck, rng);
+}
+
+function shuffle(deck, rng) {
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
