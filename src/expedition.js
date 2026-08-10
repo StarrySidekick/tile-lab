@@ -17,8 +17,9 @@
 //   market / keep / library / armoury → city landmarks; collect all four for a bonus
 // ---------------------------------------------------------------------------
 
-import { Board, keyOf } from './board.js';
-import { TILES, MARKS, CITY_LANDMARKS, buildCaveDeck, rotPoint, SIDE_STEP } from './tiles.js';
+import { keyOf } from './board.js';
+import { Interior } from './interior.js';
+import { MARKS, CITY_LANDMARKS, buildCaveDeck, rotPoint, SIDE_STEP } from './tiles.js';
 
 export const EXPEDITION_RULES = {
   baseMoves: 1,
@@ -199,58 +200,26 @@ export class Expedition {
 
   enterCave(pawn, cell) {
     if (this.caves.has(pawn.player)) return;
-    const board = new Board();
-    board.place(0, 0, TILES['vc'], 0);          // entrance chamber
-    const cave = {
-      board,
+    const cave = new Interior({
+      kind: 'cave',
       deck: buildCaveDeck(this.game.rng),
+      entryType: 'vc',
       entry: { x: cell.x, y: cell.y },
-      pawn,
-      pos: { x: 0, y: 0 },
-      tile: null,
-      rot: 0,
-      phase: 'place',
-      claimed: new Set(),
-    };
+      owner: pawn,
+      label: 'CAVE',
+      rng: this.game.rng,
+    });
     pawn.inCave = true;
     this.caves.set(pawn.player, cave);
-    this.drawCaveTile(cave);
     this.game.say(`${this.game.players[pawn.player].name} descends into the cave.`);
     this.game.emit('caveEnter');
   }
 
-  drawCaveTile(cave) {
-    while (cave.deck.length) {
-      const type = TILES[cave.deck.pop()];
-      if (cave.board.hasAnyPlacement(type)) {
-        cave.tile = type; cave.rot = 0; cave.phase = 'place';
-        return;
-      }
-    }
-    cave.tile = null;
-    cave.phase = 'move';                        // out of tiles — just walk out
-  }
-
-  caveReachable(cave) {
-    const out = new Map();
-    for (let s = 0; s < 4; s++) {
-      const [dx, dy] = SIDE_STEP[s];
-      const nx = cave.pos.x + dx, ny = cave.pos.y + dy;
-      if (cave.board.cells.has(keyOf(nx, ny))) out.set(keyOf(nx, ny), { x: nx, y: ny });
-    }
-    return out;
-  }
-
-  caveMove(cave, x, y) {
-    if (!this.caveReachable(cave).has(keyOf(x, y))) return false;
-    cave.pos = { x, y };
-    const cell = cave.board.get(x, y);
-    const player = this.game.players[cave.pawn.player];
-
-    cell.type.marks.forEach((m, i) => {
-      const key = `${keyOf(x, y)}#${i}`;
-      if (cave.claimed.has(key)) return;
-      cave.claimed.add(key);
+  /** Score whatever the pawn just walked onto underground. */
+  caveArrive(cave) {
+    const player = this.game.players[cave.owner.player];
+    for (const m of cave.freshMarks()) {
+      cave.take(m);
       const info = MARKS[m.kind] || { label: m.kind, score: 0 };
       if (info.score) {
         player.score += info.score;
@@ -258,16 +227,12 @@ export class Expedition {
         this.game.emit('treasure', { kind: m.kind });
       }
       if (m.kind === 'shaft') this.leaveCave(cave, 'climbs out through a shaft');
-    });
-    return true;
-  }
-
-  canLeaveCave(cave) {
-    return cave.pos.x === 0 && cave.pos.y === 0;
+    }
   }
 
   leaveCave(cave, how = 'returns to the surface') {
-    const pawn = cave.pawn;
+    const pawn = cave.owner;
+    if (!this.caves.has(pawn.player)) return;
     pawn.inCave = false;
     pawn.x = cave.entry.x;
     pawn.y = cave.entry.y;

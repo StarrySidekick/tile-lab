@@ -42,11 +42,12 @@ const mark = (kind, on = null) => ({ kind, on });
 // ---------------------------------------------------------------------------
 
 export const GROUPS = [
-  { id: 'base', name: 'Carcassonne base set', note: 'The original 72 tiles.', classic: true, expedition: true },
-  { id: 'roads', name: 'Road experiments', note: 'Continuous crossroads, dead-ends, double bends.', classic: false, expedition: false },
-  { id: 'cities', name: 'City experiments', note: 'Tunnels, four-way cities, twin corners.', classic: false, expedition: false },
-  { id: 'outposts', name: 'Outposts', note: 'Stables, villages, towers, cave mouths.', classic: false, expedition: true },
-  { id: 'citylife', name: 'City landmarks', note: 'Markets, keeps, libraries, armouries.', classic: false, expedition: true },
+  { id: 'base', name: 'Carcassonne base set', note: 'The original 72 tiles.', classic: true, expedition: true, adventure: true },
+  { id: 'roads', name: 'Road experiments', note: 'Continuous crossroads, dead-ends, double bends.', classic: false, expedition: false, adventure: true },
+  { id: 'cities', name: 'City experiments', note: 'Tunnels, four-way cities, twin corners.', classic: false, expedition: false, adventure: false },
+  { id: 'outposts', name: 'Outposts', note: 'Stables, villages, towers, cave mouths.', classic: false, expedition: true, adventure: true },
+  { id: 'citylife', name: 'City landmarks', note: 'Markets, keeps, libraries, armouries.', classic: false, expedition: true, adventure: true },
+  { id: 'adventure', name: 'Adventure sites', note: 'Wayshrines, ruins, campsites, merchants.', classic: false, expedition: false, adventure: true },
 ];
 
 export const TILE_TYPES = [
@@ -101,6 +102,17 @@ export const TILE_TYPES = [
   { id: 'Of', n: 2, group: 'outposts', name: 'Cave + road', feats: [road([S])],                          marks: [mark('cave')] },
 
   // --- citylife: landmarks inside cities ------------------------------------
+  // --- adventure: things to find on the road --------------------------------
+  { id: 'Aa', n: 3, group: 'adventure', name: 'Wayshrine', feats: [],                marks: [mark('shrine')] },
+  { id: 'Ab', n: 4, group: 'adventure', name: 'Ruin',      feats: [],                marks: [mark('ruin')] },
+  { id: 'Ac', n: 3, group: 'adventure', name: 'Campsite',  feats: [road([N, S])],    marks: [mark('camp')] },
+  { id: 'Ad', n: 2, group: 'adventure', name: 'Merchant',  feats: [road([E, W])],    marks: [mark('merchant')] },
+  { id: 'Ae', n: 3, group: 'adventure', name: 'Roadside ruin', feats: [road([W, S])],marks: [mark('ruin')] },
+  // Followers come only from villages, so Adventure needs more of them than
+  // Expedition does — three in a ~110 tile deck left most runs solo.
+  { id: 'Af', n: 4, group: 'adventure', name: 'Hamlet',    feats: [road([W, S])],    marks: [mark('village')] },
+  { id: 'Ag', n: 2, group: 'adventure', name: 'Crossroads village', feats: [road([N]), road([E]), road([S]), road([W])], marks: [mark('village')] },
+
   { id: 'La', n: 2, group: 'citylife', name: 'Market',   feats: [city([N, W])],           marks: [mark('market', 0)] },
   { id: 'Lb', n: 2, group: 'citylife', name: 'Keep',     feats: [city([N, E, W], true)],  marks: [mark('keep', 0)] },
   { id: 'Lc', n: 2, group: 'citylife', name: 'Library',  feats: [city([E, W])],           marks: [mark('library', 0)] },
@@ -123,21 +135,58 @@ export const CAVE_TYPES = [
   { id: 'vg', n: 3, group: 'cave', name: 'Shaft to surface',feats: [road([N])],                                 marks: [mark('shaft')] },
 ];
 
+// ---------------------------------------------------------------------------
+// City interiors — the districts you walk through once a city is finished and
+// you enter it by its gate. 'r' edges are streets, 'f' edges are building
+// frontage, so the same matching rule lays out a street plan.
+// ---------------------------------------------------------------------------
+
+export const CITY_TYPES = [
+  { id: 'ga', n: 1, group: 'city-interior', name: 'City gate',   feats: [road([N]), road([E]), road([S]), road([W])] },
+  { id: 'gb', n: 6, group: 'city-interior', name: 'Street',      feats: [road([N, S])] },
+  { id: 'gc', n: 6, group: 'city-interior', name: 'Street bend', feats: [road([W, S])] },
+  { id: 'gd', n: 4, group: 'city-interior', name: 'Crossing',    feats: [road([E]), road([S]), road([W])] },
+  { id: 'ge', n: 2, group: 'city-interior', name: 'Market square', feats: [road([N]), road([E]), road([S]), road([W])], marks: [mark('market')] },
+  { id: 'gf', n: 2, group: 'city-interior', name: 'Smithy',      feats: [road([N])],    marks: [mark('smithy')] },
+  { id: 'gg', n: 2, group: 'city-interior', name: 'Tavern',      feats: [road([N])],    marks: [mark('tavern')] },
+  { id: 'gh', n: 1, group: 'city-interior', name: 'Temple',      feats: [road([N])],    marks: [mark('temple')] },
+  { id: 'gi', n: 1, group: 'city-interior', name: 'Inner keep',  feats: [road([N])],    marks: [mark('keep')] },
+  { id: 'gj', n: 2, group: 'city-interior', name: 'Well',        feats: [road([N, S])], marks: [mark('well')] },
+  { id: 'gk', n: 2, group: 'city-interior', name: 'Guild hall',  feats: [road([N])],    marks: [mark('guild')] },
+  { id: 'gl', n: 3, group: 'city-interior', name: 'Back alley',  feats: [road([N])],    marks: [mark('cache')] },
+];
+
 /** What each mark is worth / does. Referenced by Expedition and by the art. */
 export const MARKS = {
   stable:  { label: 'Stable',   score: 1, note: 'Your pawn is mounted from now on — it moves 2 tiles.' },
   village: { label: 'Village',  score: 1, note: 'Rest here a turn to raise a second pawn.' },
   tower:   { label: 'Watchtower', score: 2, note: 'Once raised, pawns may warp between any two towers.' },
   cave:    { label: 'Cave mouth', score: 0, note: 'Enter to explore a cave.' },
-  market:  { label: 'Market',   score: 2, note: 'City landmark.' },
-  keep:    { label: 'Keep',     score: 2, note: 'City landmark.' },
-  library: { label: 'Library',  score: 2, note: 'City landmark.' },
-  armoury: { label: 'Armoury',  score: 2, note: 'City landmark.' },
+  // City landmarks — these double as Expedition set-collection targets and as
+  // Adventure districts, so they carry both a score and a loot table.
+  market:  { label: 'Market',    score: 2, loot: { gold: 4 },     note: 'City landmark.' },
+  keep:    { label: 'Keep',      score: 2, loot: { gold: 5 },     note: 'City landmark.' },
+  library: { label: 'Library',   score: 2, loot: { relics: 1 },   note: 'City landmark.' },
+  armoury: { label: 'Armoury',   score: 2, loot: { gold: 3 },     note: 'City landmark.' },
   // cave-only
-  hoard:   { label: 'Hoard',    score: 5, note: 'Cave treasure.' },
-  trove:   { label: 'Trove',    score: 3, note: 'Cave treasure.' },
-  spring:  { label: 'Spring',   score: 2, note: 'Cave treasure.' },
+  hoard:   { label: 'Hoard',    score: 5, note: 'Cave treasure.', loot: { gold: 6 } },
+  trove:   { label: 'Trove',    score: 3, note: 'Cave treasure.', loot: { gold: 3 } },
+  spring:  { label: 'Spring',   score: 2, note: 'Cave treasure.', loot: { supplies: 2 } },
   shaft:   { label: 'Shaft',    score: 1, note: 'Climb out to the surface.' },
+
+  // adventure: surface landmarks
+  shrine:    { label: 'Wayshrine', score: 1, loot: { supplies: 2 }, note: 'Rest and restock.' },
+  ruin:      { label: 'Ruin',      score: 3, loot: { relics: 1 },   note: 'A relic lies here.' },
+  camp:      { label: 'Campsite',  score: 1, loot: { supplies: 3 }, note: 'Provisions.' },
+  merchant:  { label: 'Merchant',  score: 1, loot: { gold: 3 },     note: 'Trade on the road.' },
+
+  // adventure: city districts
+  smithy:  { label: 'Smithy',    score: 2, loot: { gold: 2 }, note: 'Gear for the road.' },
+  tavern:  { label: 'Tavern',    score: 2, loot: { gold: 1 }, note: 'Rumours — and a lead.' },
+  temple:  { label: 'Temple',    score: 3, loot: { supplies: 4 } },
+  well:    { label: 'Well',      score: 1, loot: { supplies: 2 } },
+  guild:   { label: 'Guild hall',score: 2, loot: { gold: 3 } },
+  cache:   { label: 'Cache',     score: 1, loot: { gold: 2 } },
 };
 
 export const CITY_LANDMARKS = ['market', 'keep', 'library', 'armoury'];
@@ -168,8 +217,10 @@ function prepare(list) {
 
 prepare(TILE_TYPES);
 prepare(CAVE_TYPES);
+prepare(CITY_TYPES);
 
-export const TILES = Object.fromEntries([...TILE_TYPES, ...CAVE_TYPES].map((t) => [t.id, t]));
+export const TILES = Object.fromEntries(
+  [...TILE_TYPES, ...CAVE_TYPES, ...CITY_TYPES].map((t) => [t.id, t]));
 
 // Declared as a function so it's hoisted above the prepare() calls that run
 // at module load — a const arrow here is a temporal-dead-zone crash.
@@ -217,6 +268,22 @@ export function buildCaveDeck(rng = Math.random) {
   const deck = [];
   for (const t of CAVE_TYPES) for (let i = 0; i < t.n; i++) deck.push(t.id);
   return shuffle(deck, rng);
+}
+
+/**
+ * A city's street plan. Bigger cities get more of it — `size` is the number of
+ * tiles in the finished city, so a two-tile hamlet is a few streets and a
+ * ten-tile capital is most of the pool.
+ */
+export function buildCityDeck(size, rng = Math.random) {
+  const deck = [];
+  for (const t of CITY_TYPES) {
+    if (t.id === 'ga') continue;             // the gate is placed as the entrance
+    for (let i = 0; i < t.n; i++) deck.push(t.id);
+  }
+  shuffle(deck, rng);
+  const budget = Math.max(4, Math.min(deck.length, size * 3));
+  return deck.slice(0, budget);
 }
 
 function shuffle(deck, rng) {

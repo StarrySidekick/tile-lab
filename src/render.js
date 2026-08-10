@@ -93,15 +93,15 @@ export class Renderer {
     if (game.phase === 'meeple') this.drawMeepleTargets(game);
     else this.meepleSpots = [];
 
-    if (game.expedition) this.drawPawns(game);
+    if (game.walker) this.drawPawns(game);
     else { this.pawnSpots = []; this.moveSpots = []; }
 
     if (this.showDebug) this.drawDebug(game);
 
     applyDusk(ctx, this.w, this.h);
 
-    // The cave sits above the dusk pass — you're underground, not outdoors.
-    if (game.cave) this.drawCave(game); else this.caveView = null;
+    // Interiors sit above the dusk pass — you're indoors, not outdoors.
+    if (game.interior) this.drawInterior(game); else this.caveView = null;
   }
 
   onScreen(x, y) {
@@ -203,54 +203,73 @@ export class Renderer {
 
   // --- expedition pawns -----------------------------------------------------
 
+  /** Colour for a figure — Expedition goes by player, Adventure by role. */
+  pawnColor(game, p) {
+    if (game.adventure) return p.hero ? PLAYER_COLORS[0] : PLAYER_COLORS[1];
+    return PLAYER_COLORS[p.player];
+  }
+
   drawPawns(game) {
     const ctx = this.ctx;
-    const exp = game.expedition;
+    const walker = game.walker;
     this.pawnSpots = [];
     this.moveSpots = [];
 
-    // Reachable tiles for the selected pawn.
-    if (game.phase === 'move' && exp.selected) {
+    // Reachable tiles for the selected figure. Adventure marks the free road
+    // dash apart from the supply-costing forced march.
+    if (game.phase === 'move' && walker.selected) {
       const pulse = 0.5 + Math.sin(performance.now() / 380) * 0.14;
-      for (const dest of exp.reachable(exp.selected).values()) {
+      for (const dest of walker.reachable(walker.selected).values()) {
         if (!this.onScreen(dest.x, dest.y)) continue;
         const [sx, sy] = this.toScreen(dest.x, dest.y);
         const z = this.cam.zoom;
-        ctx.fillStyle = dest.warp ? `rgba(95,191,174,${0.10 + pulse * 0.14})`
-                                  : `rgba(212,175,95,${0.08 + pulse * 0.12})`;
+        const special = dest.warp || (dest.steps === 2 && dest.byRoad);
+        const costly = dest.cost > 0;
+        const hue = costly ? '182,88,68' : special ? '95,191,174' : '212,175,95';
+        ctx.fillStyle = `rgba(${hue},${0.08 + pulse * 0.13})`;
         ctx.fillRect(sx, sy, z, z);
         ctx.lineWidth = 2.5;
-        ctx.strokeStyle = dest.warp ? THEME.teal : THEME.gold;
+        ctx.strokeStyle = costly ? '#b65844' : special ? THEME.teal : THEME.gold;
         ctx.strokeRect(sx + 2, sy + 2, z - 4, z - 4);
-        this.moveSpots.push({ x: dest.x, y: dest.y, warp: dest.warp });
+        this.moveSpots.push({ x: dest.x, y: dest.y });
+
+        if (costly) {                      // show the price on the tile
+          ctx.fillStyle = '#e8c9a8';
+          ctx.font = `600 ${Math.max(9, z * 0.16)}px ui-sans-serif, system-ui, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('−1 supply', sx + z / 2, sy + z * 0.86);
+        }
       }
     }
 
-    // Pawns, fanned out when several share a tile.
+    // Figures, fanned out when several share a tile.
+    const list = game.adventure ? game.adventure.outside : walker.pawns.filter((p) => !p.inCave);
     const byCell = new Map();
-    for (const p of exp.pawns) {
-      if (p.inCave) continue;
+    for (const p of list) {
       const k = `${p.x},${p.y}`;
       if (!byCell.has(k)) byCell.set(k, []);
       byCell.get(k).push(p);
     }
-    for (const [k, list] of byCell) {
+    for (const [k, group] of byCell) {
       const [cx, cy] = k.split(',').map(Number);
       if (!this.onScreen(cx, cy)) continue;
-      list.forEach((p, i) => {
-        const off = list.length === 1 ? [0, 0]
-          : [Math.cos(i / list.length * Math.PI * 2) * 0.22, Math.sin(i / list.length * Math.PI * 2) * 0.22];
+      group.forEach((p, i) => {
+        const off = group.length === 1 ? [0, 0]
+          : [Math.cos(i / group.length * Math.PI * 2) * 0.22, Math.sin(i / group.length * Math.PI * 2) * 0.22];
         const [sx, sy] = this.toScreen(cx + 0.5 + off[0], cy + 0.62 + off[1]);
         const size = this.cam.zoom * 0.46;
-        const isMine = p.player === game.current && game.phase === 'move';
-        if (isMine) {
+        const mine = game.adventure ? true : p.player === game.current;
+        if (mine && game.phase === 'move') {
           ctx.beginPath();
           ctx.arc(sx, sy, size * 0.62, 0, Math.PI * 2);
-          ctx.strokeStyle = exp.selected === p ? THEME.gold : 'rgba(212,175,95,0.35)';
-          ctx.lineWidth = exp.selected === p ? 3 : 2;
+          ctx.strokeStyle = walker.selected === p ? THEME.gold : 'rgba(212,175,95,0.35)';
+          ctx.lineWidth = walker.selected === p ? 3 : 2;
           ctx.stroke();
         }
-        drawMeeple(ctx, sx, sy, size, PLAYER_COLORS[p.player], { mounted: p.mounted, resting: p.resting });
+        drawMeeple(ctx, sx, sy, size, this.pawnColor(game, p), {
+          mounted: p.mounted, resting: p.resting, hero: p.hero,
+        });
         this.pawnSpots.push({ pawn: p, sx, sy, r: size * 0.62 });
       });
     }
@@ -273,26 +292,28 @@ export class Renderer {
     return { x: (this.w - size) / 2, y: (this.h - size) / 2, size, zoom: size / 5.5 };
   }
 
-  caveToScreen(g, cave, wx, wy) {
-    return [(wx - cave.pos.x - 0.5) * g.zoom + g.x + g.size / 2,
-            (wy - cave.pos.y - 0.5) * g.zoom + g.y + g.size / 2];
+  caveToScreen(g, inv, wx, wy) {
+    return [(wx - inv.pos.x - 0.5) * g.zoom + g.x + g.size / 2,
+            (wy - inv.pos.y - 0.5) * g.zoom + g.y + g.size / 2];
   }
 
-  caveCellAt(game, sx, sy) {
-    const cave = game.cave;
-    if (!cave || !this.caveView) return null;
+  interiorCellAt(game, sx, sy) {
+    const inv = game.interior;
+    if (!inv || !this.caveView) return null;
     const g = this.caveView;
     if (sx < g.x || sx > g.x + g.size || sy < g.y || sy > g.y + g.size) return null;
-    const wx = (sx - g.x - g.size / 2) / g.zoom + cave.pos.x + 0.5;
-    const wy = (sy - g.y - g.size / 2) / g.zoom + cave.pos.y + 0.5;
+    const wx = (sx - g.x - g.size / 2) / g.zoom + inv.pos.x + 0.5;
+    const wy = (sy - g.y - g.size / 2) / g.zoom + inv.pos.y + 0.5;
     return { x: Math.floor(wx), y: Math.floor(wy) };
   }
 
-  drawCave(game) {
+  drawInterior(game) {
     const ctx = this.ctx;
-    const cave = game.cave;
+    const inv = game.interior;
     const g = this.caveGeom();
     this.caveView = g;
+    const terrain = inv.kind;                  // 'cave' | 'city'
+    const isCity = terrain === 'city';
 
     ctx.fillStyle = 'rgba(9,8,12,0.78)';
     ctx.fillRect(0, 0, this.w, this.h);
@@ -300,19 +321,18 @@ export class Renderer {
     ctx.save();
     ctx.beginPath();
     ctx.rect(g.x, g.y, g.size, g.size);
-    ctx.fillStyle = '#15111b';
+    ctx.fillStyle = isCity ? '#2a2432' : '#15111b';
     ctx.fill();
     ctx.clip();
 
-    const origin = (x, y) => this.caveToScreen(g, cave, x, y);
+    const origin = (x, y) => this.caveToScreen(g, inv, x, y);
 
-    for (const cell of cave.board.cells.values()) {
-      this.inCell(cell.x, cell.y, cell.rot, (c) => drawTile(c, cell.type, { cave: true }), g.zoom, origin);
+    for (const cell of inv.board.cells.values()) {
+      this.inCell(cell.x, cell.y, cell.rot, (c) => drawTile(c, cell.type, { terrain }), g.zoom, origin);
     }
 
-    // Where the next cave tile can go.
-    if (game.phase === 'cave-place' && cave.tile) {
-      for (const p of cave.board.legalPlacements(cave.tile)) {
+    if (game.phase === 'interior-place' && inv.tile) {
+      for (const p of inv.board.legalPlacements(inv.tile)) {
         const [sx, sy] = origin(p.x, p.y);
         ctx.fillStyle = 'rgba(212,175,95,0.07)';
         ctx.fillRect(sx, sy, g.zoom, g.zoom);
@@ -321,20 +341,19 @@ export class Renderer {
         ctx.strokeRect(sx + 2, sy + 2, g.zoom - 4, g.zoom - 4);
       }
       if (this.pointer) {
-        const c = this.caveCellAt(game, this.pointer.sx, this.pointer.sy);
-        if (c && cave.board.canPlace(c.x, c.y, cave.tile, cave.rot)) {
+        const c = this.interiorCellAt(game, this.pointer.sx, this.pointer.sy);
+        if (c && inv.canPlace(c.x, c.y)) {
           ctx.save();
           ctx.globalAlpha = 0.9;
-          this.inCell(c.x, c.y, cave.rot, (cc) => drawTile(cc, cave.tile, { cave: true }), g.zoom, origin);
+          this.inCell(c.x, c.y, inv.rot, (cc) => drawTile(cc, inv.tile, { terrain }), g.zoom, origin);
           ctx.restore();
         }
       }
     }
 
-    // Where the pawn can step.
-    if (game.phase === 'cave-move') {
+    if (game.phase === 'interior-move') {
       const pulse = 0.5 + Math.sin(performance.now() / 380) * 0.14;
-      for (const d of game.expedition.caveReachable(cave).values()) {
+      for (const d of inv.reachable().values()) {
         const [sx, sy] = origin(d.x, d.y);
         ctx.fillStyle = `rgba(95,191,174,${0.10 + pulse * 0.14})`;
         ctx.fillRect(sx, sy, g.zoom, g.zoom);
@@ -344,13 +363,16 @@ export class Renderer {
       }
     }
 
-    const [px, py] = origin(cave.pos.x + 0.5, cave.pos.y + 0.62);
-    drawMeeple(ctx, px, py, g.zoom * 0.46, PLAYER_COLORS[cave.pawn.player], { mounted: cave.pawn.mounted });
+    const owner = inv.owner;
+    const [px, py] = origin(inv.pos.x + 0.5, inv.pos.y + 0.62);
+    drawMeeple(ctx, px, py, g.zoom * 0.46, this.pawnColor(game, owner), {
+      mounted: owner.mounted, hero: owner.hero,
+    });
 
-    // Lantern light falloff — the whole point of being underground.
-    const lamp = ctx.createRadialGradient(px, py, g.zoom * 0.4, px, py, g.size * 0.62);
+    // Falloff: a lantern underground, lamplit streets in a city.
+    const lamp = ctx.createRadialGradient(px, py, g.zoom * (isCity ? 0.7 : 0.4), px, py, g.size * 0.62);
     lamp.addColorStop(0, 'rgba(0,0,0,0)');
-    lamp.addColorStop(1, 'rgba(6,5,9,0.60)');
+    lamp.addColorStop(1, isCity ? 'rgba(10,8,14,0.42)' : 'rgba(6,5,9,0.60)');
     ctx.fillStyle = lamp;
     ctx.fillRect(g.x, g.y, g.size, g.size);
     ctx.restore();
@@ -363,10 +385,12 @@ export class Renderer {
     ctx.font = '600 12px ui-sans-serif, system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    const label = game.phase === 'cave-place' ? 'CAVE — place a passage' : 'CAVE — move, or hold';
-    ctx.fillText(label, g.x + 10, g.y + 20);
+    const verb = game.phase === 'interior-place'
+      ? (isCity ? 'lay a street' : 'place a passage')
+      : 'move, or hold';
+    ctx.fillText(`${inv.label} — ${verb}`, g.x + 10, g.y + 20);
     ctx.fillStyle = THEME.dim;
-    ctx.fillText(`${cave.deck.length} cave tiles left`, g.x + 10, g.y + g.size - 12);
+    ctx.fillText(`${inv.deck.length} tiles left · ${inv.visited} discovered`, g.x + 10, g.y + g.size - 12);
   }
 
   drawDebug(game) {

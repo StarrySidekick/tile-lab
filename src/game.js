@@ -3,10 +3,13 @@
 //
 //   Classic    place tile -> (claim a feature) -> score closed features
 //   Expedition place tile -> move a pawn       -> claim landmarks you reach
+//   Adventure  place tile -> move a party member -> collect, recruit, explore
 //
 // Classic can be played with meeples off entirely, in which case a completed
-// feature pays whoever closed it. That keeps the placement game intact without
-// any of the claim/supply management.
+// feature pays whoever closed it.
+//
+// Interiors (caves, city streets) are a sub-map that replaces your surface turn
+// while you're inside one. Both Expedition and Adventure use the same machine.
 //
 // Pure state; no DOM and no canvas in here.
 // ---------------------------------------------------------------------------
@@ -15,6 +18,7 @@ import { Board } from './board.js';
 import { TILES, GROUPS, buildDeck } from './tiles.js';
 import { PLAYER_NAMES } from './theme.js';
 import { Expedition } from './expedition.js';
+import { Adventure } from './adventure.js';
 
 export const RULES = {
   meeplesPerPlayer: 7,
@@ -27,20 +31,22 @@ export const RULES = {
 export const DEFAULT_GROUPS = {
   classic: GROUPS.filter((g) => g.classic).map((g) => g.id),
   expedition: GROUPS.filter((g) => g.expedition).map((g) => g.id),
+  adventure: GROUPS.filter((g) => g.adventure).map((g) => g.id),
 };
 
 export class Game {
   constructor({ players = 2, seed = null, mode = 'classic', meeples = true, groups = null } = {}) {
-    this.mode = mode;                 // 'classic' | 'expedition'
+    this.mode = mode;
     this.useMeeples = mode === 'classic' ? meeples : false;
     this.groups = groups || DEFAULT_GROUPS[mode] || DEFAULT_GROUPS.classic;
+    if (mode === 'adventure') players = 1;
 
     this.board = new Board();
     this.rng = seed == null ? Math.random : mulberry32(seed);
     this.deck = buildDeck(this.groups, this.rng, RULES.startTile);
     this.players = Array.from({ length: players }, (_, i) => ({
       id: i,
-      name: PLAYER_NAMES[i],
+      name: mode === 'adventure' ? 'Hero' : PLAYER_NAMES[i],
       score: 0,
       meeples: RULES.meeplesPerPlayer,
     }));
@@ -53,17 +59,26 @@ export class Game {
     this.free = false;
     this.forcedNext = null;
     this.listeners = [];
+    this.turn = 1;
 
     this.board.place(0, 0, TILES[RULES.startTile], 0);
     this.expedition = mode === 'expedition' ? new Expedition(this) : null;
-    this.say(mode === 'expedition'
-      ? 'The expedition sets out from the crossroads.'
-      : 'Start tile placed.');
+    this.adventure = mode === 'adventure' ? new Adventure(this) : null;
+    this.say({
+      expedition: 'The expedition sets out from the crossroads.',
+      adventure: 'You set out from the crossroads with nothing but the road ahead.',
+    }[mode] || 'Start tile placed.');
     this.startTurn();
   }
 
   get player() { return this.players[this.current]; }
-  get cave() { return this.expedition ? this.expedition.caveOf(this.current) : null; }
+
+  /** The sub-map replacing this player's surface turn, if any. */
+  get interior() {
+    if (this.adventure) return this.adventure.interior;
+    if (this.expedition) return this.expedition.caveOf(this.current);
+    return null;
+  }
 
   say(msg) {
     this.log.unshift(msg);
@@ -77,13 +92,13 @@ export class Game {
   // --- turn structure -------------------------------------------------------
 
   startTurn() {
-    const cave = this.cave;
-    if (cave) {
-      this.phase = cave.tile ? 'cave-place' : 'cave-move';
+    const inv = this.interior;
+    if (inv) {
+      this.phase = inv.tile ? 'interior-place' : 'interior-move';
       return;
     }
     if (this.deck.length === 0) {
-      // Surface is done, but anyone still underground gets to finish their dig.
+      // Surface is done, but anyone still inside gets to finish exploring.
       for (let i = 1; i <= this.players.length; i++) {
         const p = (this.current + i) % this.players.length;
         if (this.caves.has(p)) { this.current = p; return this.startTurn(); }
@@ -118,7 +133,7 @@ export class Game {
 
   rotate(dir = 1) {
     if (this.phase === 'place') this.rot = (this.rot + dir + 4) % 4;
-    else if (this.phase === 'cave-place' && this.cave) this.cave.rot = (this.cave.rot + dir + 4) % 4;
+    else if (this.phase === 'interior-place' && this.interior) this.interior.rotate(dir);
     else return;
     this.emit('rotate');
   }
@@ -134,6 +149,10 @@ export class Game {
     this.say(`${this.player.name} played ${this.tile.id} at (${x}, ${y}).`);
     this.emit('place');
 
+    if (this.mode === 'adventure') {
+      this.phase = 'move';
+      return true;
+    }
     if (this.mode === 'expedition') {
       this.phase = 'move';
       this.expedition.beginMovement(this.current);
@@ -141,7 +160,6 @@ export class Game {
       this.expedition.selected = mine.length === 1 ? mine[0] : null;
       return true;
     }
-
     if (!this.useMeeples) { this.endTurn(); return true; }
     this.phase = 'meeple';
     if (this.meepleOptions().length === 0) this.endTurn();
@@ -175,24 +193,34 @@ export class Game {
     if (this.phase === 'meeple') this.endTurn();
   }
 
-  // --- expedition: movement -------------------------------------------------
+  // --- movement (both walking modes) ----------------------------------------
+
+  get walker() { return this.adventure || this.expedition; }
 
   selectPawn(pawn) {
-    if (this.phase !== 'move' || pawn.player !== this.current) return false;
-    this.expedition.selected = pawn;
+    if (this.phase !== 'move') return false;
+    if (this.expedition && pawn.player !== this.current) return false;
+    if (this.adventure && pawn.inside) return false;
+    this.walker.selected = pawn;
     return true;
   }
 
   movePawn(x, y) {
     if (this.phase !== 'move') return false;
-    const pawn = this.expedition.selected;
-    if (!pawn || !this.expedition.move(pawn, x, y)) return false;
+    const pawn = this.walker.selected;
+    if (!pawn) return false;
+    if (this.adventure) {
+      if (!this.adventure.move(pawn, x, y)) return false;
+      this.endTurn();
+      return true;
+    }
+    if (!this.expedition.move(pawn, x, y)) return false;
     this.endTurn();
     return true;
   }
 
   restPawn() {
-    if (this.phase !== 'move') return false;
+    if (this.phase !== 'move' || !this.expedition) return false;
     const pawn = this.expedition.selected;
     if (!pawn || !this.expedition.rest(pawn)) return false;
     this.endTurn();
@@ -205,47 +233,71 @@ export class Game {
     this.endTurn();
   }
 
-  // --- expedition: caves ----------------------------------------------------
+  /** Adventure only: step through a finished city's gate. */
+  enterCity() {
+    if (this.phase !== 'move' || !this.adventure) return false;
+    const p = this.adventure.selected;
+    if (!p || !this.adventure.enterCity(p)) return false;
+    this.endTurn();
+    return true;
+  }
 
-  cavePlaceAt(x, y) {
-    const cave = this.cave;
-    if (this.phase !== 'cave-place' || !cave || !cave.tile) return false;
-    if (!cave.board.canPlace(x, y, cave.tile, cave.rot)) return false;
-    cave.board.place(x, y, cave.tile, cave.rot);
-    cave.tile = null;
+  canEnterCity() {
+    if (this.phase !== 'move' || !this.adventure) return false;
+    const p = this.adventure.selected;
+    return !!p && !p.inside && !!this.adventure.cityGateAt(p.x, p.y);
+  }
+
+  // --- interiors ------------------------------------------------------------
+
+  interiorPlaceAt(x, y) {
+    const inv = this.interior;
+    if (this.phase !== 'interior-place' || !inv) return false;
+    if (!inv.place(x, y)) return false;
     this.emit('place');
-    this.phase = 'cave-move';
+    this.phase = 'interior-move';
     return true;
   }
 
-  caveMoveTo(x, y) {
-    const cave = this.cave;
-    if (this.phase !== 'cave-move' || !cave) return false;
-    if (!this.expedition.caveMove(cave, x, y)) return false;
-    this.endCaveTurn(cave);
+  interiorMoveTo(x, y) {
+    const inv = this.interior;
+    if (this.phase !== 'interior-move' || !inv) return false;
+    if (!inv.moveTo(x, y)) return false;
+    this.emit('step');
+    if (this.adventure) this.adventure.interiorArrive(inv.owner);
+    else this.expedition.caveArrive(inv);
+    this.endInteriorTurn(inv);
     return true;
   }
 
-  caveHold() {
-    const cave = this.cave;
-    if (!cave) return;
-    this.endCaveTurn(cave);
+  interiorHold() {
+    const inv = this.interior;
+    if (!inv) return;
+    this.endInteriorTurn(inv);
   }
 
-  caveLeave() {
-    const cave = this.cave;
-    if (!cave || !this.expedition.canLeaveCave(cave)) return false;
-    this.expedition.leaveCave(cave);
+  canLeaveInterior() {
+    const inv = this.interior;
+    return !!inv && inv.atEntrance();
+  }
+
+  leaveInterior() {
+    const inv = this.interior;
+    if (!inv || !inv.atEntrance()) return false;
+    if (this.adventure) this.adventure.leaveInterior(inv.owner);
+    else this.expedition.leaveCave(inv);
     this.nextPlayer();
     return true;
   }
 
-  endCaveTurn(cave) {
-    // leaveCave() may already have fired via a shaft.
-    if (this.expedition.caves.has(cave.pawn.player)) {
-      this.expedition.drawCaveTile(cave);
-      if (!cave.tile && this.expedition.canLeaveCave(cave)) {
-        this.expedition.leaveCave(cave, 'runs out of cave and climbs back');
+  endInteriorTurn(inv) {
+    // A shaft may already have kicked the explorer out.
+    const still = this.interior === inv;
+    if (still) {
+      inv.draw();
+      if (!inv.tile && inv.atEntrance()) {
+        if (this.adventure) this.adventure.leaveInterior(inv.owner, 'has seen all there is to see here');
+        else this.expedition.leaveCave(inv, 'runs out of cave and climbs back');
       }
     }
     this.nextPlayer();
@@ -265,16 +317,13 @@ export class Game {
 
   nextPlayer() {
     this.current = (this.current + 1) % this.players.length;
+    this.turn++;
     this.startTurn();
     if (this.phase !== 'over') this.emit('turn');
   }
 
-  /**
-   * Pay out a component. With meeples on, the majority takes it; with meeples
-   * off, whoever closed it does. Expedition doesn't score features at all.
-   */
   award(d, final, closer = null) {
-    if (this.mode === 'expedition') return;
+    if (this.mode !== 'classic') return;
     const pts = this.board.value(d, final);
     let winners;
     if (this.useMeeples) winners = this.board.majority(d);
@@ -304,9 +353,15 @@ export class Game {
         this.award(d, true);
       }
     }
-    const best = Math.max(...this.players.map((p) => p.score));
-    const winners = this.players.filter((p) => p.score === best).map((p) => p.name);
-    this.say(`Game over — ${winners.join(' & ')} wins with ${best}.`);
+    if (this.adventure) {
+      this.players[0].score = this.adventure.score();
+      const done = this.adventure.journal.filter((q) => q.done).length;
+      this.say(`The road ends. ${done}/${this.adventure.journal.length} journal entries, ${this.players[0].score} points.`);
+    } else {
+      const best = Math.max(...this.players.map((p) => p.score));
+      const winners = this.players.filter((p) => p.score === best).map((p) => p.name);
+      this.say(`Game over — ${winners.join(' & ')} wins with ${best}.`);
+    }
     this.emit('over');
   }
 }

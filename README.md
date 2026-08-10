@@ -21,7 +21,7 @@ python3 -m http.server 5180 --directory carcassonne-lab
 It does need to be *served* — ES modules won't load over `file://`, so
 double-clicking `index.html` won't work.
 
-## Two modes
+## Three modes
 
 ### Classic
 
@@ -60,11 +60,35 @@ players keep going on the surface while you're down there.
 > spec — it's one function in `expedition.js` (`reachable`) if you want
 > something else.
 
+### Adventure (solo)
+
+A tile-based RPG. You are one hero. Each turn you lay a tile and move one member
+of your party — so exploration and map-making are the same act: **you decide
+what the world contains by choosing where the next piece of it goes.**
+
+- **Movement** — one tile anywhere. Two tiles along a road, free. Two tiles
+  off-road is a *forced march* and costs a supply, shown on the tile before you
+  commit. Roads are genuinely faster, not just flavour.
+- **Villages** recruit a follower you can also move. More bodies means covering
+  more ground, but only one of them acts per turn.
+- **Cities** — once a city is *finished*, walk onto one of its tiles that also
+  carries a road (the gate) and step inside. The interior is a street plan you
+  discover district by district: markets, smithies, taverns, temples, guild
+  halls, wells, back-alley caches. Bigger cities have more of it — the deck is
+  sized from the finished city's tile count, so a two-tile hamlet is a few
+  streets and a ten-tile capital is a warren.
+- **Caves** work the same way, underground, with treasure.
+- **Sites** are claimed the first time anyone in the party stands on them.
+- **Journal** tracks five objectives and pays out gold as you complete them.
+
+Score is gold + 5/relic + sites discovered.
+
 ## Playing
 
 | | |
 |---|---|
 | Place tile | click a highlighted cell |
+| Enter a city | stand on its gate, press `E` |
 | Rotate | `R` (or right-click, or shift+scroll) |
 | Claim a feature | click the pulsing meeple marker |
 | Skip / hold | `Space` |
@@ -187,6 +211,45 @@ free of audio and the same events can drive animation later.
 - **Force next tile** — deal yourself a specific tile
 - **Seed** — reproducible shuffles
 - `window.LAB` exposes `game`, `renderer` and `THEME` live
+
+## Adventure roadmap — scoped, not built
+
+Ordered by how much game they add per unit of work. Each is deliberately
+described in terms of what it changes mechanically, not just what it adds.
+
+**1. Encounters (highest value).** Right now nothing on the map can hurt you, so
+every decision is upside-only. Bandits on roads, wolves in fields, something
+worse in deep cave tiles. Resolve against party size + gear so followers and the
+smithy both suddenly matter. This is the single change that turns collecting
+into *risk management*.
+
+**2. Supply upkeep.** Followers currently cost nothing to keep. Charge 1 supply
+per follower per turn and recruiting becomes a real decision instead of a
+strict gain — you'd stop at the party you can feed. Pairs with wayshrines and
+campsites becoming genuinely important rather than nice.
+
+**3. Follower roles.** Scout (sees two tiles of the draw pile), porter (+carry,
+cheaper marches), guard (wins encounters). Turns "a follower" into "*which*
+follower", and makes which village you reach first matter.
+
+**4. Quest chains.** Taverns currently pay coins. Have them *issue* a job —
+"carry this to the keep three tiles east" — that names a real board location and
+pays on delivery. Converts the map from a scoring surface into a set of
+destinations.
+
+**5. A clock.** The deck is the only timer, and it's long. A day counter with
+nightfall (encounters get worse, or you must be in a settlement) gives every
+turn a cost and makes the road dash a decision rather than a freebie.
+
+**6. Gear and the economy.** Gold has no sink. Smithy sells a mount (+1 move) or
+armour (encounter rolls); markets sell supplies. Gives the whole loop somewhere
+to spend.
+
+**7. Hero progression.** XP from discoveries; pick a perk every few levels.
+Cheap to add once encounters exist, meaningless before.
+
+**8. Named sites and a seeded world.** Generate names for cities and villages
+and keep them in the journal, so a run becomes a story you can retell.
 
 ## Deliberately not implemented
 

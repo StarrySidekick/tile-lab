@@ -54,11 +54,13 @@ function onModeChange() {
   enabledGroups = new Set(DEFAULT_GROUPS[mode]);
   renderGroups();
   $('meepleRow').style.display = mode === 'classic' ? '' : 'none';
-  $('modeHint').textContent = mode === 'expedition'
-    ? 'Place a tile, then walk a pawn. Landmarks go to whoever reaches them first.'
-    : ($('useMeeples').checked
-      ? 'Claim features with meeples; majority scores when they close.'
-      : 'No meeples — a feature pays whoever closes it.');
+  $('playerRow').style.display = mode === 'adventure' ? 'none' : '';
+  $('modeHint').textContent = {
+    expedition: 'Place a tile, then walk a pawn. Landmarks go to whoever reaches them first.',
+    adventure: 'Solo. Place a tile, then move one of your party. Two tiles along a road; off-road costs supplies.',
+  }[mode] || ($('useMeeples').checked
+    ? 'Claim features with meeples; majority scores when they close.'
+    : 'No meeples — a feature pays whoever closes it.');
 }
 
 // --- pointer ----------------------------------------------------------------
@@ -99,12 +101,12 @@ canvas.addEventListener('pointerup', (e) => {
   if (wasDrag) return;
   const { offsetX: sx, offsetY: sy } = e;
 
-  // A cave takes over the whole interaction while it's open.
-  if (game.cave) {
-    const c = renderer.caveCellAt(game, sx, sy);
+  // An interior takes over the whole interaction while it's open.
+  if (game.interior) {
+    const c = renderer.interiorCellAt(game, sx, sy);
     if (!c) return;
-    if (game.phase === 'cave-place') game.cavePlaceAt(c.x, c.y);
-    else if (game.phase === 'cave-move') game.caveMoveTo(c.x, c.y);
+    if (game.phase === 'interior-place') game.interiorPlaceAt(c.x, c.y);
+    else if (game.phase === 'interior-move') game.interiorMoveTo(c.x, c.y);
     return;
   }
 
@@ -123,7 +125,7 @@ canvas.addEventListener('pointerup', (e) => {
     }
     case 'move': {
       const pawn = renderer.hitPawn(sx, sy);
-      if (pawn && pawn.player === game.current) { game.selectPawn(pawn); break; }
+      if (pawn && game.selectPawn(pawn)) break;
       const c = renderer.cellAt(sx, sy);
       game.movePawn(c.x, c.y);
       break;
@@ -147,8 +149,9 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (game.phase === 'meeple') game.skipMeeple();
     else if (game.phase === 'move') game.holdPosition();
-    else if (game.phase === 'cave-move') game.caveHold();
+    else if (game.phase === 'interior-move') game.interiorHold();
   }
+  if (e.key === 'e' || e.key === 'E') game.enterCity();
   if (e.key === 'd' || e.key === 'D') { renderer.showDebug = !renderer.showDebug; $('debug').checked = renderer.showDebug; }
   if (e.key === 'c' || e.key === 'C') {
     if (game.lastPlaced) renderer.centerOn(game.lastPlaced.x, game.lastPlaced.y);
@@ -216,8 +219,9 @@ function renderGroups() {
 const previewCtx = $('preview').getContext('2d');
 
 function currentTile() {
-  if (game.cave && game.phase === 'cave-place') return { type: game.cave.tile, rot: game.cave.rot, cave: true };
-  if (game.tile) return { type: game.tile, rot: game.rot, cave: false };
+  const inv = game.interior;
+  if (inv && game.phase === 'interior-place') return { type: inv.tile, rot: inv.rot, terrain: inv.kind };
+  if (game.tile) return { type: game.tile, rot: game.rot, terrain: 'surface' };
   return null;
 }
 
@@ -232,16 +236,16 @@ function drawPreview() {
   c.rotate(cur.rot * Math.PI / 2);
   c.translate(-size / 2, -size / 2);
   c.scale(size, size);
-  drawTile(c, cur.type, { cave: cur.cave });
+  drawTile(c, cur.type, { terrain: cur.terrain });
   c.restore();
 }
 
 const PHASE_TEXT = {
   place: 'Place the tile — R rotates',
   meeple: 'Claim a feature, or skip',
-  move: 'Move a pawn',
-  'cave-place': 'Cave: place a passage',
-  'cave-move': 'Cave: move, or hold',
+  move: 'Move — click a figure, then a target',
+  'interior-place': 'Lay the next piece',
+  'interior-move': 'Move, or hold',
   over: 'Game over',
 };
 
@@ -251,16 +255,19 @@ function renderActions() {
   const add = (label, key, fn, disabled = false) =>
     btns.push({ label, key, fn, disabled });
 
-  if (game.phase === 'place' || game.phase === 'cave-place') add('Rotate', 'R', () => game.rotate(1));
+  if (game.phase === 'place' || game.phase === 'interior-place') add('Rotate', 'R', () => game.rotate(1));
   if (game.phase === 'meeple') add('Skip meeple', 'Space', () => game.skipMeeple());
   if (game.phase === 'move') {
-    const sel = game.expedition.selected;
+    const sel = game.walker.selected;
+    if (game.canEnterCity()) add('Enter the city', 'E', () => game.enterCity());
     add('Hold position', 'Space', () => game.holdPosition());
-    if (sel && game.expedition.canRest(sel)) add('Rest at village', '', () => game.restPawn());
+    if (game.expedition && sel && game.expedition.canRest(sel)) add('Rest at village', '', () => game.restPawn());
   }
-  if (game.phase === 'cave-move') {
-    add('Hold', 'Space', () => game.caveHold());
-    if (game.expedition.canLeaveCave(game.cave)) add('Leave cave', '', () => game.caveLeave());
+  if (game.phase === 'interior-move') {
+    add('Hold', 'Space', () => game.interiorHold());
+    if (game.canLeaveInterior()) {
+      add(game.interior.kind === 'city' ? 'Leave the city' : 'Leave the cave', '', () => game.leaveInterior());
+    }
   }
 
   const host = $('actions');
@@ -300,9 +307,41 @@ function scoreRow(p, i) {
     </div>`;
 }
 
+/** Adventure replaces the score table with party / satchel / journal. */
+function adventurePanel() {
+  const a = game.adventure;
+  const sel = a.selected;
+  const party = a.party.map((p) => `
+    <div class="member ${sel === p ? 'sel' : ''}">
+      <span class="swatch" style="background:${p.hero ? PLAYER_COLORS[0] : PLAYER_COLORS[1]}"></span>
+      <span class="pname">${p.hero ? '★ ' : ''}${p.name}</span>
+      <span class="dim">${p.inside ? `in the ${p.inside.kind}` : `(${p.x}, ${p.y})`}</span>
+    </div>`).join('');
+
+  const bag = [
+    ['gold', a.bag.gold], ['supplies', a.bag.supplies], ['relics', a.bag.relics],
+  ].map(([k, v]) => `<span class="bagItem"><b>${v}</b> ${k}</span>`).join('');
+
+  const journal = a.journal.map((q) => `
+    <div class="quest ${q.done ? 'done' : ''}">
+      <span>${q.done ? '✓' : '○'} ${q.text}</span>
+      <span class="dim">${Math.min(q.have, q.need)}/${q.need}</span>
+    </div>`).join('');
+
+  $('scores').innerHTML = `
+    <div class="advTop">
+      <span>Day <b>${game.turn}</b></span>
+      <span>Score <b>${a.score()}</b></span>
+    </div>
+    <div class="bag">${bag}</div>
+    <h2>Party</h2>${party}
+    <h2>Journal</h2>${journal}`;
+}
+
 function syncPanel() {
-  $('scores').innerHTML = game.players.map(scoreRow).join('');
-  $('deckCount').textContent = game.cave ? game.cave.deck.length : game.deck.length;
+  if (game.adventure) adventurePanel();
+  else $('scores').innerHTML = game.players.map(scoreRow).join('');
+  $('deckCount').textContent = game.interior ? game.interior.deck.length : game.deck.length;
   const cur = currentTile();
   $('tileName').textContent = cur && cur.type ? `${cur.type.id} · ${cur.type.name}` : '—';
   $('phase').textContent = PHASE_TEXT[game.phase] || '—';
@@ -318,12 +357,15 @@ function syncPanel() {
 // sync with the UI too.
 let lastSig = '';
 function signature() {
-  const cave = game.cave;
+  const inv = game.interior;
+  const a = game.adventure;
   return [
     game.phase, game.current, game.rot, game.deck.length, game.board.size,
-    game.tile ? game.tile.id : '-', game.log.length,
-    cave ? `${cave.deck.length}/${cave.rot}/${cave.board.size}/${cave.pos.x},${cave.pos.y}` : '-',
-    game.expedition ? game.expedition.pawns.length + ':' + (game.expedition.selected?.id ?? '-') : '-',
+    game.tile ? game.tile.id : '-', game.log.length, game.turn,
+    inv ? `${inv.deck.length}/${inv.rot}/${inv.board.size}/${inv.pos.x},${inv.pos.y}` : '-',
+    game.walker ? (game.walker.selected?.id ?? '-') : '-',
+    game.expedition ? game.expedition.pawns.length : '-',
+    a ? `${a.party.length}:${a.bag.gold},${a.bag.supplies},${a.bag.relics}:${a.claimed.size}` : '-',
     game.players.map((p) => `${p.score}/${p.meeples}`).join(','),
   ].join('|');
 }
