@@ -1,21 +1,41 @@
-# Modes to prototype
+# The modes
 
 Tile Lab is a place to find out which tile mechanic is worth building a whole
-game around. This file is the queue: twelve modes, each described in terms of
-**what it changes mechanically**, what it costs to build against the engine as
-it stands, and — most importantly — **what question it answers**. A prototype
-that doesn't answer a question isn't worth building.
+game around. This file is the reasoning behind each one: **what it changes
+mechanically**, what it cost against the engine, and — most importantly —
+**what question it answers**. A prototype that doesn't answer a question isn't
+worth building.
 
-Six of these are yours. Six are mine. At the bottom there's a list of
-*modifiers* — mechanics that bolt onto any mode — plus the shared engine work
-and a recommended build order.
+**All twelve are built.** Eight became modes; four became modifiers, because a
+mechanic that works on every mode is worth more than one that works on its own.
+Each section below keeps its original design, with a note at the top recording
+what actually shipped and where the build differed from the plan — the places
+they diverge are the interesting part.
+
+| | Shipped as | Question it answers |
+|---|---|---|
+| 1. The Marches | mode | Is the board better as a contested surface than a scoring one? |
+| 2. Cirrus | mode | Is a small board you keep *editing* better than a big one you keep *growing*? |
+| 3. Sprawl | mode | Does the board get more interesting when the *holes* matter? |
+| 4. Descent | mode | Does exploration hold up with a real fail state? |
+| 5. The Chronicle | mode | Are the tiles good *prompts*? |
+| 6. Strata | mode | What does a Z axis buy — replacement, or elevation? |
+| 7. Tideline | modifier `Rising tide` | Does every mode here just need a clock? |
+| 8. Market | modifier `Drafting market` | How much of the game is the randomness of the draw? |
+| 9. Duel | mode | Is placing a tile fun with *nothing else* attached? |
+| 10. Agendas & fog | modifiers | Does anything change when players can't read each other? |
+| 11. Tesserae | mode | Is there a version someone opens every morning? |
+| 12. Two-faced | modifier | Is a tile a noun, or a state? |
+
+Play them and the questions answer themselves. What's at the bottom is what the
+engine still can't do.
 
 ---
 
-## What the engine already gives you for free
+## What the engine gave us for free
 
-Worth stating plainly, because it decides which of these are cheap and which
-are expensive:
+Worth stating plainly, because it decided which of these were cheap and which
+were expensive:
 
 - **Edge matching is generic.** `Board.canPlace` compares edge letters. Caves
   and city interiors already reuse it with `r`/`f` meaning *passage*/*rock*
@@ -29,22 +49,23 @@ are expensive:
 - **A tile is data.** One line in `tiles.js` gets you art, meeple anchors, edge
   matching and scoring.
 
-And the three things it *can't* do yet, which most of the list below depends
-on:
+And the three things it couldn't do, which most of the list below depended on:
 
-| Missing | Blocks |
-|---|---|
-| Removing a tile (union-find is append-only) | Cloud kingdom, stacking, tideline |
-| Fields as real features (half-edge connectivity) | Wargame area control, farmers |
-| Multi-cell footprints (`place` assumes 1×1) | Polyomino mode |
+| Missing | Blocked | Status |
+|---|---|---|
+| Removing a tile (union-find is append-only) | Cloud kingdom, stacking, tideline, two-faced | **Done** — `Board.rebuild()` |
+| Multi-cell footprints (`place` assumed 1×1) | Polyomino mode | **Done** — `canPlacePiece` / `placePiece` |
+| Fields as real features (half-edge connectivity) | Wargame area control, farmers | **Not done** — Marches uses banners instead |
 
-See [Shared engine work](#shared-engine-work) for how each is actually done.
+See [Shared engine work](#shared-engine-work) for how each was actually done.
 
 ---
 
 # Your six
 
 ## 1. The Marches — war, battle, area control
+
+> **Built** — `src/modes/marches.js`. Area control ended up being done by *banner* flood-fill rather than by field, which needs no tile-format change and gets the supply rule working today; fields would make it finer-grained. The campaign is capped at twelve rounds and territory is counted every fourth, because continuous income compounded into meaningless four-figure scores. Muster chits are auto-spent when they'd win a fight — against a human, choosing to spend and bluffing about it is the interesting half, and that needs a prompt.
 
 **Question it answers:** is the board more interesting as a *contested surface*
 than as a scoring one?
@@ -93,6 +114,8 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 
 ## 2. Cirrus — the cloud kingdom, where tiles can be lifted
 
+> **Built** — `src/modes/cirrus.js`. It needed one rule the design didn't have: a newly placed tile gets a round's grace before it can drift, or you can never build outward at all. Cloud and crystallised land are drawn differently, which turned out to be load-bearing — the lift rules read as arbitrary until you can see at a glance which is which.
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 
@@ -136,6 +159,8 @@ a big decision space. Mitigations in order of preference: limit lifts to tiles
 
 ## 3. Sprawl — polyomino tiles
 
+> **Built** — `src/modes/sprawl.js`, with pieces generated by search (`src/pieces.js`) so seams are valid by construction. First version sorted shapes biggest-first before filling, and the search succeeded on a tetromino *every single time* — a mode where every piece is four cells is much duller than the one intended. Choosing uniformly across shapes fixed it: roughly 15% dominoes, 30% trominoes, 55% tetrominoes.
+
 **Question it answers:** does the board get more interesting when the *holes*
 matter?
 
@@ -175,6 +200,8 @@ Costly, always available, keeps the game moving.
 ---
 
 ## 4. Descent — roguelike
+
+> **Built** — `src/modes/descent.js`. Four depths, HP, escalating decks, and the boon that adds tiles to the pool is in. Meta-progression writes to `localStorage`, guarded so the headless harness can still run it.
 
 **Question it answers:** does the exploration loop hold up under real pressure
 and a real fail state? (Right now Adventure is upside-only — nothing on the
@@ -225,6 +252,8 @@ saves weeks.
 
 ## 5. The Chronicle — story mode, D&D-ish, ad-lib
 
+> **Built** — `src/modes/chronicle.js`. Names, clocks, oracle and markdown export all in. The prompt had to move to sit directly *above* the three endings — read the situation, then choose — which is a two-line change and makes the whole mode read properly.
+
 **Question it answers:** are the tiles good *prompts*? Is the map worth
 reading back afterwards?
 
@@ -273,6 +302,8 @@ the end.
 
 ## 6. Strata — building on top of tiles
 
+> **Built** — `src/modes/strata.js`. Cost, respect and ceiling are all in, and height-as-multiplier is the version that shipped rather than height-as-replacement. Foundations pay at the end. The art check came first, as planned: a raised tile is drawn lifted with a drop shadow and a `▲n` badge, and you can read a stack at a glance.
+
 **Question it answers:** what does a Z axis buy? Replacement, or elevation?
 
 **The hook.** You may place onto an occupied cell. The top tile is the truth
@@ -314,6 +345,8 @@ first, before the rules.
 
 ## 7. Tideline — the board changes without anyone placing
 
+> **Built as a modifier**, not a mode — `Rising tide`, and it works on any of the eleven. It's implemented as a moving southern bound on the board, which is why nothing else needed a special case: a tile that could only go underwater is unplayable for the same reason a tile off the edge of Duel's 5×5 is, and the draw loop already discarded those.
+
 **Question:** does every mode here just need a clock?
 
 A front advances each round — flood, fire, blight — eating tiles from one edge
@@ -328,6 +361,8 @@ difficulty setting.
 
 ## 8. Market — a drafting layer (best ratio on the list)
 
+> **Built as a modifier** — `Drafting market`, and it works everywhere. Duel's open pool and Cirrus's hand reuse the same row and the same picker, with the discard rule switched off.
+
 **Question:** how much of the game is the randomness of the draw?
 
 Instead of drawing one tile blind, a face-up row of five with escalating cost.
@@ -340,6 +375,8 @@ gold — which the README correctly notes has no sink. **If you only build one
 thing off this document, build this.**
 
 ## 9. Duel — 24 tiles, a 5×5 board, no randomness
+
+> **Built** — `src/modes/duel.js`.
 
 **Question:** is the act of placing a tile fun with *nothing else* attached?
 
@@ -354,6 +391,8 @@ the best regression testbed you'll have for rule changes.
 
 ## 10. Hidden agendas & fog — imperfect information
 
+> **Built as two modifiers** — `Hidden agendas` (ten of them, in `src/modes/agendas.js`) and `Fog of war`. Fog is pure rendering, so it's the one modifier that takes effect without starting a new game.
+
 **Question:** does anything change when players can't read each other's plans?
 
 Two secret objectives per player, drawn at the start, scored at the end: *"a
@@ -366,6 +405,8 @@ Expedition into a genuinely different game for near-zero engine cost.
 
 ## 11. Tesserae — daily puzzle
 
+> **Built** — `src/modes/tesserae.js`. The seed comes from the UTC date, and the seed box hides itself so you can't accidentally play a different puzzle from everyone else.
+
 **Question:** is there a version of this that someone opens every morning?
 
 Fixed seed, fixed 30-tile deck, solo, a par score, one attempt. Same puzzle
@@ -377,6 +418,8 @@ rather than just demoed, and *"this seed must produce this board forever"* is
 the best regression test the engine will ever have.
 
 ## 12. Two-faced tiles — every tile has a reverse
+
+> **Built as a modifier** — `Two-faced tiles`, ten pairs in the `BACKS` table in `tiles.js`. Press `F` before placing. It came out nearly free once removal existed, exactly as predicted.
 
 **Question:** is a tile a noun, or a state?
 
@@ -394,101 +437,121 @@ nearly free at that point.
 
 # Modifiers — bolt onto any mode
 
-Cheap, orthogonal, and each one changes several modes at once. These are
-where the leverage is.
+Cheap, orthogonal, and each one changes several modes at once. This is where
+the leverage turned out to be: four of the twelve designs above are here rather
+than in the mode list, and they're worth more for it.
 
-| Modifier | What it does | Cost |
+| Modifier | What it does | Built |
 |---|---|---|
-| **Drafting market** (#8) | Removes draw luck, adds an economy | Small |
-| **Hidden objectives** (#10) | Imperfect information, bluffing | Small |
-| **Fog** | Exploration becomes real | Small |
-| **Oracle dice** | Uncertainty the table resolves narratively | Tiny |
-| **Asymmetric powers** | Each player breaks one rule ("your roads score double", "you may rotate a placed tile") | Small |
-| **Turn timer** | Kills analysis paralysis, changes the whole feel | Tiny |
-| **Co-op vs the deck** | Deck plays events against the table | Medium |
-| **Hand of tiles** | Choice instead of fate; needed by Cirrus anyway | Small |
+| **Drafting market** (#8) | Removes draw luck, adds a cost model with no currency | ✔ |
+| **Hidden objectives** (#10) | Imperfect information, bluffing | ✔ (ten of them) |
+| **Fog** (#10) | Exploration becomes real | ✔ |
+| **Two-faced tiles** (#12) | A tile is a state, not a noun | ✔ (ten pairs) |
+| **Rising tide** (#7) | A clock, and pressure on every mode at once | ✔ |
+| **Oracle dice** | Uncertainty the table resolves narratively | ✔, inside The Chronicle |
+| **Asymmetric powers** | Each player breaks one rule | not built |
+| **Turn timer** | Kills analysis paralysis, changes the whole feel | not built |
+| **Co-op vs the deck** | The deck plays events against the table | not built |
+| **Hand of tiles** | Choice instead of fate | ✔, inside Cirrus |
+
+The three unbuilt ones are all small. Asymmetric powers is the one I'd do next,
+because it's the cheapest way to make any of the eleven replayable.
 
 ---
 
 # Shared engine work
 
-Three primitives unlock most of the list. Doing them in this order means each
-mode gets cheaper than the last.
+Three primitives were supposed to unlock most of the list. Two got built and
+did exactly that; the third turned out not to be needed yet.
 
-### 1. A mutable board — `Board.remove()` and `Board.rebuild()`
+### 1. A mutable board — `Board.remove()` and `Board.rebuild()` ✔
 
-Union-find can't split, so removal can't be incremental. It doesn't need to
-be: keep `cells` as the source of truth and make connectivity **recomputable**.
+Union-find can't split, so removal can't be incremental. It doesn't need to be:
+`cells` is the source of truth and connectivity is **recomputable**.
 
 ```js
 rebuild() {
   this.parent.clear(); this.data.clear();
-  for (const cell of this.order) this.link(cell);   // replay placement
+  for (const cell of visibleCellsInPlacementOrder) this.link(cell);
 }
 ```
 
-O(n) per removal with n ≈ 100. Utterly fine at this scale, and it's the same
-call that supports **lifting** (Cirrus), **covering** (Strata), **flipping**
-(#12) and **flooding** (Tideline). One caveat: `scored` flags and claimed
-marks live on components, so they need to live on cells and be re-applied
-during replay. That's the only fiddly part.
+O(n) per removal with n ≈ 100. Free at this scale, and the same call now
+supports **lifting** (Cirrus), **covering** (Strata), **flipping** (two-faced)
+and **flooding** (rising tide) — one primitive, four features, which is the
+best ratio anything in this document achieved.
 
-### 2. Fields as real features
+Two things the design flagged as fiddly, and one it missed:
 
-Area control (#1) and the long-promised farmers both need fields modelled as
-their own segments. The clean version: features get **half-edges** — eight
-slots (N-left, N-right, E-top, …) instead of four sides. A road bend has two
-distinct field segments, which is exactly what a four-side model can't express.
-`featAt` generalises to half-edges; the union-find and the `open` counter don't
-change at all. Declared in tile data alongside the existing features.
+- `scored` is component-level and components change, so it moved to
+  `board.scoredParts`, a set of cell-feature keys. Meeples moved onto their
+  cell and are re-attached during replay.
+- **The one it missed:** during a replay, a cell's neighbour may not be linked
+  yet, because it was placed later. `link()` has to skip those — that
+  neighbour makes the same join from its own side when its turn comes. Without
+  the guard, `union()` reaches into an empty component and every mode that
+  removes a tile crashes on its first removal. The harness caught it in the
+  first run.
 
-This is a change to the tile *format*, not an addition — so it wants doing
-before the tile pool grows much further.
+### 2. Pieces — multi-cell footprints ✔
 
-### 3. Pieces — multi-cell footprints
+`Piece = {cells: [{dx, dy, type, rot}]}` plus `canPlacePiece` / `placePiece`
+laying the cells in order. `board.js` needed nothing new; the work was in the
+renderer and hit-testing, as predicted.
 
-`Piece = {cells: [{dx, dy, typeId, rot}]}` plus `canPlacePiece` / `placePiece`
-that lay the cells in order. `board.js` needs nothing new; the work is in the
-renderer and hit-testing. Needed only by Sprawl (#3), but cheap and isolated.
+The part the design got wrong: it assumed pieces would be **authored**. They're
+**generated** — a shape is picked and filled by search with tiles whose shared
+edges agree. That removes the whole class of hand-checking bugs the design was
+worried about, and it means the piece pool is effectively infinite.
 
-### And one refactor: a mode registry
+### 3. Fields as real features ✖
 
-`Game` already branches on `this.mode` in eight places, and there are three
-modes. At twelve it becomes unreadable. Before mode four goes in, move each
-mode to `src/modes/<name>.js` exporting a spec:
+Not built. Marches does area control by banner flood-fill instead, which needs
+no format change and gets the supply rule working today — the thing that makes
+the mode good is the *supply* rule, not the granularity of the territory.
 
-```js
-{ id, name, hint, groups, players, setup, onPlace, onEndTurn, actions, panel }
-```
+It's still the natural next build, and it's still a change to the tile format
+rather than an addition: features would carry **half-edges** (eight slots —
+N-left, N-right, E-top, … — instead of four sides), so a road bend can hold two
+distinct field segments. `featAt` generalises; the union-find and the `open`
+counter don't change at all. It wants doing before the tile pool grows much
+further.
 
-`game.js` becomes the host that runs the phase machine and calls hooks. This
-is what keeps the lab a lab — a new mode should be *one new file*, and right
-now it's edits in five.
+### And one refactor: a mode registry ✔
+
+Done first, and it paid for itself immediately. `Game` is now a host that runs
+the phase machine and calls hooks; each mode is one file in `src/modes/`
+exporting a class plus a spec. The dropdown, the hint, the player-count limits,
+the panel and the action buttons are all built from that spec — adding the
+eighth mode touched exactly one new file and one line of `index.js`.
 
 ---
 
-# Recommended build order
+# What playing them should tell you
 
-Ordered by *question answered per unit of work*, not by how exciting each one
-is.
+The build order is spent. What's left is the part only you can do, which is
+deciding which of these is the game.
 
-| # | Build | Why here |
-|---|---|---|
-| 0 | **Mode registry** | Do it while there are only three modes to move |
-| 1 | **Market (#8)** | ~60 lines, improves everything already built |
-| 2 | **Duel (#9)** | Tells you if the core act is fun before you build more on top of it |
-| 3 | **`Board.remove()`** | Unlocks Cirrus, Strata, Tideline, two-faced |
-| 4 | **Cirrus (#2)** | Smallest complete new mode; proves removal |
-| 5 | **Sprawl (#3)** | Self-contained, no removal needed, biggest visual change |
-| 6 | **Strata (#6)** | Art prototype first, rules second |
-| 7 | **Encounters, then Descent (#4)** | Encounters are the missing piece; the roguelike is where they pay off. Most likely to *be* the full game |
-| 8 | **Fields, then The Marches (#1)** | Biggest mode, and it wants fields underneath it |
-| 9 | **The Chronicle (#5)** | Content-heavy, engine-light — slot it in whenever board work is blocked |
+A few things the harness noticed that are worth watching for at the table:
 
-Tideline (#7), hidden agendas (#10), Tesserae (#11) and two-faced tiles (#12)
-are small enough to drop in wherever they fit.
+- **Duel** finishes in ~22 turns and scores land between 0 and 28. That spread
+  is healthy — it means the draft and the bounded board are doing work. If it's
+  *not* fun, that's the single most useful negative result in the whole
+  document, because everything else assumes it is.
+- **Cirrus** ends with roughly half the tiles it dealt still on the board. The
+  drift is doing a lot; if it feels punishing rather than tense, raise the
+  grace period before lowering the drift.
+- **Marches** is capped at twelve rounds because uncapped income compounds into
+  meaningless numbers. If the campaign feels short, raise the cap before you
+  touch the scoring — the round count is the tuning knob, not the points.
+- **Descent** loses most random runs by depth two, which is roughly right for a
+  roguelike but says nothing about how it plays with actual decisions. The
+  boons are where the mode lives; if they feel weak, they're too small, not too
+  few.
+- **The Chronicle** can't be judged by score. Judge it on whether people keep
+  taking turns, and whether the exported log is worth reading back.
 
-**The two I'd bet on for the full game:** Descent, because roguelike structure
-solves the "when does it end and why do I replay it" problem that every one of
-these modes otherwise has — and Strata-as-elevation, because it's the only
-idea here that isn't already a board game.
+**The two I'd still bet on for the full game:** Descent, because roguelike
+structure solves the "when does it end and why do I replay it" problem that
+every other mode here has — and Strata, because height-as-elevation is the only
+idea in this document that isn't already a board game.

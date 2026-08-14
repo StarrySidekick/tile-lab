@@ -145,7 +145,9 @@ export class Game {
    * face-up row and hands the choice to the player instead.
    */
   drawTile() {
-    if (this.m.drawNext && this.m.drawNext() !== undefined) return;
+    // A mode with its own draw owns it completely — including deciding that
+    // there's nothing left and ending the game.
+    if (this.m.drawNext) return void this.m.drawNext();
     this.flipped = false;
     if (this.options.market && this.spec.market !== false) return this.fillMarket();
 
@@ -231,7 +233,9 @@ export class Game {
 
   /** Two-faced modifier: swap the held tile for its reverse. */
   canFlip() {
-    return this.options.twoFaced && this.phase === 'place' && !!this.tile && !!BACKS[this.tile.id];
+    if (!this.options.twoFaced || this.phase !== 'place') return false;
+    if (this.m.piece) return false;          // a piece isn't one tile to turn over
+    return !!this.tile && !!BACKS[this.tile.id];
   }
 
   flipTile() {

@@ -7,9 +7,9 @@ A sandbox for experimenting with tile mechanics and game modes, built to be
 **fast to iterate on**. No build step, no dependencies, no image assets — plain
 ES modules and a canvas. Edit a file, hit refresh, keep playing.
 
-Three modes are built. **[MODES.md](MODES.md) is the queue** — twelve more
-scoped out, with what each one changes mechanically, what it costs against the
-current engine, and what question it answers.
+Eleven modes and five modifiers, all sharing one board engine. Each mode exists
+to answer a specific question about what makes tile-laying good;
+[MODES.md](MODES.md) is where that reasoning lives.
 
 ## Run it locally
 
@@ -19,33 +19,85 @@ game. Closing that Terminal window stops it.
 Or from a terminal:
 
 ```bash
-python3 -m http.server 5180 --directory carcassonne-lab
+python3 -m http.server 5180
 ```
 
 It does need to be *served* — ES modules won't load over `file://`, so
 double-clicking `index.html` won't work.
 
-## Three modes so far
+## The modes
 
-### Classic
+Pick one from the dropdown. Every mode brings its own tile pool, panel and
+buttons.
 
-Place a tile, optionally claim a feature with a meeple, score it when it closes.
-Cities 2/tile + 2/shield, roads 1/tile, monasteries 1 + surrounding tiles.
+### The short forms
 
-**Meeples can be turned off entirely.** With no meeples, a completed feature pays
-whoever closed it — the placement game stays intact without any claim or supply
-management.
+**Duel** — 2 players, a bounded 5×5, 24 tiles, an open pool you draft from, and
+nothing else. No meeples, no pawns, no gold. This is the diagnostic mode: if
+placing a tile isn't fun with nothing on top of it, no amount of RPG will fix
+that. Five minutes a game.
 
-### Expedition
+**Tesserae** — the daily puzzle. One seed derived from the date, so everyone
+gets the same thirty tiles on the same 7×7 board on the same day. Solo, against
+par.
 
-A different use of meeples. Each player has a **pawn** that walks the map. Every
-turn you place a tile, *then move a pawn one tile* (two if it's mounted). The
-board stops being a scoring grid and becomes terrain you lay in front of
-yourself as you travel.
+**Sprawl** — pieces of two to four cells, in tetromino shapes. A big piece has
+to satisfy several neighbours at once, so once a single-cell gap exists almost
+nothing fits it — **denial becomes a real strategy**. Sealing an empty cell
+makes a *courtyard* worth points. Four wild **fillers** each let you plug a hole
+anyway, and you can always **break a piece** and play just one cell of it, so it
+never deadlocks.
 
-Landmarks go to the **first pawn to reach them**, which is what makes placement a
-race: you're building road toward what you want while trying not to build it
-toward what they want.
+Pieces are *generated*, not authored: a shape is picked and then filled by
+search with tiles whose shared edges agree, so every piece is valid by
+construction. `atlas.html?group=pieces` shows a fresh dozen.
+
+**Strata** — build on top of tiles. The top tile owns the edges; what's
+underneath still counts. A closed feature scores **× its mean height**, so
+building up beats building out and the skyline is the score. Ground-level tiles
+earn stone, covering spends it, and you can't cover something that already
+scored. Buried tiles still pay 1 to whoever laid them at the end — **covering
+an opponent freezes them rather than erasing them**.
+
+**Cirrus** — the cloud kingdom. Forty tiles, a hand of three, and the main verb
+is *lifting*: each turn, play from hand or pick up a placed tile and put it
+somewhere better. Two rules make that a game rather than a fidget — you can't
+lift anything anchored, and a lift **must leave the board connected**. Closing a
+feature *crystallises* its tiles into permanent land. Everything still cloud is
+subject to the **drift**: at the end of each round, any unanchored tile holding
+on by a single edge blows away.
+
+### The long forms
+
+**The Marches** — war and area control. The board grows from a keep per player
+at opposite ends. Laying a tile beside ground you hold plants your banner; a
+company marching onto neutral or enemy ground takes it. Battles are
+deterministic — units plus terrain, defender wins ties — with **muster chits**
+as the only variable, spent to win a fight you'd otherwise lose.
+
+The good part is supply: territory is counted every four rounds, and a region
+only scores **if it can trace a path of your banners back to your keep**. So the
+sharpest move is often the tile that *severs* rather than the one that grows.
+
+**Descent** — the roguelike. Four depths, one life. Each depth is a small board
+with a stair down shuffled into the back half of its deck; find it before the
+tiles run out. Encounters resolve against your might, and losing costs health.
+
+Between depths you pick one of three boons — a stat, a relic that changes a
+rule, or **more of a thing the world can contain**. That last kind is the point:
+the upgrade currency is the tile pool itself. Each depth also reweights the
+deck toward danger, so the difficulty curve isn't a number, it's the deck.
+
+**The Chronicle** — story mode with D&D bones. Each tile you lay produces a
+prompt built from what's actually on it, and you pick one of three endings or
+type your own. Places get **names** (a seeded generator, so `(3,-2)` becomes
+Ashfen Mill), threads fill **clocks** as relevant tiles come up, and an
+**oracle** answers yes/no/and/but when the table doesn't know. Export the whole
+log as markdown when you're done — the shareable artifact is the point.
+
+**Expedition** — pawns that walk the map instead of meeples that sit on it.
+Place a tile, then move a pawn. Landmarks go to the first pawn to reach them,
+which makes placement a race.
 
 | Landmark | Effect |
 |---|---|
@@ -55,46 +107,41 @@ toward what they want.
 | **Cave mouth** | Drop into a private sub-map with its own tile pool and treasure |
 | **Market / Keep / Library / Armoury** | City landmarks — collect all four for +8 |
 
-**Caves** are a real second board: your own tile pool of passages and chambers,
-lit by a lantern falloff. You place a passage and move each turn, banking
-hoards, troves and springs, and climb out at the entrance or via a shaft. Other
-players keep going on the surface while you're down there.
+**Adventure (solo)** — a tile-based RPG. Exploration and map-making are the same
+act: you decide what the world contains by choosing where the next piece of it
+goes. Roads are genuinely faster (two tiles free; two off-road costs a supply),
+villages recruit followers, and **finished cities can be entered** through a
+road gate to discover their streets district by district. Caves work the same
+way, underground.
 
-> **Towers are a placeholder.** Warp-between-towers is my proposal, not your
-> spec — it's one function in `expedition.js` (`reachable`) if you want
-> something else.
+**Classic** — place a tile, optionally claim a feature, score it when it closes.
+Meeples can be turned off entirely, in which case a completed feature pays
+whoever closed it — the cheapest way to see how much of Carcassonne is the
+meeples.
 
-### Adventure (solo)
+## Modifiers
 
-A tile-based RPG. You are one hero. Each turn you lay a tile and move one member
-of your party — so exploration and map-making are the same act: **you decide
-what the world contains by choosing where the next piece of it goes.**
+Orthogonal to modes, and they compose — each one changes several modes at once,
+which is where the leverage is.
 
-- **Movement** — one tile anywhere. Two tiles along a road, free. Two tiles
-  off-road is a *forced march* and costs a supply, shown on the tile before you
-  commit. Roads are genuinely faster, not just flavour.
-- **Villages** recruit a follower you can also move. More bodies means covering
-  more ground, but only one of them acts per turn.
-- **Cities** — once a city is *finished*, walk onto one of its tiles that also
-  carries a road (the gate) and step inside. The interior is a street plan you
-  discover district by district: markets, smithies, taverns, temples, guild
-  halls, wells, back-alley caches. Bigger cities have more of it — the deck is
-  sized from the finished city's tile count, so a two-tile hamlet is a few
-  streets and a ten-tile capital is a warren.
-- **Caves** work the same way, underground, with treasure.
-- **Sites** are claimed the first time anyone in the party stands on them.
-- **Journal** tracks five objectives and pays out gold as you complete them.
-
-Score is gold + 5/relic + sites discovered.
+| Modifier | What it does |
+|---|---|
+| **Drafting market** | A face-up row instead of a blind draw. The first is free; reaching past a tile discards it, so cost needs no currency |
+| **Hidden agendas** | Two secret objectives each, scored at the end. Every placement becomes a tell |
+| **Fog of war** | Tiles far from your figures fade out |
+| **Two-faced tiles** | Most tiles have a reverse — a road is a city on the back. Press `F` before you place |
+| **Rising tide** | A waterline climbs the board every three rounds, drowning whatever it reaches. It's implemented as a moving bound, so nothing else needed a special case |
 
 ## Playing
 
 | | |
 |---|---|
 | Place tile | click a highlighted cell |
-| Enter a city | stand on its gate, press `E` |
+| Pick from the row | click it, or `1`–`4` |
 | Rotate | `R` (or right-click, or shift+scroll) |
+| Flip a two-faced tile | `F` |
 | Claim a feature | click the pulsing meeple marker |
+| Enter a city | stand on its gate, press `E` |
 | Skip / hold | `Space` |
 | Move a pawn | click your pawn, then a gold target |
 | Pan / zoom | drag / scroll |
@@ -113,20 +160,28 @@ Tiles are grouped, and each group toggles on and off independently:
   cities on one tile, twin corner cities
 - **Outposts** — stables, villages, watchtowers, cave mouths
 - **City landmarks** — markets, keeps, libraries, armouries
+- **Adventure sites** — wayshrines, ruins, campsites, merchants
+- **War terrain** — keeps, forts, hills, fords, beacons, muster fields
+- **Dangers** — stairs down, bandit camps, wolf dens, barrows
+- **Cloud kingdom** — skyholds, windvanes, raincatches
 
-Changes apply on the next new game.
+Changes apply on the next new game. Each mode picks sensible defaults when you
+switch to it.
 
 ## How it's put together
 
 ```
-src/tiles.js      tile data — the only file you touch to add tiles
-src/theme.js      the entire colour scheme, in one place
-src/board.js      grid, placement legality, feature connectivity, scoring
-src/art.js        procedural tile + landmark drawing (no assets)
-src/game.js       turn flow for both modes
-src/expedition.js pawn movement, landmarks, caves
-src/render.js     camera, canvas painting, cave overlay, hit-testing
-src/main.js       DOM wiring
+src/tiles.js       tile data — the only file you touch to add tiles
+src/pieces.js      polyomino generation for Sprawl
+src/theme.js       the entire colour scheme, in one place
+src/board.js       grid, placement, connectivity, removal, stacking, scoring
+src/art.js         procedural tile + landmark drawing (no assets)
+src/game.js        the host: turn flow, deck, players, modifiers
+src/modes/         one file per mode, behind a small set of hooks
+src/interior.js    caves and city streets — a sub-map on the same loop
+src/render.js      camera, canvas painting, overlays, hit-testing
+src/main.js        DOM wiring
+tools/             headless and browser test harnesses
 ```
 
 ### The core idea
@@ -145,16 +200,26 @@ centre are two *separate* features — that's exactly what makes a 3-way junctio
 terminate three roads.
 
 **Marks** are landmarks that sit on a tile and never span tiles. They do nothing
-in Classic; they're what Expedition is built on. Anchoring a mark to a feature
-index puts it inside that feature (so a market sits in its city).
-
-Everything else is derived: edge letters for the matching rule, the art, meeple
-anchors, landmark positions.
+in Classic; they're what every other mode is built on. Anchoring a mark to a
+feature index puts it inside that feature (so a market sits in its city).
 
 Connectivity is a union-find over `(tile, featureIndex)` pairs where each
 component counts how many edge-slots are still open. Joining two tiles closes
 two slots; zero means complete. That one counter is the whole completion
 rule — identical for a 2-tile road and a 40-tile city.
+
+### A mutable board
+
+Union-find can't split, so removing a tile can't be incremental. It doesn't need
+to be: `cells` is the source of truth and connectivity is **recomputable**.
+`Board.rebuild()` throws the components away and replays every visible cell in
+placement order — O(n) with n in the low hundreds, which is free at this scale.
+
+That one primitive is what lets tiles be **lifted** (Cirrus), **covered**
+(Strata), **flipped** (two-faced) and **drowned** (rising tide). Two pieces of
+state have to survive a rebuild, so neither lives on the component: meeples live
+on their cell, and "already scored" lives in `scoredParts` as a set of
+cell-feature keys.
 
 ### Adding a tile type
 
@@ -168,6 +233,52 @@ placement and scoring for free:
 
 Check it in `atlas.html` (which takes `?group=cities` to show one group), then
 use **Force next tile** to deal it to yourself immediately.
+
+### Adding a mode
+
+Write `src/modes/<name>.js` exporting a class extending `Mode` plus a `.spec`,
+and add it to the list in `src/modes/index.js`. Nothing else changes — the
+dropdown, hint, player-count limits, panel and buttons are all built from the
+spec and the hooks.
+
+```js
+export class Skirmish extends Mode {
+  deck()            { return buildDeck(['base'], this.game.rng, 'D', 30); }
+  seeds()           { return [{ x: 0, y: 0, id: 'D' }]; }
+  afterPlace(cell)  { return 'move'; }        // or null to just end the turn
+  onClosed(d, by)   { this.game.award(d, false, by); }
+  actions()         { return [{ label: 'Rally', fn: (g) => g.endTurn() }]; }
+  panel()           { return '<p>…</p>'; }    // null keeps the score table
+}
+Skirmish.spec = { id: 'skirmish', name: 'Skirmish', Mode: Skirmish, groups: ['base'] };
+```
+
+Every hook has a do-nothing default, so a mode file only writes what it changes.
+Walking modes add `visiblePawns`, `reachable`, `select` and `moveSelected`, and
+the renderer draws figures and move targets from those.
+
+### Testing
+
+Eleven modes is more than you can click through, and a change in `board.js`
+breaks the one you weren't looking at.
+
+```bash
+node tools/harness.mjs              # every mode + modifier, headless
+node tools/harness.mjs marches 200  # one mode, 200 seeded games
+node tools/smoke.mjs                # each mode booted in a real browser
+node tools/smoke.mjs --shots        # …and screenshotted to tools/shots/
+```
+
+The harness plays random legal moves to completion and fails on anything that
+throws, hangs or gets stuck with no legal action. It also prints turn counts and
+score spreads, which is the cheap way to notice that a mode is degenerate before
+you sit down to play it. The smoke test covers the half that only exists in a
+browser: that each mode renders, builds its panel and survives being clicked.
+
+`package.json` exists only so Node treats `src/` as ES modules for those two
+scripts. The game itself still has no build step and no dependencies.
+(`tools/smoke.mjs` wants Playwright, which is the one dev-only exception:
+`npm install --no-save playwright`.)
 
 ### Re-vibing the look
 
@@ -214,54 +325,25 @@ free of audio and the same events can drive animation later.
 - **Feature overlay** (`D`) — `tiles·openEdges` per feature, `✓` when closed
 - **Force next tile** — deal yourself a specific tile
 - **Seed** — reproducible shuffles
-- `window.LAB` exposes `game`, `renderer` and `THEME` live
+- `window.LAB` exposes `game`, `renderer`, `THEME` and `MODES` live
 
-## Adventure roadmap — scoped, not built
+## What's next
 
-Ordered by how much game they add per unit of work. Each is deliberately
-described in terms of what it changes mechanically, not just what it adds.
+[MODES.md](MODES.md) has the full reasoning behind each mode, what it was built
+to find out, and what's still scoped but unbuilt. The short version of what the
+engine is still missing:
 
-**1. Encounters (highest value).** Right now nothing on the map can hurt you, so
-every decision is upside-only. Bandits on roads, wolves in fields, something
-worse in deep cave tiles. Resolve against party size + gear so followers and the
-smithy both suddenly matter. This is the single change that turns collecting
-into *risk management*.
+**Fields as real features.** Farmers, and richer area control in The Marches,
+both need fields modelled as their own segments — split by roads, bounded by
+city walls, so a road-bend tile has *two* distinct fields. That means features
+carrying half-edges (eight slots, not four) rather than a new feature type. It's
+a change to the tile format, so it wants doing before the pool grows much
+further. The Marches currently does area control by banner instead, which works
+but is coarser.
 
-**2. Supply upkeep.** Followers currently cost nothing to keep. Charge 1 supply
-per follower per turn and recruiting becomes a real decision instead of a
-strict gain — you'd stop at the party you can feed. Pairs with wayshrines and
-campsites becoming genuinely important rather than nice.
+**A proper battle UI for The Marches.** Muster chits are auto-spent to win a
+fight when you can afford it. Against a human, choosing to spend — and bluffing
+about it — is the interesting half, and that needs a prompt.
 
-**3. Follower roles.** Scout (sees two tiles of the draw pile), porter (+carry,
-cheaper marches), guard (wins encounters). Turns "a follower" into "*which*
-follower", and makes which village you reach first matter.
-
-**4. Quest chains.** Taverns currently pay coins. Have them *issue* a job —
-"carry this to the keep three tiles east" — that names a real board location and
-pays on delivery. Converts the map from a scoring surface into a set of
-destinations.
-
-**5. A clock.** The deck is the only timer, and it's long. A day counter with
-nightfall (encounters get worse, or you must be in a settlement) gives every
-turn a cost and makes the road dash a decision rather than a freebie.
-
-**6. Gear and the economy.** Gold has no sink. Smithy sells a mount (+1 move) or
-armour (encounter rolls); markets sell supplies. Gives the whole loop somewhere
-to spend.
-
-**7. Hero progression.** XP from discoveries; pick a perk every few levels.
-Cheap to add once encounters exist, meaningless before.
-
-**8. Named sites and a seeded world.** Generate names for cities and villages
-and keep them in the journal, so a run becomes a story you can retell.
-
-## Deliberately not implemented
-
-**Farmers.** Field scoring needs fields modelled as their own segments, split by
-roads and bounded by city walls — a road-bend tile has *two* distinct fields,
-not one. That's a change to the tile format rather than an addition, so the
-"roads that cut off farms" tiles above are currently about the *geometry*; the
-fields they carve aren't scored yet. It's the natural next build, and the
-wargame mode in [MODES.md](MODES.md) needs it too.
-
-Also absent: an AI opponent, networked play, and persistence.
+Also absent: an AI opponent, networked play, and persistence beyond Descent's
+unlocks.

@@ -51,11 +51,10 @@ export class Sprawl extends Mode {
         g.tile = piece.cells[0].type;      // so the preview has something to draw
         g.rot = 0;
         g.phase = 'place';
-        return true;
+        return;
       }
     }
     g.finish();
-    return true;
   }
 
   /** Generate until something fits — falls back to a single cell if need be. */

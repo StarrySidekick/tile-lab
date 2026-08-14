@@ -43,11 +43,8 @@ export class Cirrus extends Mode {
 
   /** The hand IS the market row — same picker, different refill rule. */
   drawNext() {
-    const hand = this.hands[this.game.current];
     this.lifting = false;
-    const filled = this.game.fillMarket(HAND, hand);
-    if (filled === undefined) return true;   // fillMarket ended the game
-    return true;
+    this.game.fillMarket(HAND, this.hands[this.game.current]);
   }
 
   // --- lifting --------------------------------------------------------------

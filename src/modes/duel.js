@@ -23,7 +23,7 @@ export class Duel extends Mode {
   deck() { return buildDeck(['base'], this.game.rng, 'D', 24); }
 
   /** No blind draw — refill the open pool and let them pick. */
-  drawNext() { return this.game.fillMarket(POOL); }
+  drawNext() { this.game.fillMarket(POOL); }
 
   afterPlace() { return null; }
 

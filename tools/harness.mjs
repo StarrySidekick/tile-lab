@@ -266,11 +266,15 @@ function main() {
   }
 
   if (!only) {
-    console.log('\nmodifiers (on Classic, and on a mode that removes tiles)');
+    // Classic is the plain case, Cirrus removes tiles, and Sprawl places
+    // several at once — between them they cover the ways a modifier can go
+    // wrong.
+    console.log('\nmodifiers, against a plain mode, a removing one and a piece one');
     for (const mod of MODIFIERS) {
       if (mod.id === 'fog') continue;                 // purely a render flag
-      runMode(MODE_OF('classic'), Math.max(4, games / 2), { options: { [mod.id]: true } }, `+${mod.id}`);
-      runMode(MODE_OF('cirrus'), Math.max(4, games / 2), { options: { [mod.id]: true } }, `+${mod.id}`);
+      for (const host of ['classic', 'cirrus', 'sprawl']) {
+        runMode(MODE_OF(host), Math.max(4, games / 2), { options: { [mod.id]: true } }, `+${mod.id}`);
+      }
     }
     console.log('\nall modifiers at once');
     const all = Object.fromEntries(MODIFIERS.map((m) => [m.id, true]));
