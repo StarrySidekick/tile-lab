@@ -1,12 +1,17 @@
 // ---------------------------------------------------------------------------
 // DOM wiring: input handling, side panel, and the render loop.
+//
+// Nothing in here knows what a mode is. The dropdown, the hint, the panel and
+// the action buttons are all built from the mode registry and from whatever
+// the running mode returns from its hooks — so a new mode file shows up in the
+// UI without this file changing.
 // ---------------------------------------------------------------------------
 
-import { Game, DEFAULT_GROUPS } from './game.js';
+import { Game, DEFAULT_GROUPS, MODES, MODIFIERS } from './game.js';
 import { Renderer } from './render.js';
 import { drawTile, PLAYER_COLORS } from './art.js';
 import { THEME } from './theme.js';
-import { TILE_TYPES, GROUPS, CITY_LANDMARKS } from './tiles.js';
+import { TILE_TYPES, TILES, GROUPS } from './tiles.js';
 import { Sfx, SOUND_NAMES } from './audio.js';
 
 const canvas = document.getElementById('board');
@@ -15,6 +20,7 @@ const $ = (id) => document.getElementById(id);
 const sfx = new Sfx();
 
 let enabledGroups = new Set(DEFAULT_GROUPS.classic);
+let modifiers = {};
 let game;
 
 /** Every Game is fresh, so sound has to be re-subscribed each time. */
@@ -23,7 +29,7 @@ function bind(g) {
   return g;
 }
 
-game = bind(new Game({ players: 2, groups: [...enabledGroups] }));
+const spec = (id) => MODES.find((m) => m.id === id);
 
 // --- new game ---------------------------------------------------------------
 
@@ -36,10 +42,12 @@ function newGame() {
     players, seed, mode,
     meeples: $('useMeeples').checked,
     groups: [...enabledGroups],
+    options: { ...modifiers },
   }));
   game.free = $('freePlace').checked;
   renderer.centerOn(0, 0);
-  renderer.cam.zoom = 96;
+  renderer.cam.zoom = spec(mode)?.bounds ? 78 : 96;
+  syncPanel();
 }
 
 function hashSeed(s) {
@@ -50,17 +58,26 @@ function hashSeed(s) {
 
 /** Switching mode swaps in that mode's sensible default tile pool. */
 function onModeChange() {
-  const mode = $('mode').value;
-  enabledGroups = new Set(DEFAULT_GROUPS[mode]);
+  const id = $('mode').value;
+  const s = spec(id);
+  enabledGroups = new Set(DEFAULT_GROUPS[id] || DEFAULT_GROUPS.classic);
   renderGroups();
-  $('meepleRow').style.display = mode === 'classic' ? '' : 'none';
-  $('playerRow').style.display = mode === 'adventure' ? 'none' : '';
-  $('modeHint').textContent = {
-    expedition: 'Place a tile, then walk a pawn. Landmarks go to whoever reaches them first.',
-    adventure: 'Solo. Place a tile, then move one of your party. Two tiles along a road; off-road costs supplies.',
-  }[mode] || ($('useMeeples').checked
-    ? 'Claim features with meeples; majority scores when they close.'
-    : 'No meeples — a feature pays whoever closes it.');
+  $('meepleRow').style.display = s?.meeples ? '' : 'none';
+  $('playerRow').style.display = s?.solo ? 'none' : '';
+  $('seedRow').style.display = s?.seedFor ? 'none' : '';
+
+  const count = $('playerCount');
+  const min = s?.minPlayers || 1, max = s?.maxPlayers || 5;
+  count.innerHTML = '';
+  for (let n = Math.max(2, min); n <= max; n++) {
+    count.insertAdjacentHTML('beforeend', `<option>${n}</option>`);
+  }
+
+  let hint = s?.hint || '';
+  if (id === 'classic' && !$('useMeeples').checked) {
+    hint = 'No meeples — a feature pays whoever closes it.';
+  }
+  $('modeHint').textContent = hint;
 }
 
 // --- pointer ----------------------------------------------------------------
@@ -84,7 +101,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (drag) {
     const dx = e.offsetX - drag.x, dy = e.offsetY - drag.y;
     drag.moved = Math.max(drag.moved, Math.hypot(dx, dy));
-    if (drag.moved > 4 && !game.cave) {
+    if (drag.moved > 4 && !game.interior) {
       renderer.cam.x = drag.camX - dx / renderer.cam.zoom;
       renderer.cam.y = drag.camY - dy / renderer.cam.zoom;
     }
@@ -110,27 +127,19 @@ canvas.addEventListener('pointerup', (e) => {
     return;
   }
 
-  switch (game.phase) {
-    case 'place': {
-      const c = renderer.cellAt(sx, sy);
-      // Only complain if they aimed at a real but illegal square — clicking
-      // empty space well off the board shouldn't buzz at you.
-      if (!game.placeAt(c.x, c.y) && !game.board.get(c.x, c.y) && nearBoard(c)) sfx.play('deny');
-      break;
-    }
-    case 'meeple': {
-      const hit = renderer.hitMeepleSpot(sx, sy);
-      if (hit) game.placeMeeple(hit.i);
-      break;
-    }
-    case 'move': {
-      const pawn = renderer.hitPawn(sx, sy);
-      if (pawn && game.selectPawn(pawn)) break;
-      const c = renderer.cellAt(sx, sy);
-      game.movePawn(c.x, c.y);
-      break;
-    }
+  if (game.phase === 'meeple') {
+    const hit = renderer.hitMeepleSpot(sx, sy);
+    if (hit) game.placeMeeple(hit.i);
+    return;
   }
+  if (game.phase === 'move') {
+    const pawn = renderer.hitPawn(sx, sy);
+    if (pawn && game.selectPawn(pawn)) return;
+  }
+
+  const c = renderer.cellAt(sx, sy);
+  const acted = game.cellClick(c.x, c.y);
+  if (!acted && game.phase === 'place' && !game.board.get(c.x, c.y) && nearBoard(c)) sfx.play('deny');
 });
 
 canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); game.rotate(1); });
@@ -138,13 +147,14 @@ canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); game.rotate(
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   if (e.shiftKey) { game.rotate(e.deltaY > 0 ? 1 : -1); return; }
-  if (game.cave) return;
+  if (game.interior) return;
   renderer.zoomAt(e.offsetX, e.offsetY, e.deltaY > 0 ? 0.9 : 1.1);
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.key === 'r' || e.key === 'R') game.rotate(e.shiftKey ? -1 : 1);
+  if (e.key === 'f' || e.key === 'F') game.flipTile();
   if (e.key === ' ') {
     e.preventDefault();
     if (game.phase === 'meeple') game.skipMeeple();
@@ -156,11 +166,18 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'c' || e.key === 'C') {
     if (game.lastPlaced) renderer.centerOn(game.lastPlaced.x, game.lastPlaced.y);
   }
+  if (e.key >= '1' && e.key <= '9' && game.phase === 'market') {
+    game.takeFromMarket(Number(e.key) - 1);
+  }
 });
 
 window.addEventListener('resize', () => renderer.resize());
 
 // --- controls ---------------------------------------------------------------
+
+for (const s of MODES) {
+  $('mode').insertAdjacentHTML('beforeend', `<option value="${s.id}">${s.name}</option>`);
+}
 
 $('newGame').onclick = newGame;
 $('mode').onchange = onModeChange;
@@ -169,7 +186,7 @@ $('freePlace').onchange = (e) => { game.free = e.target.checked; };
 $('debug').onchange = (e) => { renderer.showDebug = e.target.checked; };
 $('forceTile').onchange = (e) => {
   game.forcedNext = e.target.value || null;
-  if (game.forcedNext && game.phase === 'place') {
+  if (game.forcedNext && game.phase === 'place' && game.tile) {
     game.deck.push(game.tile.id);
     game.drawTile();
   }
@@ -182,15 +199,24 @@ for (const t of TILE_TYPES) {
   $('forceTile').appendChild(o);
 }
 
+$('modifiers').innerHTML = MODIFIERS.map((m) => `
+  <label title="${m.note}"><input type="checkbox" data-mod="${m.id}" /> ${m.name}</label>`).join('');
+for (const el of $('modifiers').querySelectorAll('input[data-mod]')) {
+  el.onchange = (e) => {
+    const id = e.target.dataset.mod;
+    if (e.target.checked) modifiers[id] = true; else delete modifiers[id];
+    // Fog is pure rendering, so it can take effect without a new game.
+    if (id === 'fog' && game) game.options.fog = !!modifiers.fog;
+  };
+}
+
 // --- sound controls ---------------------------------------------------------
 
 $('sound').onchange = (e) => {
   sfx.enabled = e.target.checked;
   if (sfx.enabled) sfx.play('meeple');   // confirm it's back on
 };
-$('volume').oninput = (e) => {
-  sfx.setVolume(Number(e.target.value));
-};
+$('volume').oninput = (e) => { sfx.setVolume(Number(e.target.value)); };
 for (const name of SOUND_NAMES) {
   const o = document.createElement('option');
   o.value = name;
@@ -221,16 +247,37 @@ const previewCtx = $('preview').getContext('2d');
 function currentTile() {
   const inv = game.interior;
   if (inv && game.phase === 'interior-place') return { type: inv.tile, rot: inv.rot, terrain: inv.kind };
+  if (game.m.piece) return { piece: game.m.piece };
   if (game.tile) return { type: game.tile, rot: game.rot, terrain: 'surface' };
   return null;
 }
 
+/** The held tile, or the whole piece scaled to fit the same square. */
 function drawPreview() {
   const c = previewCtx;
   const size = $('preview').width;
   c.clearRect(0, 0, size, size);
   const cur = currentTile();
-  if (!cur || !cur.type) return;
+  if (!cur) return;
+
+  if (cur.piece) {
+    const p = cur.piece;
+    const scale = size / Math.max(p.w, p.h);
+    const ox = (size - p.w * scale) / 2, oy = (size - p.h * scale) / 2;
+    for (const cell of p.cells) {
+      c.save();
+      c.translate(ox + cell.dx * scale, oy + cell.dy * scale);
+      c.scale(scale, scale);
+      c.translate(0.5, 0.5);
+      c.rotate((cell.rot & 3) * Math.PI / 2);
+      c.translate(-0.5, -0.5);
+      drawTile(c, cell.type);
+      c.restore();
+    }
+    return;
+  }
+
+  if (!cur.type) return;
   c.save();
   c.translate(size / 2, size / 2);
   c.rotate(cur.rot * Math.PI / 2);
@@ -242,26 +289,60 @@ function drawPreview() {
 
 const PHASE_TEXT = {
   place: 'Place the tile — R rotates',
+  market: 'Choose a tile',
+  lift: 'Click a tile to lift it',
   meeple: 'Claim a feature, or skip',
   move: 'Move — click a figure, then a target',
+  story: 'Say what is there',
+  boon: 'Choose a boon',
   'interior-place': 'Lay the next piece',
   'interior-move': 'Move, or hold',
   over: 'Game over',
 };
 
-/** Contextual buttons — what you can actually do right now. */
+/** The face-up row, when a mode or the market modifier is offering a choice. */
+function renderMarket() {
+  const host = $('market');
+  if (game.phase !== 'market' || !game.market || !game.market.length) {
+    host.innerHTML = '';
+    host.style.display = 'none';
+    return;
+  }
+  host.style.display = '';
+  const discards = game.spec.marketDiscards !== false;
+  host.innerHTML = `<h2>${discards ? 'Market' : 'Your hand'}</h2><div class="row-tiles"></div>
+    <p class="hint">${discards
+      ? 'The first is free. Reaching past a tile discards it.'
+      : 'Take any of them.'}</p>`;
+  const row = host.querySelector('.row-tiles');
+
+  game.market.forEach((id, i) => {
+    const wrap = document.createElement('button');
+    wrap.className = 'tileBtn';
+    wrap.title = `${id} — ${TILES[id].name}`;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 56;
+    const ctx = cv.getContext('2d');
+    ctx.scale(56, 56);
+    drawTile(ctx, TILES[id]);
+    wrap.appendChild(cv);
+    wrap.insertAdjacentHTML('beforeend', `<kbd>${i + 1}</kbd>`);
+    wrap.onclick = () => game.takeFromMarket(i);
+    row.appendChild(wrap);
+  });
+}
+
+/** Contextual buttons — what you can actually do right now, mode included. */
 function renderActions() {
   const btns = [];
-  const add = (label, key, fn, disabled = false) =>
-    btns.push({ label, key, fn, disabled });
+  const add = (label, key, fn, disabled = false, wide = false) =>
+    btns.push({ label, key, fn, disabled, wide });
 
   if (game.phase === 'place' || game.phase === 'interior-place') add('Rotate', 'R', () => game.rotate(1));
+  if (game.canFlip()) add('Flip it over', 'F', () => game.flipTile());
   if (game.phase === 'meeple') add('Skip meeple', 'Space', () => game.skipMeeple());
   if (game.phase === 'move') {
-    const sel = game.walker.selected;
-    if (game.canEnterCity()) add('Enter the city', 'E', () => game.enterCity());
     add('Hold position', 'Space', () => game.holdPosition());
-    if (game.expedition && sel && game.expedition.canRest(sel)) add('Rest at village', '', () => game.restPawn());
   }
   if (game.phase === 'interior-move') {
     add('Hold', 'Space', () => game.interiorHold());
@@ -269,11 +350,15 @@ function renderActions() {
       add(game.interior.kind === 'city' ? 'Leave the city' : 'Leave the cave', '', () => game.leaveInterior());
     }
   }
+  for (const a of game.m.actions()) {
+    add(a.label, a.key || '', () => a.fn(game), !!a.disabled, !!a.wide);
+  }
 
   const host = $('actions');
   host.innerHTML = '';
   for (const b of btns) {
     const el = document.createElement('button');
+    if (b.wide) el.className = 'wide';
     el.innerHTML = `${b.label}${b.key ? ` <kbd>${b.key}</kbd>` : ''}`;
     el.disabled = b.disabled;
     el.onclick = b.fn;
@@ -284,71 +369,58 @@ function renderActions() {
 
 function scoreRow(p, i) {
   const active = i === game.current && game.phase !== 'over';
-  let extra = '';
-  if (game.expedition) {
-    const pawns = game.expedition.pawns.filter((q) => q.player === i);
-    const mounted = pawns.some((q) => q.mounted);
-    const inCave = pawns.some((q) => q.inCave);
-    const set = game.expedition.collections[i];
-    const bits = [`${pawns.length} pawn${pawns.length > 1 ? 's' : ''}`];
-    if (mounted) bits.push('mounted');
-    if (inCave) bits.push('in cave');
-    if (set.size) bits.push(`${set.size}/${CITY_LANDMARKS.length} landmarks`);
-    extra = bits.join(' · ');
-  } else if (game.useMeeples) {
-    extra = '●'.repeat(p.meeples) + `<span class="dim">${'○'.repeat(7 - p.meeples)}</span>`;
-  }
+  const extra = game.useMeeples
+    ? '●'.repeat(p.meeples) + `<span class="dim">${'○'.repeat(7 - p.meeples)}</span>`
+    : '';
+  const agendas = (p.agendas || []).map((a) => `<div class="quest"><span>◆ ${a.text}</span><span class="dim">${a.points}</span></div>`).join('');
   return `
     <div class="player ${active ? 'active' : ''}">
       <span class="swatch" style="background:${PLAYER_COLORS[i]}"></span>
       <span class="pname">${p.name}</span>
       <span class="pmeta">${extra}</span>
       <span class="pscore">${p.score}</span>
-    </div>`;
-}
-
-/** Adventure replaces the score table with party / satchel / journal. */
-function adventurePanel() {
-  const a = game.adventure;
-  const sel = a.selected;
-  const party = a.party.map((p) => `
-    <div class="member ${sel === p ? 'sel' : ''}">
-      <span class="swatch" style="background:${p.hero ? PLAYER_COLORS[0] : PLAYER_COLORS[1]}"></span>
-      <span class="pname">${p.hero ? '★ ' : ''}${p.name}</span>
-      <span class="dim">${p.inside ? `in the ${p.inside.kind}` : `(${p.x}, ${p.y})`}</span>
-    </div>`).join('');
-
-  const bag = [
-    ['gold', a.bag.gold], ['supplies', a.bag.supplies], ['relics', a.bag.relics],
-  ].map(([k, v]) => `<span class="bagItem"><b>${v}</b> ${k}</span>`).join('');
-
-  const journal = a.journal.map((q) => `
-    <div class="quest ${q.done ? 'done' : ''}">
-      <span>${q.done ? '✓' : '○'} ${q.text}</span>
-      <span class="dim">${Math.min(q.have, q.need)}/${q.need}</span>
-    </div>`).join('');
-
-  $('scores').innerHTML = `
-    <div class="advTop">
-      <span>Day <b>${game.turn}</b></span>
-      <span>Score <b>${a.score()}</b></span>
-    </div>
-    <div class="bag">${bag}</div>
-    <h2>Party</h2>${party}
-    <h2>Journal</h2>${journal}`;
+    </div>${active && agendas ? agendas : ''}`;
 }
 
 function syncPanel() {
-  if (game.adventure) adventurePanel();
-  else $('scores').innerHTML = game.players.map(scoreRow).join('');
+  const custom = game.m.panel();
+  $('scores').innerHTML = custom != null ? custom : game.players.map(scoreRow).join('');
+  $('lead').innerHTML = game.m.lead ? game.m.lead() : '';
+
+  // The Chronicle's free-text box is re-created on every panel render, so wire
+  // it up here rather than once at startup.
+  const own = $('ownLine');
+  if (own) {
+    own.onkeydown = (e) => {
+      if (e.key !== 'Enter' || !own.value.trim()) return;
+      game.m.writeOwn(own.value.trim());
+    };
+  }
+
   $('deckCount').textContent = game.interior ? game.interior.deck.length : game.deck.length;
   const cur = currentTile();
-  $('tileName').textContent = cur && cur.type ? `${cur.type.id} · ${cur.type.name}` : '—';
-  $('phase').textContent = PHASE_TEXT[game.phase] || '—';
+  $('tileName').textContent = cur
+    ? (cur.piece ? `${cur.piece.name} · ${cur.piece.cells.length} cells`
+      : cur.type ? `${cur.type.id} · ${cur.type.name}` : '—')
+    : '—';
+  const status = game.m.status();
+  $('phase').textContent = (PHASE_TEXT[game.phase] || '—') + (status ? ` · ${status}` : '');
   $('log').innerHTML = game.log.map((l) => `<div class="entry">${l}</div>`).join('');
+  $('export').style.display = game.m.toMarkdown ? '' : 'none';
+  renderMarket();
   renderActions();
   drawPreview();
 }
+
+$('export').onclick = () => {
+  if (!game.m.toMarkdown) return;
+  const blob = new Blob([game.m.toMarkdown()], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `chronicle-${game.seed ?? 'run'}.md`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
 
 // --- loop -------------------------------------------------------------------
 
@@ -358,14 +430,13 @@ function syncPanel() {
 let lastSig = '';
 function signature() {
   const inv = game.interior;
-  const a = game.adventure;
   return [
     game.phase, game.current, game.rot, game.deck.length, game.board.size,
-    game.tile ? game.tile.id : '-', game.log.length, game.turn,
+    game.tile ? game.tile.id : '-', game.log.length, game.turn, game.round,
+    game.market ? game.market.join('') : '-',
     inv ? `${inv.deck.length}/${inv.rot}/${inv.board.size}/${inv.pos.x},${inv.pos.y}` : '-',
     game.walker ? (game.walker.selected?.id ?? '-') : '-',
-    game.expedition ? game.expedition.pawns.length : '-',
-    a ? `${a.party.length}:${a.bag.gold},${a.bag.supplies},${a.bag.relics}:${a.claimed.size}` : '-',
+    game.m.piece ? game.m.piece.cells.map((c) => `${c.dx}${c.dy}${c.rot}`).join('') : '-',
     game.players.map((p) => `${p.score}/${p.meeples}`).join(','),
   ].join('|');
 }
@@ -379,7 +450,9 @@ function frame() {
 
 renderGroups();
 onModeChange();
+game = bind(new Game({ players: 2, groups: [...enabledGroups] }));
+syncPanel();
 frame();
 
 // Handy for poking at state from the devtools console while iterating.
-window.LAB = { get game() { return game; }, renderer, newGame, THEME, sfx };
+window.LAB = { get game() { return game; }, renderer, newGame, THEME, sfx, MODES };

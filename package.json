@@ -1,0 +1,9 @@
+{
+  "name": "tile-lab",
+  "private": true,
+  "type": "module",
+  "description": "Marks src/ as ES modules so the headless harness in tools/ can import them under Node. The game itself still has no build step and no dependencies.",
+  "scripts": {
+    "test": "node tools/harness.mjs"
+  }
+}

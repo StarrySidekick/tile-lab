@@ -34,6 +34,7 @@
   <script type="module">
     import { TILE_TYPES, CAVE_TYPES, GROUPS } from './src/tiles.js';
     import { drawTile, drawMeeple, PLAYER_COLORS } from './src/art.js';
+    import { makePiece, rotatePiece, validatePiece } from './src/pieces.js';
 
     const out = document.getElementById('out');
     const SIZE = 240;
@@ -78,7 +79,48 @@
     // ?group=outposts shows one group on its own — handy on a small screen.
     const only = new URLSearchParams(location.search).get('group');
 
-    const links = ['all', ...GROUPS.map((g) => g.id), 'cave']
+    /**
+     * Sprawl's pieces are generated, not authored, so the thing worth looking
+     * at is whether the generator is producing valid seams and a decent spread
+     * of shapes. A red seam here is a bug in pieces.js, not in a tile.
+     */
+    function pieceSection(n = 12) {
+      out.insertAdjacentHTML('beforeend',
+        `<h2 class="group">Sprawl pieces</h2>
+         <p class="note">Generated on the fly: a shape is picked, then filled with tiles whose shared edges agree. Reload for a new dozen.</p>`);
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      for (let i = 0; i < n; i++) {
+        const piece = rotatePiece(makePiece(Math.random, ['base']), Math.floor(Math.random() * 4));
+        const err = validatePiece(piece);
+        const el = document.createElement('div');
+        el.className = 'card';
+        const scale = SIZE / Math.max(piece.w, piece.h);
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = SIZE;
+        const ctx = cv.getContext('2d');
+        for (const c of piece.cells) {
+          ctx.save();
+          ctx.translate(c.dx * scale, c.dy * scale);
+          ctx.scale(scale, scale);
+          ctx.translate(0.5, 0.5);
+          ctx.rotate((c.rot & 3) * Math.PI / 2);
+          ctx.translate(-0.5, -0.5);
+          drawTile(ctx, c.type);
+          ctx.restore();
+        }
+        el.appendChild(cv);
+        el.insertAdjacentHTML('beforeend', `
+          <h3>${piece.name}</h3>
+          <p>${piece.cells.length} cells · ${piece.w}×${piece.h}</p>
+          <p class="edges">${piece.cells.map((c) => c.type.id).join(' ')}</p>
+          <p class="${err ? 'marks' : ''}" style="${err ? 'color:#d06a5a!important' : ''}">${err || 'seams ok'}</p>`);
+        grid.appendChild(el);
+      }
+      out.appendChild(grid);
+    }
+
+    const links = ['all', ...GROUPS.map((g) => g.id), 'pieces', 'cave']
       .map((g) => `<a href="?group=${g}"${(only || 'all') === g ? ' style="color:var(--accent)"' : ''}>${g}</a>`)
       .join(' · ');
     out.insertAdjacentHTML('beforeend', `<p class="note">Show: ${links}</p>`);
@@ -88,6 +130,7 @@
       const list = TILE_TYPES.filter((t) => t.group === g.id);
       if (list.length) section(g.name, g.note, list);
     }
+    if (!only || only === 'all' || only === 'pieces') pieceSection();
     if (!only || only === 'all' || only === 'cave') {
       section('Cave pool', 'Only drawn inside caves. Passages connect like roads; everything else is solid rock.', CAVE_TYPES, true);
     }

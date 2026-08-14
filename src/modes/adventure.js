@@ -16,12 +16,14 @@
 // Sites are claimed the first time anyone in the party stands on them.
 // ---------------------------------------------------------------------------
 
-import { keyOf } from './board.js';
-import { Interior } from './interior.js';
+import { keyOf } from '../board.js';
+import { Interior } from '../interior.js';
 import {
   MARKS, SIDE_STEP, rotPoint,
   buildCaveDeck, buildCityDeck,
-} from './tiles.js';
+} from '../tiles.js';
+import { PLAYER_COLORS } from '../theme.js';
+import { Mode } from './mode.js';
 
 export const ADVENTURE_RULES = {
   roadDash: 2,          // tiles you may cover along a road
@@ -35,18 +37,81 @@ const FOLLOWER_NAMES = [
   'Rusl', 'Ilia', 'Colin', 'Telma', 'Ashei', 'Shad', 'Auru', 'Fyer', 'Purlo',
 ];
 
-export class Adventure {
-  constructor(game) {
-    this.game = game;
+export class Adventure extends Mode {
+  isWalker = true;
+  walkerKind = 'party';
+
+  setup() {
     this.party = [];
     this.nextId = 1;
     this.claimed = new Set();       // "x,y#markIndex" already taken
     this.visitedCities = new Set(); // city component roots already entered
     this.bag = { gold: 0, supplies: ADVENTURE_RULES.startSupplies, relics: 0 };
-    this.selected = null;
     this.journal = makeJournal();
-
     this.hero = this.add('You', true);
+  }
+
+  // --- mode hooks -----------------------------------------------------------
+
+  afterPlace() { return 'move'; }
+
+  get visiblePawns() { return this.outside; }
+
+  select(p) {
+    if (p.inside) return false;
+    this.selected = p;
+    return true;
+  }
+
+  moveSelected(x, y) { return !!this.selected && this.move(this.selected, x, y); }
+
+  interiorArrive(inv) { this.arriveInside(inv.owner); }
+  leaveInterior(inv, how) { this.leaveInside(inv.owner, how); }
+
+  enterCity() { return !!this.selected && this.enterCityWith(this.selected); }
+  canEnterCity() {
+    const p = this.selected;
+    return !!p && !p.inside && !!this.cityGateAt(p.x, p.y);
+  }
+
+  figureStyle(p) { return { color: p.hero ? 0 : 1, hero: !!p.hero }; }
+
+  actions() {
+    const out = [];
+    if (this.canEnterCity()) out.push({ label: 'Enter the city', key: 'E', fn: (g) => g.enterCity() });
+    return out;
+  }
+
+  finish() {
+    this.game.players[0].score = this.score();
+    const done = this.journal.filter((q) => q.done).length;
+    this.game.say(`The road ends. ${done}/${this.journal.length} journal entries, ${this.game.players[0].score} points.`);
+  }
+
+  /** Party / satchel / journal, in place of the score table. */
+  panel() {
+    const sel = this.selected;
+    const party = this.party.map((p) => `
+      <div class="member ${sel === p ? 'sel' : ''}">
+        <span class="swatch" style="background:${p.hero ? PLAYER_COLORS[0] : PLAYER_COLORS[1]}"></span>
+        <span class="pname">${p.hero ? '★ ' : ''}${p.name}</span>
+        <span class="dim">${p.inside ? `in the ${p.inside.kind}` : `(${p.x}, ${p.y})`}</span>
+      </div>`).join('');
+
+    const bag = [['gold', this.bag.gold], ['supplies', this.bag.supplies], ['relics', this.bag.relics]]
+      .map(([k, v]) => `<span class="bagItem"><b>${v}</b> ${k}</span>`).join('');
+
+    const journal = this.journal.map((q) => `
+      <div class="quest ${q.done ? 'done' : ''}">
+        <span>${q.done ? '✓' : '○'} ${q.text}</span>
+        <span class="dim">${Math.min(q.have, q.need)}/${q.need}</span>
+      </div>`).join('');
+
+    return `
+      <div class="advTop"><span>Day <b>${this.game.turn}</b></span><span>Score <b>${this.score()}</b></span></div>
+      <div class="bag">${bag}</div>
+      <h2>Party</h2>${party}
+      <h2>Journal</h2>${journal}`;
   }
 
   add(name, hero = false) {
@@ -190,7 +255,7 @@ export class Adventure {
     return null;
   }
 
-  enterCity(p) {
+  enterCityWith(p) {
     const gate = this.cityGateAt(p.x, p.y);
     if (!gate || p.inside) return false;
     const size = gate.data.tiles.size;
@@ -227,7 +292,7 @@ export class Adventure {
   }
 
   /** Pick up whatever the party member is standing on inside an interior. */
-  interiorArrive(p) {
+  arriveInside(p) {
     const inv = p.inside;
     if (!inv) return;
     for (const m of inv.freshMarks()) {
@@ -237,14 +302,14 @@ export class Adventure {
       if (info.loot) this.game.emit('treasure');
       this.game.say(`${p.name} finds the ${info.label}${lootText(info.loot)}`);
       if (m.kind === 'library') this.progress('relics');
-      if (m.kind === 'shaft') this.leaveInterior(p, 'climbs out through a shaft');
+      if (m.kind === 'shaft') this.leaveInside(p, 'climbs out through a shaft');
     }
     // "Districts" means city streets specifically — cave passages don't count.
     if (inv.kind === 'city') this.progress('districts');
     this.checkJournal();
   }
 
-  leaveInterior(p, how = 'returns to the surface') {
+  leaveInside(p, how = 'returns to the surface') {
     if (!p.inside) return;
     p.x = p.inside.entry.x;
     p.y = p.inside.entry.y;
@@ -285,3 +350,14 @@ function makeJournal() {
     { text: 'Discover twelve districts',   track: 'districts', need: 12, have: 0, reward: 12, done: false },
   ];
 }
+
+Adventure.spec = {
+  id: 'adventure',
+  name: 'Adventure (solo)',
+  Mode: Adventure,
+  groups: ['base', 'roads', 'outposts', 'citylife', 'adventure'],
+  solo: true,
+  playerName: () => 'Hero',
+  opening: 'You set out from the crossroads with nothing but the road ahead.',
+  hint: 'Solo. Place a tile, then move one of your party. Two tiles along a road; off-road costs supplies.',
+};

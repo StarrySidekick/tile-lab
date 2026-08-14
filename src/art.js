@@ -202,7 +202,201 @@ function district(ctx, roof, glyph) {
   if (glyph) glyph(ctx);
 }
 
+/** A blunt tower body — keeps, forts and skyholds are all variations on it. */
+function turret(ctx, w, h, fill) {
+  ctx.fillStyle = fill;
+  ctx.beginPath();
+  ctx.rect(-w / 2, -h / 2, w, h);
+  ctx.fill(); ctx.stroke();
+  for (let x = -w / 2; x < w / 2 - 0.01; x += w / 3) {   // crenellations
+    ctx.beginPath();
+    ctx.rect(x, -h / 2 - 0.12, w / 6, 0.13);
+    ctx.fill(); ctx.stroke();
+  }
+}
+
 const MARK_ART = {
+  // --- marches ---------------------------------------------------------------
+  stronghold(ctx) {
+    turret(ctx, 0.34, 0.72, THEME.city);
+    turret(ctx, 0.72, 0.42, THEME.cityShade);
+    ctx.fillStyle = THEME.gold;                 // banner
+    ctx.beginPath();
+    ctx.moveTo(0.17, -0.50);
+    ctx.lineTo(0.52, -0.40);
+    ctx.lineTo(0.17, -0.28);
+    ctx.closePath();
+    ctx.fill();
+  },
+  fort(ctx) {
+    turret(ctx, 0.60, 0.46, THEME.cityShade);
+    ctx.fillStyle = THEME.timber;               // gate
+    ctx.beginPath(); ctx.rect(-0.10, 0.00, 0.20, 0.23); ctx.fill(); ctx.stroke();
+  },
+  hill(ctx) {
+    ctx.fillStyle = THEME.fieldAlt;
+    ctx.beginPath();
+    ctx.moveTo(-0.56, 0.30);
+    ctx.quadraticCurveTo(-0.16, -0.36, 0.10, 0.06);
+    ctx.quadraticCurveTo(0.30, 0.34, 0.56, 0.30);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.fieldEdge;
+    ctx.beginPath();
+    ctx.moveTo(0.02, 0.30);
+    ctx.quadraticCurveTo(0.26, -0.12, 0.44, 0.12);
+    ctx.quadraticCurveTo(0.52, 0.24, 0.58, 0.30);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  },
+  ford(ctx) {
+    ctx.strokeStyle = THEME.shield;
+    ctx.lineWidth = 0.10;
+    for (const y of [-0.12, 0.10, 0.32]) {
+      ctx.beginPath();
+      ctx.moveTo(-0.50, y);
+      ctx.quadraticCurveTo(-0.16, y - 0.14, 0.10, y);
+      ctx.quadraticCurveTo(0.34, y + 0.14, 0.54, y);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.055;
+  },
+  beacon(ctx) {
+    ctx.fillStyle = THEME.timber;               // brazier legs
+    ctx.beginPath();
+    ctx.moveTo(-0.20, 0.42); ctx.lineTo(-0.06, 0.02);
+    ctx.lineTo(0.06, 0.02); ctx.lineTo(0.20, 0.42);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.gold;                 // flame
+    ctx.beginPath();
+    ctx.moveTo(0, -0.52);
+    ctx.quadraticCurveTo(0.28, -0.16, 0.16, 0.02);
+    ctx.quadraticCurveTo(0, 0.10, -0.16, 0.02);
+    ctx.quadraticCurveTo(-0.28, -0.16, 0, -0.52);
+    ctx.fill();
+  },
+  muster(ctx) {
+    for (const x of [-0.26, 0, 0.26]) {         // a rack of spears
+      ctx.strokeStyle = THEME.timber;
+      ctx.lineWidth = 0.07;
+      ctx.beginPath(); ctx.moveTo(x, 0.42); ctx.lineTo(x, -0.40); ctx.stroke();
+      ctx.fillStyle = THEME.cityShade;
+      ctx.beginPath();
+      ctx.moveTo(x, -0.56); ctx.lineTo(x + 0.09, -0.34); ctx.lineTo(x - 0.09, -0.34);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.lineWidth = 0.055;
+  },
+
+  // --- descent ---------------------------------------------------------------
+  stair(ctx) {
+    ctx.fillStyle = '#241f2c';                  // a hole with steps going down
+    ctx.beginPath(); ctx.rect(-0.44, -0.34, 0.88, 0.74); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.cityShade;
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.rect(-0.40 + i * 0.05, 0.28 - i * 0.16, 0.80 - i * 0.10, 0.10);
+      ctx.fill();
+    }
+  },
+  bandit(ctx) {
+    ctx.fillStyle = THEME.timber;               // lean-to
+    ctx.beginPath();
+    ctx.moveTo(-0.46, 0.38); ctx.lineTo(-0.02, -0.40);
+    ctx.lineTo(0.14, -0.40); ctx.lineTo(0.30, 0.38);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#a8443a';                // crossed blades
+    ctx.lineWidth = 0.08;
+    ctx.beginPath();
+    ctx.moveTo(0.10, 0.34); ctx.lineTo(0.56, -0.10);
+    ctx.moveTo(0.56, 0.34); ctx.lineTo(0.10, -0.10);
+    ctx.stroke();
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.055;
+  },
+  wolves(ctx) {
+    ctx.fillStyle = '#4a4453';                  // head
+    ctx.beginPath();
+    ctx.moveTo(-0.34, -0.10); ctx.lineTo(-0.20, -0.46); ctx.lineTo(-0.04, -0.18);
+    ctx.lineTo(0.12, -0.46); ctx.lineTo(0.26, -0.08);
+    ctx.quadraticCurveTo(0.30, 0.34, -0.04, 0.38);
+    ctx.quadraticCurveTo(-0.38, 0.32, -0.34, -0.10);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.gold;                 // eyes
+    ctx.beginPath(); ctx.arc(-0.15, 0.02, 0.055, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0.09, 0.02, 0.055, 0, Math.PI * 2); ctx.fill();
+  },
+  barrow(ctx) {
+    ctx.fillStyle = THEME.fieldEdge;            // grass mound
+    ctx.beginPath();
+    ctx.ellipse(0, 0.16, 0.54, 0.34, 0, Math.PI, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#1c1822';                  // the dark doorway
+    ctx.beginPath();
+    ctx.moveTo(-0.14, 0.16); ctx.lineTo(-0.14, -0.06);
+    ctx.quadraticCurveTo(0, -0.22, 0.14, -0.06);
+    ctx.lineTo(0.14, 0.16);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  },
+  healer(ctx) {
+    district(ctx, '#6f8a5e', (c) => {
+      c.strokeStyle = THEME.plaster;
+      c.lineWidth = 0.09;
+      c.beginPath();
+      c.moveTo(0, 0.04); c.lineTo(0, 0.28);
+      c.moveTo(-0.12, 0.16); c.lineTo(0.12, 0.16);
+      c.stroke();
+      c.strokeStyle = THEME.timber;
+      c.lineWidth = 0.055;
+    });
+  },
+  chest(ctx) {
+    ctx.fillStyle = THEME.timber;
+    ctx.beginPath(); ctx.rect(-0.36, -0.06, 0.72, 0.38); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.roofDark;
+    ctx.beginPath();
+    ctx.moveTo(-0.36, -0.06);
+    ctx.quadraticCurveTo(0, -0.44, 0.36, -0.06);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.gold;
+    ctx.beginPath(); ctx.rect(-0.07, -0.10, 0.14, 0.18); ctx.fill();
+  },
+
+  // --- cloud -----------------------------------------------------------------
+  skyhold(ctx) {
+    turret(ctx, 0.40, 0.56, THEME.plaster);
+    ctx.fillStyle = 'rgba(255,255,255,0.30)';   // the cloud it rests on
+    ctx.beginPath();
+    ctx.ellipse(-0.18, 0.36, 0.30, 0.15, 0, 0, Math.PI * 2);
+    ctx.ellipse(0.20, 0.36, 0.26, 0.13, 0, 0, Math.PI * 2);
+    ctx.fill();
+  },
+  vane(ctx) {
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.08;
+    ctx.beginPath(); ctx.moveTo(0, 0.44); ctx.lineTo(0, -0.44); ctx.stroke();
+    ctx.fillStyle = THEME.teal;
+    ctx.beginPath();
+    ctx.moveTo(0.02, -0.44); ctx.lineTo(0.46, -0.24); ctx.lineTo(0.02, -0.06);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = 0.055;
+  },
+  raincatch(ctx) {
+    ctx.fillStyle = THEME.shield;               // a basin of caught water
+    ctx.beginPath();
+    ctx.moveTo(-0.40, -0.06); ctx.lineTo(0.40, -0.06);
+    ctx.lineTo(0.26, 0.34); ctx.lineTo(-0.26, 0.34);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = 0.06;
+    for (const x of [-0.20, 0.04, 0.24]) {
+      ctx.beginPath(); ctx.moveTo(x, -0.50); ctx.lineTo(x - 0.05, -0.16); ctx.stroke();
+    }
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.055;
+  },
+
   stable(ctx) {
     ctx.fillStyle = THEME.timber;
     ctx.fillRect(-0.38, -0.10, 0.76, 0.42);

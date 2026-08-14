@@ -21,20 +21,19 @@
         <div class="hand-meta">
           <div id="tileName">—</div>
           <div class="dim"><span id="deckCount">0</span> tiles left</div>
+          <div id="lead"></div>
           <div class="btns" id="actions"></div>
         </div>
       </section>
+
+      <section id="market" class="tools" style="display:none"></section>
 
       <section id="scores"></section>
 
       <section class="tools">
         <h2>Game</h2>
         <label class="row">Mode
-          <select id="mode">
-            <option value="classic">Classic</option>
-            <option value="expedition">Expedition</option>
-            <option value="adventure">Adventure (solo)</option>
-          </select>
+          <select id="mode"></select>
         </label>
         <label id="meepleRow"><input type="checkbox" id="useMeeples" checked /> Use meeples</label>
         <label class="row" id="playerRow">Players
@@ -42,9 +41,16 @@
             <option>2</option><option>3</option><option>4</option><option>5</option>
           </select>
         </label>
-        <label class="row">Seed <input id="seed" placeholder="blank = random" /></label>
+        <label class="row" id="seedRow">Seed <input id="seed" placeholder="blank = random" /></label>
         <button id="newGame" class="primary">New game</button>
+        <button id="export">Export the chronicle</button>
         <p class="hint" id="modeHint"></p>
+      </section>
+
+      <section class="tools">
+        <h2>Modifiers</h2>
+        <div id="modifiers"></div>
+        <p class="hint">Bolt onto any mode. Applied on the next new game (except fog).</p>
       </section>
 
       <section class="tools">
@@ -77,8 +83,8 @@
       </section>
 
       <footer class="dim">
-        drag to pan · scroll to zoom · right-click or <kbd>R</kbd> to rotate · <kbd>C</kbd> recenters
-        · <a href="./atlas.html">tile atlas</a>
+        drag to pan · scroll to zoom · <kbd>R</kbd> rotate · <kbd>F</kbd> flip · <kbd>1</kbd>–<kbd>4</kbd> pick
+        · <kbd>C</kbd> recenters · <a href="./atlas.html">tile atlas</a>
       </footer>
     </aside>
   </main>

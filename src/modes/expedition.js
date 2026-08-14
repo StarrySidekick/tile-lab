@@ -17,9 +17,11 @@
 //   market / keep / library / armoury → city landmarks; collect all four for a bonus
 // ---------------------------------------------------------------------------
 
-import { keyOf } from './board.js';
-import { Interior } from './interior.js';
-import { MARKS, CITY_LANDMARKS, buildCaveDeck, rotPoint, SIDE_STEP } from './tiles.js';
+import { keyOf } from '../board.js';
+import { Interior } from '../interior.js';
+import { MARKS, CITY_LANDMARKS, buildCaveDeck, rotPoint, SIDE_STEP } from '../tiles.js';
+import { PLAYER_COLORS } from '../theme.js';
+import { Mode } from './mode.js';
 
 export const EXPEDITION_RULES = {
   baseMoves: 1,
@@ -29,18 +31,79 @@ export const EXPEDITION_RULES = {
   movementRequiresRoad: false, // knob: gate movement on road connections instead
 };
 
-export class Expedition {
-  constructor(game) {
-    this.game = game;
+export class Expedition extends Mode {
+  isWalker = true;
+
+  setup() {
     this.pawns = [];
     this.nextId = 1;
     this.claimed = new Set();                 // "x,y#markIndex" already scored
-    this.collections = game.players.map(() => new Set());
+    this.collections = this.game.players.map(() => new Set());
     this.caves = new Map();                   // player id -> cave session
-    this.selected = null;                     // pawn being moved this turn
     this.moved = false;
+    for (const p of this.game.players) this.spawn(p.id, 0, 0);
+  }
 
-    for (const p of game.players) this.spawn(p.id, 0, 0);
+  // --- mode hooks -----------------------------------------------------------
+
+  afterPlace() {
+    this.beginMovement(this.game.current);
+    const mine = this.pawnsOf(this.game.current);
+    this.selected = mine.length === 1 ? mine[0] : null;
+    return 'move';
+  }
+
+  get visiblePawns() { return this.pawns.filter((p) => !p.inCave); }
+  get interior() { return this.caveOf(this.game.current); }
+
+  select(pawn) {
+    if (pawn.player !== this.game.current) return false;
+    this.selected = pawn;
+    return true;
+  }
+
+  moveSelected(x, y) { return !!this.selected && this.move(this.selected, x, y); }
+
+  rest() { return !!this.selected && this.doRest(this.selected); }
+
+  /** Expedition's endgame lets anyone still underground finish exploring. */
+  someoneStillInside(current) {
+    for (let i = 1; i <= this.game.players.length; i++) {
+      const p = (current + i) % this.game.players.length;
+      if (this.caves.has(p)) return p;
+    }
+    return null;
+  }
+
+  interiorArrive(inv) { this.caveArrive(inv); }
+  leaveInterior(inv, how) { this.leaveCave(inv, how); }
+
+  figureStyle(p) { return { color: p.player, hero: false }; }
+
+  actions() {
+    const out = [];
+    if (this.selected && this.canRest(this.selected)) {
+      out.push({ label: 'Rest at village', fn: (g) => g.restPawn() });
+    }
+    return out;
+  }
+
+  panel() {
+    return this.game.players.map((p, i) => {
+      const pawns = this.pawns.filter((q) => q.player === i);
+      const bits = [`${pawns.length} pawn${pawns.length > 1 ? 's' : ''}`];
+      if (pawns.some((q) => q.mounted)) bits.push('mounted');
+      if (pawns.some((q) => q.inCave)) bits.push('in cave');
+      const set = this.collections[i];
+      if (set.size) bits.push(`${set.size}/${CITY_LANDMARKS.length} landmarks`);
+      const active = i === this.game.current && this.game.phase !== 'over';
+      return `<div class="player ${active ? 'active' : ''}">
+          <span class="swatch" style="background:${PLAYER_COLORS[i]}"></span>
+          <span class="pname">${p.name}</span>
+          <span class="pmeta">${bits.join(' · ')}</span>
+          <span class="pscore">${p.score}</span>
+        </div>`;
+    }).join('');
   }
 
   spawn(player, x, y) {
@@ -140,7 +203,7 @@ export class Expedition {
     return !!cell && cell.type.marks.some((m) => m.kind === 'village') && !pawn.resting;
   }
 
-  rest(pawn) {
+  doRest(pawn) {
     if (!this.canRest(pawn)) return false;
     pawn.resting = true;
     this.game.say(`${this.game.players[pawn.player].name} rests at the village.`);
@@ -241,3 +304,14 @@ export class Expedition {
     this.game.emit('caveExit');
   }
 }
+
+Expedition.spec = {
+  id: 'expedition',
+  name: 'Expedition',
+  Mode: Expedition,
+  groups: ['base', 'outposts', 'citylife'],
+  minPlayers: 2,
+  maxPlayers: 5,
+  opening: 'The expedition sets out from the crossroads.',
+  hint: 'Place a tile, then walk a pawn. Landmarks go to whoever reaches them first.',
+};

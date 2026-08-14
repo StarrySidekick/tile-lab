@@ -48,6 +48,9 @@ export const GROUPS = [
   { id: 'outposts', name: 'Outposts', note: 'Stables, villages, towers, cave mouths.', classic: false, expedition: true, adventure: true },
   { id: 'citylife', name: 'City landmarks', note: 'Markets, keeps, libraries, armouries.', classic: false, expedition: true, adventure: true },
   { id: 'adventure', name: 'Adventure sites', note: 'Wayshrines, ruins, campsites, merchants.', classic: false, expedition: false, adventure: true },
+  { id: 'marches', name: 'War terrain', note: 'Keeps, forts, hills, fords, beacons.', classic: false, expedition: false, adventure: false },
+  { id: 'descent', name: 'Dangers', note: 'Stairs down, bandits, wolves, barrows.', classic: false, expedition: false, adventure: false },
+  { id: 'cloud', name: 'Cloud kingdom', note: 'Skyholds, windvanes, raincatches.', classic: false, expedition: false, adventure: false },
 ];
 
 export const TILE_TYPES = [
@@ -112,6 +115,29 @@ export const TILE_TYPES = [
   // Expedition does — three in a ~110 tile deck left most runs solo.
   { id: 'Af', n: 4, group: 'adventure', name: 'Hamlet',    feats: [road([W, S])],    marks: [mark('village')] },
   { id: 'Ag', n: 2, group: 'adventure', name: 'Crossroads village', feats: [road([N]), road([E]), road([S]), road([W])], marks: [mark('village')] },
+
+  // --- marches: terrain that matters for marching, not for scoring ----------
+  // The keep is a seed tile, so its edges are deliberately easy to build off:
+  // a road through and open field either side.
+  { id: 'Ma', n: 2, group: 'marches', name: 'Keep',     feats: [road([N, S])], marks: [mark('stronghold')] },
+  { id: 'Mb', n: 3, group: 'marches', name: 'Fort',     feats: [road([N, S])], marks: [mark('fort')] },
+  { id: 'Mc', n: 5, group: 'marches', name: 'Hill',     feats: [],             marks: [mark('hill')] },
+  { id: 'Md', n: 3, group: 'marches', name: 'Ford',     feats: [road([E, W])], marks: [mark('ford')] },
+  { id: 'Me', n: 3, group: 'marches', name: 'Beacon',   feats: [],             marks: [mark('beacon')] },
+  { id: 'Mf', n: 3, group: 'marches', name: 'Muster field', feats: [road([W, S])], marks: [mark('muster')] },
+
+  // --- descent: things that can kill you ------------------------------------
+  { id: 'Da', n: 2, group: 'descent', name: 'Stair down', feats: [road([N])],    marks: [mark('stair')] },
+  { id: 'Db', n: 4, group: 'descent', name: 'Bandit camp', feats: [road([N, S])], marks: [mark('bandit')] },
+  { id: 'Dc', n: 4, group: 'descent', name: 'Wolf den',   feats: [],             marks: [mark('wolves')] },
+  { id: 'Dd', n: 3, group: 'descent', name: 'Barrow',     feats: [],             marks: [mark('barrow')] },
+  { id: 'De', n: 3, group: 'descent', name: "Healer's hut", feats: [road([S])],  marks: [mark('healer')] },
+  { id: 'Df', n: 3, group: 'descent', name: 'Wayside cache', feats: [road([W, S])], marks: [mark('chest')] },
+
+  // --- cloud: the sky kingdom ----------------------------------------------
+  { id: 'Ka', n: 3, group: 'cloud', name: 'Skyhold',    feats: [city([N, W])],  marks: [mark('skyhold', 0)] },
+  { id: 'Kb', n: 4, group: 'cloud', name: 'Windvane',   feats: [road([N, S])],  marks: [mark('vane')] },
+  { id: 'Kc', n: 4, group: 'cloud', name: 'Raincatch',  feats: [],              marks: [mark('raincatch')] },
 
   { id: 'La', n: 2, group: 'citylife', name: 'Market',   feats: [city([N, W])],           marks: [mark('market', 0)] },
   { id: 'Lb', n: 2, group: 'citylife', name: 'Keep',     feats: [city([N, E, W], true)],  marks: [mark('keep', 0)] },
@@ -187,7 +213,50 @@ export const MARKS = {
   well:    { label: 'Well',      score: 1, loot: { supplies: 2 } },
   guild:   { label: 'Guild hall',score: 2, loot: { gold: 3 } },
   cache:   { label: 'Cache',     score: 1, loot: { gold: 2 } },
+
+  // marches: terrain modifiers rather than treasure. `defence` is added to a
+  // defender's strength; `home` marks a tile as a supply source.
+  stronghold: { label: 'Keep',    score: 0, defence: 3, home: true, note: 'Your seat. Supply flows from here.' },
+  fort:       { label: 'Fort',    score: 0, defence: 2, note: 'Whoever holds it defends at +2.' },
+  hill:       { label: 'Hill',    score: 0, defence: 1, note: 'High ground — defend at +1.' },
+  ford:       { label: 'Ford',    score: 0, defence: 0, note: 'A crossing. Nothing defends well here.' },
+  beacon:     { label: 'Beacon',  score: 1, defence: 0, note: 'Lights a region: +1 when you score it.' },
+  muster:     { label: 'Muster field', score: 0, defence: 0, muster: 1, note: 'Take a muster chit when you hold it.' },
+
+  // descent: hazards. `threat` is what you roll against; `heal` restores HP.
+  stair:   { label: 'Stair down', score: 0, exit: true, note: 'The way to the next depth.' },
+  bandit:  { label: 'Bandit camp', score: 2, threat: 2, loot: { gold: 5 } },
+  wolves:  { label: 'Wolf den',   score: 2, threat: 3, loot: { supplies: 3 } },
+  barrow:  { label: 'Barrow',     score: 4, threat: 4, loot: { relics: 1 } },
+  healer:  { label: "Healer's hut", score: 1, heal: 3, loot: { supplies: 1 } },
+  chest:   { label: 'Wayside cache', score: 1, loot: { gold: 4 } },
+
+  // cloud
+  skyhold:   { label: 'Skyhold',   score: 3, note: 'Crystallises the moment its city closes.' },
+  vane:      { label: 'Windvane',  score: 1, note: 'Anchors its tile against the drift.' },
+  raincatch: { label: 'Raincatch', score: 2, note: 'Worth points while it survives the round.' },
 };
+
+/**
+ * Two-faced tiles: the reverse of each tile. Flipping is an action, and the
+ * back is usually the wilder or more ruined version of the front. Listed one
+ * way round and mirrored below, so every pair works in both directions.
+ */
+const BACK_PAIRS = [
+  ['U', 'G'],    // road straight     <-> city across
+  ['V', 'N'],    // road bend         <-> city corner
+  ['E', 'Rb'],   // city edge         <-> road dead-end
+  ['B', 'Ab'],   // monastery         <-> ruin
+  ['W', 'R'],    // road 3-way        <-> city 3-sided
+  ['D', 'Ra'],   // city + road       <-> continuous crossroads
+  ['X', 'C'],    // road 4-way        <-> city all round
+  ['A', 'Ae'],   // monastery + road  <-> roadside ruin
+  ['H', 'Rc'],   // two cities        <-> double bend
+  ['P', 'Oc'],   // city corner+road  <-> watchtower
+];
+
+export const BACKS = Object.fromEntries(
+  BACK_PAIRS.flatMap(([a, b]) => [[a, b], [b, a]]));
 
 export const CITY_LANDMARKS = ['market', 'keep', 'library', 'armoury'];
 
@@ -252,7 +321,7 @@ export function rotPoint([x, y], rot) {
  * Build a shuffled draw pile from the enabled groups.
  * `groups` is a Set/array of group ids; the start tile is removed once.
  */
-export function buildDeck(groups, rng = Math.random, startId = 'D') {
+export function buildDeck(groups, rng = Math.random, startId = 'D', limit = 0) {
   const on = new Set(groups);
   const deck = [];
   for (const t of TILE_TYPES) {
@@ -261,6 +330,17 @@ export function buildDeck(groups, rng = Math.random, startId = 'D') {
   }
   const idx = deck.indexOf(startId);
   if (idx >= 0) deck.splice(idx, 1);
+  shuffle(deck, rng);
+  return limit > 0 ? deck.slice(0, limit) : deck;
+}
+
+/**
+ * A deck built from an explicit list of {id, n} counts rather than from whole
+ * groups — what Descent uses to reweight the pool stage by stage.
+ */
+export function weightedDeck(counts, rng = Math.random) {
+  const deck = [];
+  for (const { id, n } of counts) for (let i = 0; i < n; i++) deck.push(id);
   return shuffle(deck, rng);
 }
 

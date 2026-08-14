@@ -81,13 +81,24 @@ export class Renderer {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.w, this.h);
     this.drawBackdrop();
+    if (game.options?.tide) this.drawWater(game);
+
+    const fog = game.options?.fog ? this.fogSet(game) : null;
 
     for (const cell of game.board.cells.values()) {
       if (!this.onScreen(cell.x, cell.y)) continue;
-      this.inCell(cell.x, cell.y, cell.rot, (c) => drawTile(c, cell.type));
+      const overlay = game.m.cellOverlay?.(cell) || null;
+      const lift = (overlay?.lift || 0) * 0.08;
+      if (lift) this.drawStackShadow(cell, lift);
+      ctx.save();
+      if (fog && !fog.has(`${cell.x},${cell.y}`)) ctx.globalAlpha = 0.26;
+      this.inCell(cell.x, cell.y - lift, cell.rot, (c) => drawTile(c, cell.type));
+      ctx.restore();
+      if (overlay) this.drawCellOverlay(cell, overlay, lift);
     }
 
-    if (game.phase === 'place' && game.tile) this.drawPlacementHints(game);
+    if (game.phase === 'lift') this.drawLiftTargets(game);
+    if (game.phase === 'place') this.drawPlacementHints(game);
 
     this.drawMeeples(game);
     if (game.phase === 'meeple') this.drawMeepleTargets(game);
@@ -134,10 +145,133 @@ export class Renderer {
     ctx.stroke();
   }
 
-  drawPlacementHints(game) {
+  // --- overlays the modes ask for -------------------------------------------
+
+  /** Strata: a dropped shadow under a raised tile sells the height. */
+  drawStackShadow(cell, lift) {
     const ctx = this.ctx;
-    const legal = game.board.legalPlacements(game.tile, { free: game.free });
-    const spots = new Set(legal.map((p) => `${p.x},${p.y}`));
+    const [sx, sy] = this.toScreen(cell.x, cell.y);
+    const z = this.cam.zoom;
+    ctx.fillStyle = 'rgba(8,6,12,0.55)';
+    ctx.fillRect(sx + z * 0.04, sy + z * 0.04, z, z);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(sx, sy - lift * z + z, z, lift * z);
+  }
+
+  drawCellOverlay(cell, overlay, lift) {
+    const ctx = this.ctx;
+    const [sx, sy0] = this.toScreen(cell.x, cell.y);
+    const sy = sy0 - lift * this.cam.zoom;
+    const z = this.cam.zoom;
+
+    if (overlay.banner != null) {
+      const color = PLAYER_COLORS[overlay.banner];
+      ctx.save();
+      ctx.globalAlpha = 0.16;
+      ctx.fillStyle = color;
+      ctx.fillRect(sx, sy, z, z);
+      ctx.restore();
+      ctx.fillStyle = color;                       // corner pennant
+      ctx.beginPath();
+      ctx.moveTo(sx + z, sy);
+      ctx.lineTo(sx + z, sy + z * 0.26);
+      ctx.lineTo(sx + z * 0.74, sy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    if (overlay.lift) {
+      ctx.fillStyle = THEME.gold;
+      ctx.font = `600 ${Math.max(9, z * 0.15)}px ui-sans-serif, system-ui, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`▲${overlay.lift + 1}`, sx + z * 0.06, sy + z * 0.06);
+    }
+
+    // Cirrus: solid land is hard-edged, cloud is hazed and cool. The two have
+    // to be distinguishable at a glance or the lift rules read as arbitrary.
+    if (overlay.crystal) {
+      ctx.strokeStyle = 'rgba(95,191,174,0.75)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(sx + 1, sy + 1, z - 2, z - 2);
+    }
+    if (overlay.cloud) {
+      const haze = ctx.createLinearGradient(sx, sy, sx, sy + z);
+      haze.addColorStop(0, 'rgba(206,222,240,0.20)');
+      haze.addColorStop(0.55, 'rgba(186,204,228,0.10)');
+      haze.addColorStop(1, 'rgba(150,170,205,0.22)');
+      ctx.fillStyle = haze;
+      ctx.fillRect(sx, sy, z, z);
+    }
+  }
+
+  drawLiftTargets(game) {
+    const ctx = this.ctx;
+    const pulse = 0.5 + Math.sin(performance.now() / 360) * 0.16;
+    for (const s of game.m.allLiftable()) {
+      if (!this.onScreen(s.x, s.y)) continue;
+      const [sx, sy] = this.toScreen(s.x, s.y);
+      const z = this.cam.zoom;
+      ctx.fillStyle = `rgba(107,90,140,${0.18 + pulse * 0.22})`;
+      ctx.fillRect(sx, sy, z, z);
+      ctx.strokeStyle = THEME.violet;
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(sx + 2, sy + 2, z - 4, z - 4);
+    }
+  }
+
+  /** The rising tide: everything at or below the waterline is sea. */
+  drawWater(game) {
+    if (game.waterline == null) return;
+    const ctx = this.ctx;
+    const [, sy] = this.toScreen(0, game.waterline);
+    if (sy > this.h) return;
+    const top = Math.max(0, sy);
+    const g = ctx.createLinearGradient(0, top, 0, this.h);
+    g.addColorStop(0, 'rgba(74,111,138,0.55)');
+    g.addColorStop(1, 'rgba(30,52,74,0.85)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, top, this.w, this.h - top);
+    if (sy > 0) {
+      ctx.strokeStyle = 'rgba(150,200,220,0.55)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, sy);
+      ctx.lineTo(this.w, sy);
+      ctx.stroke();
+    }
+  }
+
+  /** Fog: only cells near your own figures stay bright. */
+  fogSet(game) {
+    const near = new Set();
+    const walker = game.walker;
+    const seeds = walker
+      ? walker.visiblePawns.filter((p) => p.player == null || p.player === game.current)
+      : (game.lastPlaced ? [game.lastPlaced] : []);
+    const R = 3;
+    for (const s of seeds) {
+      for (let dx = -R; dx <= R; dx++) {
+        for (let dy = -R; dy <= R; dy++) {
+          if (Math.abs(dx) + Math.abs(dy) <= R) near.add(`${s.x + dx},${s.y + dy}`);
+        }
+      }
+    }
+    return near;
+  }
+
+  // --- placement ------------------------------------------------------------
+
+  drawPlacementHints(game) {
+    if (game.m.piece) return this.drawPieceHints(game);
+    if (!game.tile) return;
+    const ctx = this.ctx;
+    const legal = game.board.legalPlacements(game.tile, game.placeOpts());
+    const spots = new Set(legal.filter((p) => !game.m.canPlaceAt || this.modeAllows(game, p))
+      .map((p) => `${p.x},${p.y}`));
 
     for (const k of spots) {
       const [x, y] = k.split(',').map(Number);
@@ -152,8 +286,10 @@ export class Renderer {
     }
 
     const h = this.hover;
-    if (!h || game.board.get(h.x, h.y)) return;
+    if (!h) return;
+    const covering = !!game.board.get(h.x, h.y);
     const ok = game.canPlaceAt(h.x, h.y);
+    if (covering && !ok) return;              // don't smear a ghost over the board
     ctx.save();
     ctx.globalAlpha = ok ? 0.92 : 0.32;
     this.inCell(h.x, h.y, game.rot, (c) => drawTile(c, game.tile));
@@ -164,6 +300,47 @@ export class Renderer {
     ctx.lineWidth = 3;
     ctx.strokeStyle = ok ? THEME.gold : '#a8443a';
     ctx.strokeRect(sx + 1.5, sy + 1.5, z - 3, z - 3);
+  }
+
+  modeAllows(game, p) {
+    const saved = game.rot;
+    game.rot = p.rot;
+    const ok = game.m.canPlaceAt(p.x, p.y);
+    game.rot = saved;
+    return ok;
+  }
+
+  /** Sprawl: the ghost is a whole shape, so every cell of it gets drawn. */
+  drawPieceHints(game) {
+    const ctx = this.ctx;
+    const piece = game.m.piece;
+    const anchors = piece.filler
+      ? game.board.frontier().filter((c) => game.m.canPlaceAt(c.x, c.y))
+      : game.board.legalPiecePlacements(piece);
+
+    for (const a of anchors) {
+      if (!this.onScreen(a.x, a.y)) continue;
+      const [sx, sy] = this.toScreen(a.x, a.y);
+      const z = this.cam.zoom;
+      ctx.fillStyle = 'rgba(212,175,95,0.07)';
+      ctx.fillRect(sx + z * 0.3, sy + z * 0.3, z * 0.4, z * 0.4);
+    }
+
+    const h = this.hover;
+    if (!h) return;
+    const ok = game.m.canPlaceAt(h.x, h.y);
+    ctx.save();
+    ctx.globalAlpha = ok ? 0.92 : 0.30;
+    for (const c of piece.cells) {
+      this.inCell(h.x + c.dx, h.y + c.dy, c.rot, (cc) => drawTile(cc, c.type));
+    }
+    ctx.restore();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = ok ? THEME.gold : '#a8443a';
+    for (const c of piece.cells) {
+      const [sx, sy] = this.toScreen(h.x + c.dx, h.y + c.dy);
+      ctx.strokeRect(sx + 1.5, sy + 1.5, this.cam.zoom - 3, this.cam.zoom - 3);
+    }
   }
 
   // --- classic meeples ------------------------------------------------------
@@ -203,10 +380,14 @@ export class Renderer {
 
   // --- expedition pawns -----------------------------------------------------
 
-  /** Colour for a figure — Expedition goes by player, Adventure by role. */
+  /** The mode decides what a figure looks like — by player, or by role. */
   pawnColor(game, p) {
-    if (game.adventure) return p.hero ? PLAYER_COLORS[0] : PLAYER_COLORS[1];
-    return PLAYER_COLORS[p.player];
+    const style = game.m.figureStyle ? game.m.figureStyle(p) : { color: p.player ?? 0 };
+    return PLAYER_COLORS[style.color % PLAYER_COLORS.length];
+  }
+
+  pawnHero(game, p) {
+    return !!(game.m.figureStyle ? game.m.figureStyle(p).hero : p.hero);
   }
 
   drawPawns(game) {
@@ -223,7 +404,9 @@ export class Renderer {
         if (!this.onScreen(dest.x, dest.y)) continue;
         const [sx, sy] = this.toScreen(dest.x, dest.y);
         const z = this.cam.zoom;
-        const special = dest.warp || (dest.steps === 2 && dest.byRoad);
+        // `warp` doubles as "this is a fight" in Marches — either way it's the
+        // move you want to notice before you click it.
+        const special = dest.warp || (dest.steps >= 2 && dest.byRoad);
         const costly = dest.cost > 0;
         const hue = costly ? '182,88,68' : special ? '95,191,174' : '212,175,95';
         ctx.fillStyle = `rgba(${hue},${0.08 + pulse * 0.13})`;
@@ -244,7 +427,7 @@ export class Renderer {
     }
 
     // Figures, fanned out when several share a tile.
-    const list = game.adventure ? game.adventure.outside : walker.pawns.filter((p) => !p.inCave);
+    const list = walker.visiblePawns;
     const byCell = new Map();
     for (const p of list) {
       const k = `${p.x},${p.y}`;
@@ -259,7 +442,7 @@ export class Renderer {
           : [Math.cos(i / group.length * Math.PI * 2) * 0.22, Math.sin(i / group.length * Math.PI * 2) * 0.22];
         const [sx, sy] = this.toScreen(cx + 0.5 + off[0], cy + 0.62 + off[1]);
         const size = this.cam.zoom * 0.46;
-        const mine = game.adventure ? true : p.player === game.current;
+        const mine = p.player == null || p.player === game.current;
         if (mine && game.phase === 'move') {
           ctx.beginPath();
           ctx.arc(sx, sy, size * 0.62, 0, Math.PI * 2);
@@ -268,7 +451,7 @@ export class Renderer {
           ctx.stroke();
         }
         drawMeeple(ctx, sx, sy, size, this.pawnColor(game, p), {
-          mounted: p.mounted, resting: p.resting, hero: p.hero,
+          mounted: p.mounted, resting: p.resting, hero: this.pawnHero(game, p),
         });
         this.pawnSpots.push({ pawn: p, sx, sy, r: size * 0.62 });
       });
@@ -366,7 +549,7 @@ export class Renderer {
     const owner = inv.owner;
     const [px, py] = origin(inv.pos.x + 0.5, inv.pos.y + 0.62);
     drawMeeple(ctx, px, py, g.zoom * 0.46, this.pawnColor(game, owner), {
-      mounted: owner.mounted, hero: owner.hero,
+      mounted: owner.mounted, hero: this.pawnHero(game, owner),
     });
 
     // Falloff: a lantern underground, lamplit streets in a city.
