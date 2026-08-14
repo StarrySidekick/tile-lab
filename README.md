@@ -3,9 +3,13 @@
 **Play it: <https://starrysidekick.github.io/tile-lab/>**
 · [tile atlas](https://starrysidekick.github.io/tile-lab/atlas.html)
 
-A Carcassonne-style tile game built to be **fast to iterate on**. No build step, no
-dependencies, no image assets — plain ES modules and a canvas. Edit a file, hit
-refresh, keep playing.
+A sandbox for experimenting with tile mechanics and game modes, built to be
+**fast to iterate on**. No build step, no dependencies, no image assets — plain
+ES modules and a canvas. Edit a file, hit refresh, keep playing.
+
+Three modes are built. **[MODES.md](MODES.md) is the queue** — twelve more
+scoped out, with what each one changes mechanically, what it costs against the
+current engine, and what question it answers.
 
 ## Run it locally
 
@@ -21,7 +25,7 @@ python3 -m http.server 5180 --directory carcassonne-lab
 It does need to be *served* — ES modules won't load over `file://`, so
 double-clicking `index.html` won't work.
 
-## Three modes
+## Three modes so far
 
 ### Classic
 
@@ -257,6 +261,7 @@ and keep them in the journal, so a run becomes a story you can retell.
 roads and bounded by city walls — a road-bend tile has *two* distinct fields,
 not one. That's a change to the tile format rather than an addition, so the
 "roads that cut off farms" tiles above are currently about the *geometry*; the
-fields they carve aren't scored yet. It's the natural next build.
+fields they carve aren't scored yet. It's the natural next build, and the
+wargame mode in [MODES.md](MODES.md) needs it too.
 
 Also absent: an AI opponent, networked play, and persistence.
