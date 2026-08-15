@@ -9,18 +9,27 @@
 // The generic turn is: draw something placeable -> place it -> let the mode
 // decide what happens next -> score whatever closed -> next player.
 //
-// MODIFIERS (a drafting market, hidden agendas, two-faced tiles, a rising
-// tide) are orthogonal to modes and live here, because they apply to all of
-// them.
+// MECHANICS (see mechanics.js) are orthogonal to modes and live here, because
+// they apply to all of them: the drafting market, lifting placed tiles,
+// building on top of them, and the Carcassonne expansion rules.
 //
 // Pure state; no DOM and no canvas in here.
 // ---------------------------------------------------------------------------
 
 import { Board } from './board.js';
-import { TILES, GROUPS, BACKS, buildDeck } from './tiles.js';
+import {
+  TILES, GROUPS, BACKS, ABBEY_TILE, NO_MEEPLE, MARKS,
+  buildDeck, buildRiverDeck, opposite, SIDE_STEP,
+  RIVER_MOUTH, RIVER_SPRING,
+} from './tiles.js';
 import { PLAYER_NAMES } from './theme.js';
 import { MODES, MODE_BY_ID } from './modes/index.js';
 import { AGENDAS } from './modes/agendas.js';
+import {
+  MECHANICS, MECHANIC_GROUPS, canLift, liftableCells, coverProblem,
+  claimableFeatures, walkTargets, innsAndCathedrals, goodsOn, crownAndRoad,
+  WATER, MAX_STACK,
+} from './mechanics.js';
 
 export const RULES = {
   meeplesPerPlayer: 7,
@@ -28,26 +37,20 @@ export const RULES = {
   cityPerTile: 2,
   cityPerShield: 2,
   roadPerTile: 1,
+  goodsBonus: 10,
 };
 
-export const MODIFIERS = [
-  { id: 'market',   name: 'Drafting market', note: 'Choose from a face-up row instead of drawing blind. Taking a later tile discards the ones before it.' },
-  { id: 'agendas',  name: 'Hidden agendas',  note: 'Two secret objectives each, scored at the end.' },
-  { id: 'fog',      name: 'Fog of war',      note: 'Tiles far from your figures fade out.' },
-  { id: 'twoFaced', name: 'Two-faced tiles', note: 'Many tiles have a reverse. Flip before you place.' },
-  { id: 'tide',     name: 'Rising tide',     note: 'A waterline climbs the board every few rounds, drowning whatever it reaches.' },
-];
-
 export const DEFAULT_GROUPS = Object.fromEntries(MODES.map((m) => [m.id, m.groups]));
-export { MODES, GROUPS };
+export { MODES, GROUPS, MECHANICS, MECHANIC_GROUPS };
 
 const MARKET_SIZE = 4;
 const TIDE_PERIOD = 3;          // rounds between waterline steps
+const GOODS = ['wine', 'grain', 'cloth'];
 
 export class Game {
   constructor({
     players = 2, seed = null, mode = 'classic', meeples = true,
-    groups = null, options = {},
+    groups = null, options = {}, tilesPerTurn = 1,
   } = {}) {
     const spec = MODE_BY_ID[mode] || MODE_BY_ID.classic;
     this.mode = spec.id;
@@ -69,6 +72,9 @@ export class Game {
       name: spec.playerName ? spec.playerName(i) : PLAYER_NAMES[i],
       score: 0,
       meeples: RULES.meeplesPerPlayer,
+      big: this.has('bigMeeple') ? 1 : 0,
+      abbeys: this.has('abbey') ? 1 : 0,
+      goods: { wine: 0, grain: 0, cloth: 0 },
     }));
 
     this.current = 0;
@@ -86,27 +92,40 @@ export class Game {
     this.flipped = false;
     this.waterline = null;
 
-    // The mode builds its own state, then tells us what the deck and the
-    // opening tiles are.
+    // How many tiles a player lays before the turn passes. Each one is a full
+    // place-and-act sequence, so in a walking mode it's N tiles and N moves.
+    this.tilesPerTurn = Math.max(1, Math.min(5, tilesPerTurn));
+    this.tilesLeft = 0;
+    this.useBig = false;
+    this.usingAbbey = false;
+    this.builderUsed = false;
+    this.pendingWalk = null;
+    this.crown = { city: null, cityBy: null, road: null, roadBy: null };
+
     this.m = new spec.Mode(this);
     this.deck = this.m.deck();
-    for (const s of this.m.seeds()) this.board.place(s.x, s.y, TILES[s.id], s.rot || 0, { owner: s.owner ?? null });
+    this.river = this.has('river') ? this.startRiver() : null;
 
-    if (this.options.agendas) this.dealAgendas();
-    if (this.options.tide) this.setWaterline(spec.tideStart ?? 6);
+    for (const s of this.seeds()) {
+      this.board.place(s.x, s.y, TILES[s.id], s.rot || 0, { owner: s.owner ?? null });
+    }
+
+    if (this.has('agendas')) this.dealAgendas();
+    if (this.has('tide')) this.setWaterline(spec.tideStart ?? 6);
 
     this.m.setup();
-    this.say(spec.opening || 'Start tile placed.');
+    this.say(this.river ? 'The river rises. Lay it out before anything else.' : (spec.opening || 'Start tile placed.'));
     this.startTurn();
   }
+
+  /** Is a mechanic switched on? A mode may force one on for itself. */
+  has(id) { return !!(this.options?.[id] || this.spec?.mechanics?.includes(id)); }
 
   get player() { return this.players[this.current]; }
   get modeName() { return this.spec.name; }
 
   /** The sub-map replacing this player's turn, if any. */
   get interior() { return this.m.interior; }
-
-  /** Kept for Expedition's "let people finish their caves" endgame check. */
   get caves() { return this.m.caves || new Map(); }
 
   /** Legacy accessors so render/main can stay mode-agnostic. */
@@ -119,8 +138,77 @@ export class Game {
     if (this.log.length > 80) this.log.pop();
   }
 
+  /** Subscribe to gameplay events (sound, and anything else later). */
   on(fn) { this.listeners.push(fn); return this; }
   emit(kind, data = {}) { for (const fn of this.listeners) fn(kind, data); }
+
+  // --- the river ------------------------------------------------------------
+
+  /**
+   * The river is laid before the game proper: the spring first, then tiles in
+   * turn, and the lake last. It may not double back on itself — two curves in
+   * a row bending the same way would make a U-turn — but only an *immediate*
+   * reversal is illegal, which is the official reading.
+   */
+  startRiver() {
+    const deck = buildRiverDeck(this.rng);
+    deck.unshift(RIVER_MOUTH);          // drawn last, since we pop from the end
+    return { deck, end: null, lastTurn: 0, done: false };
+  }
+
+  /** The opening tiles: the spring if there's a river, else the mode's seeds. */
+  seeds() {
+    if (!this.river) return this.m.seeds();
+    this.river.end = { x: 0, y: 0, side: 0 };   // the spring flows north
+    return [{ x: 0, y: 0, id: RIVER_SPRING, rot: 0 }];
+  }
+
+  /** The cell the next river tile has to occupy. */
+  riverTarget() {
+    const e = this.river?.end;
+    if (!e) return null;
+    const [dx, dy] = SIDE_STEP[e.side];
+    return { x: e.x + dx, y: e.y + dy };
+  }
+
+  /** Where the river leaves a tile, and which way it turned to get there. */
+  riverFlow(type, rot) {
+    const incoming = opposite(this.river.end.side);
+    const feat = type.feats.find((f) => f.type === 'river');
+    if (!feat) return null;
+    const world = feat.sides.map((s) => (s + rot) % 4);
+    if (!world.includes(incoming)) return null;
+    const outgoing = world.find((s) => s !== incoming);
+    if (outgoing == null) return { outgoing: null, turn: 0 };   // the lake
+    const delta = (outgoing - incoming + 4) % 4;
+    return { outgoing, turn: delta === 2 ? 0 : delta };
+  }
+
+  riverLegal(x, y, type, rot) {
+    const target = this.riverTarget();
+    if (!target || x !== target.x || y !== target.y) return false;
+    const flow = this.riverFlow(type, rot);
+    if (!flow) return false;
+    // Two bends the same way in a row would turn the river through 180°.
+    if (flow.turn !== 0 && flow.turn === this.river.lastTurn) return false;
+    return true;
+  }
+
+  advanceRiver(cell) {
+    const flow = this.riverFlow(cell.type, cell.rot);
+    if (!flow || flow.outgoing == null) return this.endRiver();
+    this.river.end = { x: cell.x, y: cell.y, side: flow.outgoing };
+    this.river.lastTurn = flow.turn;
+    if (!this.river.deck.length) this.endRiver();
+  }
+
+  endRiver() {
+    this.river.done = true;
+    this.say('The river reaches the lake. The country around it is open now.');
+    this.emit('caveExit');
+  }
+
+  get riverActive() { return !!this.river && !this.river.done; }
 
   // --- turn structure -------------------------------------------------------
 
@@ -132,7 +220,11 @@ export class Game {
       return;
     }
     if (this.m.startTurn() === false) return;    // mode took over (boons, stages)
-    if (this.deck.length === 0 && !this.market?.length) {
+    if (this.tilesLeft <= 0) {
+      this.tilesLeft = this.tilesPerTurn;
+      this.builderUsed = false;
+    }
+    if (!this.riverActive && this.deck.length === 0 && !this.market?.length) {
       const other = this.m.someoneStillInside(this.current);
       if (other != null) { this.current = other; return this.startTurn(); }
       return this.finish();
@@ -140,16 +232,15 @@ export class Game {
     this.drawTile();
   }
 
-  /**
-   * Pull the next placeable tile. With the market modifier on, this fills a
-   * face-up row and hands the choice to the player instead.
-   */
   drawTile() {
+    this.usingAbbey = false;
+    this.useBig = false;
     // A mode with its own draw owns it completely — including deciding that
     // there's nothing left and ending the game.
-    if (this.m.drawNext) return void this.m.drawNext();
+    if (this.m.drawNext && !this.riverActive) return void this.m.drawNext();
     this.flipped = false;
-    if (this.options.market && this.spec.market !== false) return this.fillMarket();
+    if (this.riverActive) return this.drawRiverTile();
+    if (this.has('market') && this.spec.market !== false) return this.fillMarket();
 
     while (this.deck.length) {
       let id;
@@ -167,6 +258,35 @@ export class Game {
     this.finish();
   }
 
+  /** River tiles come off their own pile, and only fit in one place. */
+  drawRiverTile() {
+    while (this.river.deck.length) {
+      const id = this.river.deck.pop();
+      const type = TILES[id];
+      if (this.riverPlacements(type).length) {
+        this.tile = type;
+        this.rot = 0;
+        this.phase = 'place';
+        return;
+      }
+      this.say(`River tile ${id} had nowhere to go — discarded.`);
+    }
+    this.endRiver();
+    this.drawTile();
+  }
+
+  riverPlacements(type) {
+    const target = this.riverTarget();
+    if (!target) return [];
+    const out = [];
+    for (let rot = 0; rot < 4; rot++) {
+      if (!this.riverLegal(target.x, target.y, type, rot)) continue;
+      if (!this.board.canPlace(target.x, target.y, type, rot, { free: this.free })) continue;
+      out.push({ x: target.x, y: target.y, rot });
+    }
+    return out;
+  }
+
   /** Make a drawn tile the current one, if it can actually be played. */
   offer(id) {
     const type = TILES[id];
@@ -181,18 +301,17 @@ export class Game {
     return this.board.hasAnyPlacement(type, this.placeOpts());
   }
 
-  placeOpts() { return { free: this.free, ...(this.m.placeOpts?.() || {}) }; }
+  placeOpts() {
+    const opts = { free: this.free, ...(this.m.placeOpts?.() || {}) };
+    if (this.has('stack') && !this.riverActive) opts.cover = true;
+    return opts;
+  }
 
-  // --- the drafting market modifier ----------------------------------------
+  // --- the drafting market --------------------------------------------------
 
-  /**
-   * Fill a face-up row and hand the choice to the player. Duel and Cirrus reuse
-   * this for their own draft and hand — same UI, different refill rules.
-   */
   fillMarket(size = MARKET_SIZE, row = null) {
     const market = row || this.market || [];
     this.market = market;
-    // Anything unplayable is dead weight in a face-up row, so cull it.
     for (let i = market.length - 1; i >= 0; i--) {
       if (!this.placeableNow(TILES[market[i]])) market.splice(i, 1);
     }
@@ -205,10 +324,6 @@ export class Game {
     return true;
   }
 
-  /**
-   * Take the i-th tile in the row. In the market modifier, reaching past a
-   * tile discards it — that's the whole cost model, and it needs no currency.
-   */
   takeFromMarket(i) {
     if (this.phase !== 'market' || !this.market || i < 0 || i >= this.market.length) return false;
     const discards = this.spec.marketDiscards !== false;
@@ -224,17 +339,20 @@ export class Game {
 
   rotate(dir = 1) {
     if (this.phase === 'place') {
-      if (this.m.rotate) this.m.rotate(dir); else this.rot = (this.rot + dir + 4) % 4;
+      // The mode only handles rotation for tiles it dealt. An abbey out of
+      // hand, or a river tile, is the host's and turns the ordinary way.
+      const mine = this.usingAbbey || this.riverActive;
+      if (this.m.rotate && !mine) this.m.rotate(dir);
+      else this.rot = (this.rot + dir + 4) % 4;
     } else if (this.phase === 'interior-place' && this.interior) {
       this.interior.rotate(dir);
     } else return;
     this.emit('rotate');
   }
 
-  /** Two-faced modifier: swap the held tile for its reverse. */
   canFlip() {
-    if (!this.options.twoFaced || this.phase !== 'place') return false;
-    if (this.m.piece) return false;          // a piece isn't one tile to turn over
+    if (!this.has('twoFaced') || this.phase !== 'place') return false;
+    if (this.m.piece || this.usingAbbey || this.riverActive) return false;
     return !!this.tile && !!BACKS[this.tile.id];
   }
 
@@ -252,25 +370,123 @@ export class Game {
     return true;
   }
 
+  // --- the abbey (expansion 5) ---------------------------------------------
+
+  canPlayAbbey() {
+    return this.has('abbey') && this.phase === 'place' && !this.usingAbbey
+      && this.player.abbeys > 0 && this.abbeyGaps().length > 0;
+  }
+
+  abbeyGaps() {
+    const out = [];
+    for (const { x, y } of this.board.frontier()) {
+      if (this.board.isEnclosedGap(x, y)) out.push({ x, y });
+    }
+    return out;
+  }
+
+  playAbbey() {
+    if (!this.canPlayAbbey()) return false;
+    this.heldTile = this.tile;
+    this.tile = ABBEY_TILE;
+    this.rot = 0;
+    this.usingAbbey = true;
+    this.say(`${this.player.name} takes out their abbey.`);
+    this.emit('rotate');
+    return true;
+  }
+
+  // --- lifting (Cirrus's rule, anywhere) -----------------------------------
+
+  canLiftNow() {
+    if (!this.has('lift') || this.riverActive) return false;
+    if (this.phase !== 'place' && this.phase !== 'market') return false;
+    return liftableCells(this.board).length > 0;
+  }
+
+  beginLift() {
+    if (!this.canLiftNow()) return false;
+    this.phase = 'lift';
+    return true;
+  }
+
+  cancelLift() {
+    if (this.phase !== 'lift') return false;
+    this.phase = this.tile ? 'place' : 'market';
+    return true;
+  }
+
+  /** Pick a placed tile up; you play it instead of the one you drew. */
+  liftAt(x, y) {
+    if (this.phase !== 'lift' || !canLift(this.board, x, y)) return false;
+    const cell = this.board.remove(x, y);
+    if (this.tile) this.deck.push(this.tile.id);   // the drawn tile goes back
+    this.tile = cell.type;
+    this.rot = cell.rot;
+    this.market = null;
+    this.phase = 'place';
+    this.say(`${this.player.name} lifts ${cell.type.id} off (${x}, ${y}).`);
+    this.emit('rotate');
+    return true;
+  }
+
+  // --- placement ------------------------------------------------------------
+
   canPlaceAt(x, y) {
     if (this.phase !== 'place') return false;
+    if (this.riverActive) return this.riverLegal(x, y, this.tile, this.rot)
+      && this.board.canPlace(x, y, this.tile, this.rot, { free: this.free });
+    if (this.usingAbbey) return this.board.isEnclosedGap(x, y);
     if (this.m.canPlaceAt) return this.m.canPlaceAt(x, y);
+    if (this.board.get(x, y) && coverProblem(this.board, x, y)) return false;
     return this.board.canPlace(x, y, this.tile, this.rot, this.placeOpts());
   }
 
   placeAt(x, y) {
     if (this.phase !== 'place') return false;
-    if (this.m.placeAt) return this.m.placeAt(x, y);
+    if (this.m.placeAt && !this.usingAbbey && !this.riverActive) return this.m.placeAt(x, y);
     if (!this.canPlaceAt(x, y)) return false;
+
+    const covering = !!this.board.get(x, y);
     const cell = this.board.place(x, y, this.tile, this.rot, {
-      owner: this.current, ...(this.m.placeOpts?.() || {}),
+      owner: this.current, over: covering,
+      ...(this.m.placeOpts?.() || {}),
     });
     this.lastPlaced = cell;
-    this.tile = null;
-    this.say(`${this.player.name} played ${cell.type.id} at (${x}, ${y}).`);
+    if (this.usingAbbey) {
+      this.player.abbeys--;
+      this.tile = this.heldTile || null;      // your drawn tile is still to come
+      this.heldTile = null;
+      this.usingAbbey = false;
+      this.say(`${this.player.name} closes the gap at (${x}, ${y}) with their abbey.`);
+    } else {
+      this.tile = null;
+      this.say(`${this.player.name} played ${cell.type.id} at (${x}, ${y})${covering ? ` — level ${cell.h + 1}` : ''}.`);
+    }
     this.emit('place');
+    if (this.riverActive) this.advanceRiver(cell);
+    this.checkBuilder(cell);
     this.afterPlace(cell);
     return true;
+  }
+
+  /**
+   * Builder: extending a feature you already hold buys you another tile this
+   * turn. The real expansion has a separate figure you place; here any of your
+   * followers on the extended feature counts, which is the same decision
+   * without the extra bookkeeping.
+   */
+  checkBuilder(cell) {
+    if (!this.has('builder') || this.builderUsed) return;
+    const mine = cell.type.feats.some((f, i) => {
+      const d = this.board.featureOf(cell.x, cell.y, i);
+      return d && d.tiles.size > 1 && d.meeples.some((m) => m.player === this.current);
+    });
+    if (!mine) return;
+    this.builderUsed = true;
+    this.tilesLeft++;
+    this.say(`${this.player.name}'s builder is at work — another tile this turn.`);
+    this.emit('landmark');
   }
 
   /** Hand off to the mode; a null answer means "just end the turn". */
@@ -278,49 +494,138 @@ export class Game {
     const next = this.m.afterPlace(cell);
     if (!next) return this.endTurn();
     this.phase = next;
-    // Nothing to claim is not a decision — don't make them press skip.
     if (next === 'meeple' && this.meepleOptions().length === 0) this.endTurn();
   }
 
   /**
    * Board clicks the host doesn't recognise go to the mode, which is how
-   * Cirrus lifts a tile and Marches picks a battle.
+   * Marches picks a battle and Cirrus lifts its own way.
    */
   cellClick(x, y) {
     switch (this.phase) {
       case 'place': return this.placeAt(x, y);
       case 'move': return this.movePawn(x, y);
+      case 'lift': return this.m.onCellClick ? this.m.onCellClick(x, y) : this.liftAt(x, y);
+      case 'recall': return this.recallAt(x, y);
+      case 'walk': return this.walkTo(x, y);
       default: return this.m.onCellClick?.(x, y) ?? false;
     }
   }
 
-  // --- classic-style meeples (shared by any mode that opts in) --------------
+  // --- followers ------------------------------------------------------------
 
   meepleOptions() {
     if (this.phase !== 'meeple' || !this.lastPlaced || !this.useMeeples) return [];
     if (this.player.meeples <= 0) return [];
     const { x, y, type } = this.lastPlaced;
-    return type.feats
-      .map((f, i) => ({ i, f }))
-      .filter(({ i }) => {
-        const d = this.board.featureOf(x, y, i);
-        return d && d.meeples.length === 0;
-      });
+    return claimableFeatures(type).filter(({ i }) => {
+      const d = this.board.featureOf(x, y, i);
+      return d && d.meeples.length === 0;
+    });
   }
 
   placeMeeple(featIdx) {
     if (this.phase !== 'meeple') return false;
     if (!this.meepleOptions().some((o) => o.i === featIdx)) return false;
     const { x, y, type } = this.lastPlaced;
-    this.board.addMeeple(x, y, featIdx, this.current);
+    const big = this.useBig && this.player.big > 0;
+    this.board.addMeeple(x, y, featIdx, this.current, big);
     this.player.meeples--;
-    this.say(`${this.player.name} claimed the ${type.feats[featIdx].type}.`);
+    if (big) this.player.big--;
+    this.useBig = false;
+    this.say(`${this.player.name} claimed the ${type.feats[featIdx].type}${big ? ' with their big follower' : ''}.`);
     this.emit('meeple');
     this.endTurn();
     return true;
   }
 
   skipMeeple() { if (this.phase === 'meeple') this.endTurn(); }
+
+  toggleBig() {
+    if (!this.has('bigMeeple') || this.player.big <= 0) return false;
+    this.useBig = !this.useBig;
+    return true;
+  }
+
+  // --- recalling a follower -------------------------------------------------
+
+  canRecall() {
+    return this.has('recall') && this.phase === 'meeple' && this.myMeeples().length > 0;
+  }
+
+  myMeeples() {
+    return [...this.board.cells.values()].filter((c) => c.meeple && c.meeple.player === this.current);
+  }
+
+  beginRecall() {
+    if (!this.canRecall()) return false;
+    this.phase = 'recall';
+    return true;
+  }
+
+  recallAt(x, y) {
+    const cell = this.board.get(x, y);
+    if (!cell || !cell.meeple || cell.meeple.player !== this.current) return false;
+    const big = cell.meeple.big;
+    cell.meeple = null;
+    this.board.rebuild();
+    this.player.meeples++;
+    if (big) this.player.big++;
+    this.say(`${this.player.name} calls a follower home from (${x}, ${y}).`);
+    this.emit('meeple');
+    this.endTurn();
+    return true;
+  }
+
+  // --- the wagon: followers walk on ----------------------------------------
+
+  /**
+   * When a feature scores, a follower on it may step along the road to the
+   * next unclaimed, unfinished thing rather than going back to supply. Only
+   * the player whose turn it is gets the choice; everyone else's followers go
+   * home, because stopping the game to ask four people in turn is worse than
+   * the rule is good.
+   */
+  offerWalk(d) {
+    if (!this.has('wagon')) return false;
+    const mine = d.meeples.filter((m) => m.player === this.current);
+    if (!mine.length) return false;
+    for (const m of mine) {
+      const targets = walkTargets(this.board, m.x, m.y, d);
+      if (!targets.length) continue;
+      this.pendingWalk = { from: m, targets, big: !!m.big };
+      this.phase = 'walk';
+      return true;
+    }
+    return false;
+  }
+
+  walkTo(x, y) {
+    const w = this.pendingWalk;
+    if (!w) return false;
+    const t = w.targets.find((o) => o.x === x && o.y === y);
+    if (!t) return false;
+    this.board.addMeeple(t.x, t.y, t.feat, this.current, w.big);
+    this.player.meeples--;
+    if (w.big) this.player.big--;
+    this.say(`${this.player.name}'s follower walks on to the ${t.type} at (${x}, ${y}).`);
+    this.pendingWalk = null;
+    this.emit('step');
+    this.resumeTurn();
+    return true;
+  }
+
+  declineWalk() {
+    if (!this.pendingWalk) return false;
+    this.pendingWalk = null;
+    this.resumeTurn();
+    return true;
+  }
+
+  /** Carry on from wherever a mid-turn prompt interrupted us. */
+  resumeTurn() {
+    this.finishTurnStep();
+  }
 
   // --- movement (walking modes) --------------------------------------------
 
@@ -398,20 +703,39 @@ export class Game {
   }
 
   endInteriorTurn(inv) {
-    if (this.interior === inv) {          // a shaft may already have ejected them
+    if (this.interior === inv) {
       inv.draw();
       if (!inv.tile && inv.atEntrance()) this.m.leaveInterior(inv, 'has seen all there is to see here');
     }
     this.nextPlayer();
   }
 
-  // --- shared ---------------------------------------------------------------
+  // --- ending a turn --------------------------------------------------------
 
   endTurn() {
     if (this.lastPlaced) {
       const { x, y } = this.lastPlaced;
-      for (const d of this.board.completedBy(x, y)) this.m.onClosed(d, this.current);
+      for (const d of this.board.completedBy(x, y)) {
+        this.noteClosure(d, this.current);
+        this.m.onClosed(d, this.current);
+        if (this.offerWalk(d)) return;      // wait for them to pick a target
+      }
     }
+    this.finishTurnStep();
+  }
+
+  /**
+   * One tile is done. Either deal the next one of this turn's allowance, or
+   * pass play on.
+   */
+  finishTurnStep() {
+    this.tilesLeft--;
+    const more = this.riverActive || this.deck.length > 0 || (this.market?.length > 0);
+    if (this.tilesLeft > 0 && more && this.phase !== 'over') {
+      this.phase = 'place';
+      return this.startTurn();
+    }
+    this.tilesLeft = 0;
     this.m.endTurn();
     this.nextPlayer();
   }
@@ -424,14 +748,14 @@ export class Game {
     if (wrapped) {
       this.round++;
       this.m.endRound();
-      if (this.options.tide) this.advanceTide();
+      if (this.has('tide')) this.advanceTide();
     }
     if (this.phase === 'over') return;
     this.startTurn();
     if (this.phase !== 'over') this.emit('turn');
   }
 
-  // --- the rising tide modifier --------------------------------------------
+  // --- the rising tide ------------------------------------------------------
 
   /**
    * The waterline is just a moving southern bound on the board, which is why
@@ -465,7 +789,7 @@ export class Game {
     if (this.board.size === 0) this.finish();
   }
 
-  // --- hidden agendas modifier ---------------------------------------------
+  // --- hidden agendas -------------------------------------------------------
 
   dealAgendas() {
     const pool = AGENDAS.slice();
@@ -486,26 +810,88 @@ export class Game {
     }
   }
 
-  // --- scoring helpers modes reuse -----------------------------------------
+  // --- scoring --------------------------------------------------------------
 
-  /** Classic payout: majority of meeples, or the closer when meeples are off. */
+  /** Track who finished the biggest city and the longest road. */
+  noteClosure(d, closer) {
+    if (closer == null) return;
+    if (d.type === 'city' && (!this.crown.city || d.tiles.size > this.crown.city)) {
+      this.crown.city = d.tiles.size;
+      this.crown.cityBy = closer;
+    }
+    if (d.type === 'road' && (!this.crown.road || d.tiles.size > this.crown.road)) {
+      this.crown.road = d.tiles.size;
+      this.crown.roadBy = closer;
+    }
+    if (this.has('goods')) {
+      for (const g of goodsOn(this.board, d)) {
+        this.players[closer].goods[g]++;
+        this.say(`${this.players[closer].name} takes the ${g} from the city.`);
+      }
+    }
+  }
+
+  /**
+   * What a component pays, with every scoring mechanic folded in: the water a
+   * city sits beside, and the inn or cathedral on it.
+   */
+  valueOf(d, final) {
+    let pts = this.board.value(d, final);
+    if (this.has('inns')) {
+      const ic = innsAndCathedrals(this.board, d, final);
+      if (ic.void) return 0;
+      pts = Math.round(pts * ic.mult);
+    }
+    if (d.type === 'city') {
+      const { lakes, rivers } = this.board.adjacentWater(d);
+      pts += lakes * WATER.lake + rivers * WATER.river;
+    }
+    return pts;
+  }
+
+  /** Classic payout: majority of followers, or the closer when meeples are off. */
   award(d, final, closer = null) {
-    const pts = this.board.value(d, final);
+    const pts = this.valueOf(d, final);
     let winners;
     if (this.useMeeples) winners = this.board.majority(d);
     else winners = final || closer == null ? [] : [closer];
 
-    if (winners.length) {
+    if (winners.length && pts > 0) {
       for (const p of winners) this.players[p].score += pts;
       const who = winners.map((p) => this.players[p].name).join(' & ');
       const n = d.tiles.size;
       this.say(`${final ? 'Endgame: ' : ''}${d.type} of ${n} tile${n > 1 ? 's' : ''} → ${who} +${pts}`);
       this.emit('score', { points: pts });
-    } else if (!final) {
+    } else if (!final && !winners.length) {
       this.say(`A ${d.type} closed with nobody on it.`);
     }
     if (!final && this.useMeeples) {
-      for (const p of this.board.reclaim(d)) this.players[p].meeples++;
+      for (const m of this.board.reclaim(d)) {
+        this.players[m.player].meeples++;
+        if (m.big) this.players[m.player].big++;
+      }
+    }
+  }
+
+  scoreGoods() {
+    for (const g of GOODS) {
+      const best = Math.max(...this.players.map((p) => p.goods[g]));
+      if (best <= 0) continue;
+      const winners = this.players.filter((p) => p.goods[g] === best);
+      for (const p of winners) p.score += RULES.goodsBonus;
+      this.say(`${g}: ${winners.map((p) => p.name).join(' & ')} +${RULES.goodsBonus}`);
+    }
+  }
+
+  scoreCrown() {
+    const { cities, roads } = crownAndRoad(this.board);
+    if (this.crown.cityBy != null && cities) {
+      this.players[this.crown.cityBy].score += cities;
+      this.say(`The King (largest city, ${this.crown.city} tiles) — ${this.players[this.crown.cityBy].name} +${cities}`);
+    }
+    if (this.crown.roadBy != null && roads) {
+      this.players[this.crown.roadBy].score += roads;
+      this.say(`The Robber Baron (longest road, ${this.crown.road} tiles) — ${this.players[this.crown.roadBy].name} +${roads}`);
     }
   }
 
@@ -515,7 +901,9 @@ export class Game {
     this.tile = null;
     this.market = null;
     this.m.finish();
-    if (this.options.agendas) this.scoreAgendas();
+    if (this.has('goods')) this.scoreGoods();
+    if (this.has('king')) this.scoreCrown();
+    if (this.has('agendas')) this.scoreAgendas();
     if (!this.spec.solo) {
       const best = Math.max(...this.players.map((p) => p.score));
       const winners = this.players.filter((p) => p.score === best).map((p) => p.name);
@@ -535,4 +923,4 @@ export function mulberry32(a) {
   };
 }
 
-export { buildDeck };
+export { buildDeck, MAX_STACK, NO_MEEPLE, MARKS };

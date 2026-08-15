@@ -7,7 +7,8 @@
 // UI without this file changing.
 // ---------------------------------------------------------------------------
 
-import { Game, DEFAULT_GROUPS, MODES, MODIFIERS } from './game.js';
+import { Game, DEFAULT_GROUPS, MODES, MECHANICS, MECHANIC_GROUPS } from './game.js';
+import { groupsFor } from './mechanics.js';
 import { Renderer } from './render.js';
 import { drawTile, PLAYER_COLORS } from './art.js';
 import { THEME } from './theme.js';
@@ -20,7 +21,7 @@ const $ = (id) => document.getElementById(id);
 const sfx = new Sfx();
 
 let enabledGroups = new Set(DEFAULT_GROUPS.classic);
-let modifiers = {};
+let mechanics = {};
 let game;
 
 /** Every Game is fresh, so sound has to be re-subscribed each time. */
@@ -38,11 +39,15 @@ function newGame() {
   const players = Number($('playerCount').value);
   const seedRaw = $('seed').value.trim();
   const seed = seedRaw === '' ? null : hashSeed(seedRaw);
+  // A mechanic that needs its own tiles switches them on with it, so ticking
+  // "Inns & Cathedrals" doesn't silently do nothing.
+  for (const g of groupsFor(mechanics)) enabledGroups.add(g);
   game = bind(new Game({
     players, seed, mode,
     meeples: $('useMeeples').checked,
     groups: [...enabledGroups],
-    options: { ...modifiers },
+    options: { ...mechanics },
+    tilesPerTurn: Number($('tilesPerTurn').value) || 1,
   }));
   game.free = $('freePlace').checked;
   renderer.centerOn(0, 0);
@@ -159,9 +164,12 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (game.phase === 'meeple') game.skipMeeple();
     else if (game.phase === 'move') game.holdPosition();
+    else if (game.phase === 'walk') game.declineWalk();
     else if (game.phase === 'interior-move') game.interiorHold();
   }
   if (e.key === 'e' || e.key === 'E') game.enterCity();
+  if (e.key === 'l' || e.key === 'L') game.beginLift();
+  if (e.key === 'b' || e.key === 'B') game.toggleBig();
   if (e.key === 'd' || e.key === 'D') { renderer.showDebug = !renderer.showDebug; $('debug').checked = renderer.showDebug; }
   if (e.key === 'c' || e.key === 'C') {
     if (game.lastPlaced) renderer.centerOn(game.lastPlaced.x, game.lastPlaced.y);
@@ -199,16 +207,23 @@ for (const t of TILE_TYPES) {
   $('forceTile').appendChild(o);
 }
 
-$('modifiers').innerHTML = MODIFIERS.map((m) => `
-  <label title="${m.note}"><input type="checkbox" data-mod="${m.id}" /> ${m.name}</label>`).join('');
-for (const el of $('modifiers').querySelectorAll('input[data-mod]')) {
+$('mechanics').innerHTML = MECHANIC_GROUPS.map((g) => {
+  const items = MECHANICS.filter((m) => m.group === g.id);
+  if (!items.length) return '';
+  return `<h3>${g.name}</h3>` + items.map((m) => `
+    <label title="${m.note}"><input type="checkbox" data-mech="${m.id}" /> ${m.name}</label>`).join('');
+}).join('');
+for (const el of $('mechanics').querySelectorAll('input[data-mech]')) {
   el.onchange = (e) => {
-    const id = e.target.dataset.mod;
-    if (e.target.checked) modifiers[id] = true; else delete modifiers[id];
+    const id = e.target.dataset.mech;
+    if (e.target.checked) mechanics[id] = true; else delete mechanics[id];
     // Fog is pure rendering, so it can take effect without a new game.
-    if (id === 'fog' && game) game.options.fog = !!modifiers.fog;
+    if (id === 'fog' && game) game.options.fog = !!mechanics.fog;
+    if (MECHANICS.find((m) => m.id === id)?.groups?.length) renderGroups();
   };
 }
+
+$('hints').onchange = (e) => { renderer.showHints = e.target.checked; };
 
 // --- sound controls ---------------------------------------------------------
 
@@ -227,6 +242,7 @@ $('testSound').onchange = (e) => { if (e.target.value) sfx.play(e.target.value);
 $('testSound').onclick = (e) => { if (e.target.value) sfx.play(e.target.value); };
 
 function renderGroups() {
+  for (const g of groupsFor(mechanics)) enabledGroups.add(g);
   $('groups').innerHTML = GROUPS.map((g) => `
     <label title="${g.note}">
       <input type="checkbox" data-group="${g.id}" ${enabledGroups.has(g.id) ? 'checked' : ''} />
@@ -291,6 +307,8 @@ const PHASE_TEXT = {
   place: 'Place the tile — R rotates',
   market: 'Choose a tile',
   lift: 'Click a tile to lift it',
+  recall: 'Click one of your followers to call it home',
+  walk: 'Walk the follower on, or send it home',
   meeple: 'Claim a feature, or skip',
   move: 'Move — click a figure, then a target',
   story: 'Say what is there',
@@ -340,7 +358,17 @@ function renderActions() {
 
   if (game.phase === 'place' || game.phase === 'interior-place') add('Rotate', 'R', () => game.rotate(1));
   if (game.canFlip()) add('Flip it over', 'F', () => game.flipTile());
-  if (game.phase === 'meeple') add('Skip meeple', 'Space', () => game.skipMeeple());
+  if (game.canPlayAbbey()) add(`Play your abbey (${game.player.abbeys})`, '', () => game.playAbbey());
+  if (game.canLiftNow()) add('Lift a placed tile', 'L', () => game.beginLift());
+  if (game.phase === 'lift') add('Cancel lift', '', () => game.cancelLift());
+  if (game.phase === 'meeple') {
+    add('Skip meeple', 'Space', () => game.skipMeeple());
+    if (game.has('bigMeeple') && game.player.big > 0) {
+      add(game.useBig ? 'Using the BIG follower' : 'Use the big follower', 'B', () => game.toggleBig());
+    }
+    if (game.canRecall()) add('Recall a follower', '', () => game.beginRecall());
+  }
+  if (game.phase === 'walk') add('Send it home instead', 'Space', () => game.declineWalk());
   if (game.phase === 'move') {
     add('Hold position', 'Space', () => game.holdPosition());
   }
@@ -437,6 +465,8 @@ function signature() {
     inv ? `${inv.deck.length}/${inv.rot}/${inv.board.size}/${inv.pos.x},${inv.pos.y}` : '-',
     game.walker ? (game.walker.selected?.id ?? '-') : '-',
     game.m.piece ? game.m.piece.cells.map((c) => `${c.dx}${c.dy}${c.rot}`).join('') : '-',
+    game.tilesLeft, game.useBig ? 'B' : '-', game.usingAbbey ? 'A' : '-',
+    game.pendingWalk ? game.pendingWalk.targets.length : '-',
     game.players.map((p) => `${p.score}/${p.meeples}`).join(','),
   ].join('|');
 }
@@ -455,4 +485,4 @@ syncPanel();
 frame();
 
 // Handy for poking at state from the devtools console while iterating.
-window.LAB = { get game() { return game; }, renderer, newGame, THEME, sfx, MODES };
+window.LAB = { get game() { return game; }, renderer, newGame, THEME, sfx, MODES, MECHANICS };

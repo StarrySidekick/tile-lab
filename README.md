@@ -7,8 +7,8 @@ A sandbox for experimenting with tile mechanics and game modes, built to be
 **fast to iterate on**. No build step, no dependencies, no image assets — plain
 ES modules and a canvas. Edit a file, hit refresh, keep playing.
 
-Eleven modes and five modifiers, all sharing one board engine. Each mode exists
-to answer a specific question about what makes tile-laying good;
+Twelve modes and sixteen mechanics, all sharing one board engine. Each mode
+exists to answer a specific question about what makes tile-laying good;
 [MODES.md](MODES.md) is where that reasoning lives.
 
 ## Run it locally
@@ -67,6 +67,16 @@ feature *crystallises* its tiles into permanent land. Everything still cloud is
 subject to the **drift**: at the end of each round, any unanchored tile holding
 on by a single edge blows away.
 
+**World** — the countryside gets the rest of its geography, in four families
+you can also switch on inside any other mode:
+
+| | |
+|---|---|
+| **Mountains** | Pay the *instant* a range grows, scaling with its size — a range of five has paid 2+3+4+5 over its life, so joining two ranges is worth more than either. Nothing can be claimed on them, which makes them the one thing on the board you can't be denied |
+| **Forests** | 1 per tile, +1 per log, and **no complete/incomplete distinction at all**. A forest is simply as big as it is and pays the same either way — so they're the safe claim and cities are the greedy one |
+| **Lakes** | Worth nothing alone. A city beside one is worth +3 per distinct body of water, which turns "where is the water" into a placement question rather than scenery. Shores and corners only |
+| **Rivers** | Carcassonne's, laid before the game proper — and they pay a city the same way a lake does |
+
 ### The long forms
 
 **The Marches** — war and area control. The board grows from a keep per player
@@ -119,24 +129,65 @@ Meeples can be turned off entirely, in which case a completed feature pays
 whoever closed it — the cheapest way to see how much of Carcassonne is the
 meeples.
 
-## Modifiers
+## Mechanics
 
-Orthogonal to modes, and they compose — each one changes several modes at once,
-which is where the leverage is.
+Rules you switch on à la carte, in any mode and any combination. Anything a
+single mode invented that turns out to be interesting on its own lives here
+rather than locked inside that mode — lifting came out of Cirrus, building on
+top came out of Strata, and both are more useful bolted onto Classic, or onto
+each other.
 
-| Modifier | What it does |
+**Play**
+
+| | |
 |---|---|
 | **Drafting market** | A face-up row instead of a blind draw. The first is free; reaching past a tile discards it, so cost needs no currency |
-| **Hidden agendas** | Two secret objectives each, scored at the end. Every placement becomes a tell |
-| **Fog of war** | Tiles far from your figures fade out |
+| **Lift placed tiles** | Cirrus's main verb, anywhere. Instead of placing, pick up an unclaimed tile that isn't holding the board together, and play it somewhere better |
+| **Build on top of tiles** | Strata's rule, anywhere. Cover a tile that hasn't scored and has nobody on it. Three levels maximum |
+| **Recall a follower** | Instead of claiming, take one of your followers back off the board |
+| **Followers walk on** | Abbey & Mayor's wagon. When a feature scores, your follower steps along the road to the next unclaimed, unfinished thing instead of going home |
 | **Two-faced tiles** | Most tiles have a reverse — a road is a city on the back. Press `F` before you place |
-| **Rising tide** | A waterline climbs the board every three rounds, drowning whatever it reaches. It's implemented as a moving bound, so nothing else needed a special case |
+| **Fog of war** | Tiles far from your figures fade out |
+
+**Scoring**
+
+| | |
+|---|---|
+| **Hidden agendas** | Two secret objectives each, scored at the end. Every placement becomes a tell |
+| **Rising tide** | A waterline climbs the board every three rounds, drowning whatever it reaches. It's a moving bound on the board, so nothing else needed a special case |
+| **King & Robber Baron** | Whoever finished the largest city, and the longest road, each score 1 per completed city / road on the board at the end |
+
+**Carcassonne expansions**, implemented from the published rules:
+
+| | |
+|---|---|
+| **The River** | The mini-expansion. Laid first, spring to lake, and it may not double back on itself — two curves in a row bending the same way would make a U-turn. Only an *immediate* reversal is illegal, which is the official reading |
+| **Inns & Cathedrals** | An inn doubles its road and a cathedral triples its city — and both pay **nothing at all** if the feature never closes |
+| **Big follower** | One large follower each, counting as two when majorities are worked out |
+| **Abbey tile** | One abbey each, played instead of your tile into a hole surrounded on all four sides. It scores as a monastery, so it's always worth 9 |
+| **Builder** | Extend a feature you already hold and you get another tile this turn, once per turn |
+| **Trade goods** | Wine, grain and cloth go to whoever *closes* the city holding them, follower or not. Most of each at the end is worth 10 |
+
+Two of these are simplified where the UI can't yet ask a question. The builder
+has no separate figure — any of your followers on the extended feature counts,
+which is the same decision without the bookkeeping. And a wagon only offers the
+walk to the player whose turn it is; everyone else's followers go home, because
+stopping to ask four people in turn is worse than the rule is good.
+
+## Tiles per turn
+
+A dropdown, one to five. Each tile is a full place-and-act step, so in a
+walking mode "three" means three tiles and three moves before play passes on.
+It is the cheapest way to find out whether a mode is paced wrong — most of
+these were built assuming one, and several are better at two.
 
 ## Playing
 
 | | |
 |---|---|
 | Place tile | click a highlighted cell |
+| Lift a placed tile | `L`, then click it |
+| Use the big follower | `B`, then claim |
 | Pick from the row | click it, or `1`–`4` |
 | Rotate | `R` (or right-click, or shift+scroll) |
 | Flip a two-faced tile | `F` |
@@ -164,6 +215,11 @@ Tiles are grouped, and each group toggles on and off independently:
 - **War terrain** — keeps, forts, hills, fords, beacons, muster fields
 - **Dangers** — stairs down, bandit camps, wolf dens, barrows
 - **Cloud kingdom** — skyholds, windvanes, raincatches
+- **Mountains** — spurs, ridges, bends, massifs, passes, and one peak
+- **Forests** — edges, corners, deep forest and old growth, some with logs
+- **Lakes** — shores, corners, narrows, headlands
+- **Inns & cathedrals**, **trade goods** — the expansion tiles, switched on
+  with their mechanic
 
 Changes apply on the next new game. Each mode picks sensible defaults when you
 switch to it.
@@ -172,6 +228,7 @@ switch to it.
 
 ```
 src/tiles.js       tile data — the only file you touch to add tiles
+src/mechanics.js   the à-la-carte rules catalogue, and their shared helpers
 src/pieces.js      polyomino generation for Sprawl
 src/theme.js       the entire colour scheme, in one place
 src/board.js       grid, placement, connectivity, removal, stacking, scoring
@@ -341,9 +398,17 @@ a change to the tile format, so it wants doing before the pool grows much
 further. The Marches currently does area control by banner instead, which works
 but is coarser.
 
-**A proper battle UI for The Marches.** Muster chits are auto-spent to win a
-fight when you can afford it. Against a human, choosing to spend — and bluffing
-about it — is the interesting half, and that needs a prompt.
+Adding forests, mountains, lakes and rivers was the test of that: each is a new
+feature type and each cost one line in a table plus one drawing function,
+because they all inherit edge matching, merging and the completion counter for
+free. Fields are the only thing that doesn't fit, and it's because they need
+*half*-edges, not because they're a new type.
+
+**Prompts for the auto-resolved choices.** Three rules currently take the
+obvious option because there's nowhere to ask: Marches auto-spends muster chits
+to win a fight, the builder has no separate figure, and only the active player
+is offered a wagon walk. Each is one dialog away from being the real rule, and
+in Marches's case the bluff *is* the mechanic.
 
 Also absent: an AI opponent, networked play, and persistence beyond Descent's
 unlocks.

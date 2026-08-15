@@ -9,6 +9,14 @@
 import { drawTile, drawMeeple, PLAYER_COLORS } from './art.js';
 import { THEME, applyDusk } from './theme.js';
 import { rotPoint } from './tiles.js';
+import { liftableCells } from './mechanics.js';
+
+// Move targets, in the order you want to notice them. Green is the plain "you
+// can go here"; teal is a special move (a road dash, a warp, a fight); red is
+// one that costs you something.
+const MOVE_OK = { rgb: '124,196,108', line: '#7cc46c' };
+const MOVE_SPECIAL = { rgb: '95,191,174', line: THEME.teal };
+const MOVE_COSTLY = { rgb: '196,104,80', line: '#c46850' };
 
 export class Renderer {
   constructor(canvas) {
@@ -18,6 +26,7 @@ export class Renderer {
     this.hover = null;      // grid cell under the pointer
     this.pointer = null;    // raw screen coords, needed for the cave overlay
     this.showDebug = false;
+    this.showHints = true;  // highlight every square the tile could go in
     this.meepleSpots = [];
     this.pawnSpots = [];
     this.moveSpots = [];
@@ -97,7 +106,9 @@ export class Renderer {
       if (overlay) this.drawCellOverlay(cell, overlay, lift);
     }
 
-    if (game.phase === 'lift') this.drawLiftTargets(game);
+    if (game.phase === 'lift') this.drawCellTargets(game.m.allLiftable ? game.m.allLiftable() : liftableCells(game.board), THEME.violet, '107,90,140');
+    if (game.phase === 'recall') this.drawCellTargets(game.myMeeples(), MOVE_COSTLY.line, MOVE_COSTLY.rgb);
+    if (game.phase === 'walk') this.drawCellTargets(game.pendingWalk?.targets || [], MOVE_OK.line, MOVE_OK.rgb);
     if (game.phase === 'place') this.drawPlacementHints(game);
 
     this.drawMeeples(game);
@@ -208,17 +219,18 @@ export class Renderer {
     }
   }
 
-  drawLiftTargets(game) {
+  /** Pulsing highlights on a list of cells — lifting, recalling, walking on. */
+  drawCellTargets(cells, line, rgb) {
     const ctx = this.ctx;
     const pulse = 0.5 + Math.sin(performance.now() / 360) * 0.16;
-    for (const s of game.m.allLiftable()) {
+    for (const s of cells) {
       if (!this.onScreen(s.x, s.y)) continue;
       const [sx, sy] = this.toScreen(s.x, s.y);
       const z = this.cam.zoom;
-      ctx.fillStyle = `rgba(107,90,140,${0.18 + pulse * 0.22})`;
+      ctx.fillStyle = `rgba(${rgb},${0.18 + pulse * 0.22})`;
       ctx.fillRect(sx, sy, z, z);
-      ctx.strokeStyle = THEME.violet;
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = line;
+      ctx.lineWidth = 3;
       ctx.strokeRect(sx + 2, sy + 2, z - 4, z - 4);
     }
   }
@@ -269,9 +281,13 @@ export class Renderer {
     if (game.m.piece) return this.drawPieceHints(game);
     if (!game.tile) return;
     const ctx = this.ctx;
-    const legal = game.board.legalPlacements(game.tile, game.placeOpts());
-    const spots = new Set(legal.filter((p) => !game.m.canPlaceAt || this.modeAllows(game, p))
-      .map((p) => `${p.x},${p.y}`));
+    // The hover ghost is always drawn; only the "here are all the squares it
+    // could go" wash is optional, because some people want to find that out
+    // themselves.
+    const spots = this.showHints ? new Set(
+      game.board.legalPlacements(game.tile, game.placeOpts())
+        .filter((p) => !game.m.canPlaceAt || this.modeAllows(game, p))
+        .map((p) => `${p.x},${p.y}`)) : new Set();
 
     for (const k of spots) {
       const [x, y] = k.split(',').map(Number);
@@ -314,9 +330,10 @@ export class Renderer {
   drawPieceHints(game) {
     const ctx = this.ctx;
     const piece = game.m.piece;
-    const anchors = piece.filler
-      ? game.board.frontier().filter((c) => game.m.canPlaceAt(c.x, c.y))
-      : game.board.legalPiecePlacements(piece);
+    const anchors = !this.showHints ? []
+      : piece.filler
+        ? game.board.frontier().filter((c) => game.m.canPlaceAt(c.x, c.y))
+        : game.board.legalPiecePlacements(piece);
 
     for (const a of anchors) {
       if (!this.onScreen(a.x, a.y)) continue;
@@ -398,9 +415,14 @@ export class Renderer {
 
     // Reachable tiles for the selected figure. Adventure marks the free road
     // dash apart from the supply-costing forced march.
+    // Where you can go is the single most important thing on screen during a
+    // move, so it gets the loudest treatment on the board: a green wash, a
+    // green border, and an arrow from the figure to every square it can reach.
     if (game.phase === 'move' && walker.selected) {
       const pulse = 0.5 + Math.sin(performance.now() / 380) * 0.14;
-      for (const dest of walker.reachable(walker.selected).values()) {
+      const from = walker.selected;
+      for (const dest of walker.reachable(from).values()) {
+        this.moveSpots.push({ x: dest.x, y: dest.y });
         if (!this.onScreen(dest.x, dest.y)) continue;
         const [sx, sy] = this.toScreen(dest.x, dest.y);
         const z = this.cam.zoom;
@@ -408,16 +430,18 @@ export class Renderer {
         // move you want to notice before you click it.
         const special = dest.warp || (dest.steps >= 2 && dest.byRoad);
         const costly = dest.cost > 0;
-        const hue = costly ? '182,88,68' : special ? '95,191,174' : '212,175,95';
-        ctx.fillStyle = `rgba(${hue},${0.08 + pulse * 0.13})`;
+        const style = costly ? MOVE_COSTLY : special ? MOVE_SPECIAL : MOVE_OK;
+
+        ctx.fillStyle = `rgba(${style.rgb},${0.16 + pulse * 0.20})`;
         ctx.fillRect(sx, sy, z, z);
-        ctx.lineWidth = 2.5;
-        ctx.strokeStyle = costly ? '#b65844' : special ? THEME.teal : THEME.gold;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = style.line;
         ctx.strokeRect(sx + 2, sy + 2, z - 4, z - 4);
-        this.moveSpots.push({ x: dest.x, y: dest.y });
+
+        this.drawMoveArrow(from, dest, style.line);
 
         if (costly) {                      // show the price on the tile
-          ctx.fillStyle = '#e8c9a8';
+          ctx.fillStyle = '#f0d6c2';
           ctx.font = `600 ${Math.max(9, z * 0.16)}px ui-sans-serif, system-ui, sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -456,6 +480,46 @@ export class Renderer {
         this.pawnSpots.push({ pawn: p, sx, sy, r: size * 0.62 });
       });
     }
+  }
+
+  /**
+   * An arrow from the figure to a square it can reach. It stops short of both
+   * ends so it never covers the meeple or the tile art, and a two-step move
+   * gets a longer tail so distance reads without counting squares.
+   */
+  drawMoveArrow(from, dest, color) {
+    const ctx = this.ctx;
+    const z = this.cam.zoom;
+    const [x0, y0] = this.toScreen(from.x + 0.5, from.y + 0.5);
+    const [x1, y1] = this.toScreen(dest.x + 0.5, dest.y + 0.5);
+    const dx = x1 - x0, dy = y1 - y0;
+    const len = Math.hypot(dx, dy);
+    if (len < z * 0.4) return;
+    const ux = dx / len, uy = dy / len;
+    const start = z * 0.34;                 // clear of the figure
+    const end = len - z * 0.30;             // stop before the target's centre
+    if (end <= start) return;
+
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(2, z * 0.035);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x0 + ux * start, y0 + uy * start);
+    ctx.lineTo(x0 + ux * end, y0 + uy * end);
+    ctx.stroke();
+
+    const hx = x0 + ux * end, hy = y0 + uy * end;
+    const head = z * 0.17;
+    ctx.beginPath();
+    ctx.moveTo(hx + ux * head, hy + uy * head);
+    ctx.lineTo(hx - uy * head * 0.62 - ux * head * 0.2, hy + ux * head * 0.62 - uy * head * 0.2);
+    ctx.lineTo(hx + uy * head * 0.62 - ux * head * 0.2, hy - ux * head * 0.62 - uy * head * 0.2);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
   }
 
   hitMeepleSpot(sx, sy) {

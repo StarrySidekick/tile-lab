@@ -42,15 +42,20 @@
           </select>
         </label>
         <label class="row" id="seedRow">Seed <input id="seed" placeholder="blank = random" /></label>
+        <label class="row" title="How many tiles you lay before play passes on. Each one is a full place-and-act step.">Tiles per turn
+          <select id="tilesPerTurn">
+            <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+          </select>
+        </label>
         <button id="newGame" class="primary">New game</button>
         <button id="export">Export the chronicle</button>
         <p class="hint" id="modeHint"></p>
       </section>
 
       <section class="tools">
-        <h2>Modifiers</h2>
-        <div id="modifiers"></div>
-        <p class="hint">Bolt onto any mode. Applied on the next new game (except fog).</p>
+        <h2>Mechanics</h2>
+        <div id="mechanics"></div>
+        <p class="hint">Bolt onto any mode, in any combination. Applied on the next new game (except fog).</p>
       </section>
 
       <section class="tools">
@@ -71,6 +76,7 @@
       <section class="tools">
         <h2>Sandbox</h2>
         <label><input type="checkbox" id="freePlace" /> Free placement (ignore edge matching)</label>
+        <label><input type="checkbox" id="hints" checked /> Show where tiles can go</label>
         <label><input type="checkbox" id="debug" /> Feature overlay <kbd>D</kbd></label>
         <label class="row">Force next tile
           <select id="forceTile"><option value="">— random —</option></select>

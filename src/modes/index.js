@@ -22,9 +22,10 @@ import { Marches } from './marches.js';
 import { Descent } from './descent.js';
 import { Chronicle } from './chronicle.js';
 import { Tesserae } from './tesserae.js';
+import { World } from './world.js';
 
 export const MODES = [
-  Classic, Duel, Sprawl, Strata, Cirrus,
+  Classic, World, Duel, Sprawl, Strata, Cirrus,
   Marches, Expedition, Adventure, Descent, Chronicle, Tesserae,
 ].map((M) => M.spec);
 

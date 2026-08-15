@@ -6,11 +6,12 @@ mechanically**, what it cost against the engine, and — most importantly —
 **what question it answers**. A prototype that doesn't answer a question isn't
 worth building.
 
-**All twelve are built.** Eight became modes; four became modifiers, because a
-mechanic that works on every mode is worth more than one that works on its own.
-Each section below keeps its original design, with a note at the top recording
-what actually shipped and where the build differed from the plan — the places
-they diverge are the interesting part.
+**All twelve are built**, plus a thirteenth — World — and a mechanics menu.
+Eight became modes; four became mechanics, because a rule that works on every
+mode is worth more than one that works on its own. Each section below keeps its
+original design, with a note at the top recording what actually shipped and
+where the build differed from the plan — the places they diverge are the
+interesting part.
 
 | | Shipped as | Question it answers |
 |---|---|---|
@@ -25,7 +26,8 @@ they diverge are the interesting part.
 | 9. Duel | mode | Is placing a tile fun with *nothing else* attached? |
 | 10. Agendas & fog | modifiers | Does anything change when players can't read each other? |
 | 11. Tesserae | mode | Is there a version someone opens every morning? |
-| 12. Two-faced | modifier | Is a tile a noun, or a state? |
+| 12. Two-faced | mechanic | Is a tile a noun, or a state? |
+| 13. World | mode + 4 tile families | What does the countryside still not have? |
 
 Play them and the questions answer themselves. What's at the bottom is what the
 engine still can't do.
@@ -435,27 +437,94 @@ nearly free at that point.
 
 ---
 
-# Modifiers — bolt onto any mode
+# And one more
 
-Cheap, orthogonal, and each one changes several modes at once. This is where
-the leverage turned out to be: four of the twelve designs above are here rather
-than in the mode list, and they're worth more for it.
+## 13. World — mountains, forests, lakes and rivers
 
-| Modifier | What it does | Built |
+> **Built** — `src/modes/world.js`, and all four families are tile groups you
+> can switch on inside any other mode. Each new feature type cost one line in a
+> table plus one drawing function, because they inherit edge matching, merging
+> and the completion counter for free. That was the real test of the engine and
+> it passed.
+
+**Question it answers:** what is the countryside still missing, and does the
+feature system stretch to hold it?
+
+Four families, each picking a different fight with how Carcassonne scores:
+
+**Mountains** pay the *instant* a range grows, scaling with size — a range of
+five has paid 2+3+4+5 over its life. There's no completion and no claim, so a
+mountain is the one thing on the board you cannot be denied, and joining two
+ranges is worth more than extending either. It's the purest placement scoring
+in the lab: no meeple economy at all.
+
+**Forests** are cities with the tension taken out — 1 per tile, +1 per log, and
+no complete/incomplete distinction whatsoever. A forest pays the same whether
+it closes or the game ends around it. That makes them the *safe* claim against
+cities' greedy one, and it reproduces the farmer trade-off honestly: a follower
+parked on a big forest is locked there all game, and paid in full at the end.
+
+**Lakes** are worth nothing alone; a city beside one is worth +3 per distinct
+body of water. That's the cheapest possible way to make a terrain type matter
+without giving it a scoring rule of its own, and it turns "where is the water"
+into a placement question rather than scenery. Shores and corners only — a tile
+that was lake on all four sides would be a hole nothing could ever touch.
+
+**Rivers** are Carcassonne's own mini-expansion, laid before the game proper,
+and they pay a city the way a lake does.
+
+**What to watch at the table.** Mountains and forests pull in opposite
+directions on purpose — one rewards placing with no follower at all, the other
+rewards committing a follower for the whole game. If one of those dominates,
+the fix is the number, not the rule.
+
+---
+
+---
+
+# Mechanics — bolt onto any mode
+
+Cheap, orthogonal, and each changes several modes at once. This is where the
+leverage turned out to be: four of the twelve designs above are here rather
+than in the mode list, and they're worth more for it — and two rules that
+started life as whole modes (Cirrus's lifting, Strata's stacking) turned out to
+be better as switches than as places.
+
+| Mechanic | What it does | Built |
 |---|---|---|
 | **Drafting market** (#8) | Removes draw luck, adds a cost model with no currency | ✔ |
+| **Lift placed tiles** | Cirrus's verb, anywhere | ✔ |
+| **Build on top** | Strata's rule, anywhere | ✔ |
+| **Recall a follower** | Take one back instead of claiming | ✔ |
+| **Followers walk on** | The wagon, from Abbey & Mayor | ✔ |
 | **Hidden objectives** (#10) | Imperfect information, bluffing | ✔ (ten of them) |
 | **Fog** (#10) | Exploration becomes real | ✔ |
 | **Two-faced tiles** (#12) | A tile is a state, not a noun | ✔ (ten pairs) |
 | **Rising tide** (#7) | A clock, and pressure on every mode at once | ✔ |
+| **King & Robber Baron** | End bonuses for the largest city and longest road | ✔ |
+| **The River** | Carcassonne's mini-expansion, laid first | ✔ |
+| **Inns & Cathedrals** | Doubles a finished road, triples a finished city, voids both if open | ✔ |
+| **Big follower** | Counts as two for majorities | ✔ |
+| **Abbey tile** | One each, fills an enclosed hole, scores 9 | ✔ |
+| **Builder** | Extend what you hold, get another tile | ✔ (simplified) |
+| **Trade goods** | Wine / grain / cloth, 10 for each majority | ✔ |
 | **Oracle dice** | Uncertainty the table resolves narratively | ✔, inside The Chronicle |
+| **Hand of tiles** | Choice instead of fate | ✔, inside Cirrus |
 | **Asymmetric powers** | Each player breaks one rule | not built |
 | **Turn timer** | Kills analysis paralysis, changes the whole feel | not built |
 | **Co-op vs the deck** | The deck plays events against the table | not built |
-| **Hand of tiles** | Choice instead of fate | ✔, inside Cirrus |
+
+Plus **tiles per turn**, one to five, which isn't a mechanic so much as a knob
+on the turn itself — each tile is a full place-and-act step, so in a walking
+mode three means three tiles and three moves.
+
+Three rules are simplified where the UI has nowhere to ask a question: Marches
+auto-spends muster chits, the builder uses any of your followers rather than
+its own figure, and only the active player is offered a wagon walk. Each is one
+dialog away from the real rule.
 
 The three unbuilt ones are all small. Asymmetric powers is the one I'd do next,
-because it's the cheapest way to make any of the eleven replayable.
+because it's the cheapest way to make any of the twelve replayable.
 
 ---
 
@@ -506,7 +575,11 @@ worried about, and it means the piece pool is effectively infinite.
 
 ### 3. Fields as real features ✖
 
-Not built. Marches does area control by banner flood-fill instead, which needs
+Not built — and the World tilesets are the evidence for why that's a *format*
+problem rather than a missing feature type. Forests, mountains, lakes and
+rivers each went in as one line in a table plus one drawing function, inheriting
+edge matching, merging and the completion counter untouched. Fields don't fit
+that mould because they need **half**-edges, not because they're new. Marches does area control by banner flood-fill instead, which needs
 no format change and gets the supply rule working today — the thing that makes
 the mode good is the *supply* rule, not the granularity of the territory.
 

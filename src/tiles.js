@@ -37,6 +37,32 @@ const road = (sides) => ({ type: 'road', sides });
 const abbey = () => ({ type: 'monastery', sides: [] });
 const mark = (kind, on = null) => ({ kind, on });
 
+// --- World features ---------------------------------------------------------
+// Each spans tiles and merges like a city does, but scores its own way.
+//
+//   forest    1/tile, +1 per log. No complete/incomplete distinction — a forest
+//             is worth the same whether it closes or the game ends around it.
+//   mountain  pays the moment it grows, scaling with the size of the chain.
+//             Nothing can be claimed on it.
+//   lake      worth nothing alone; a city beside one is worth more.
+//   river     the same, and laid before the game starts.
+//
+// The `log` on a forest reuses the shield slot, because that's exactly what it
+// is: a pennant that adds one to the feature's value.
+const forest = (sides, log = false) => ({ type: 'forest', sides, shield: log });
+const mountain = (sides) => ({ type: 'mountain', sides });
+const lake = (sides) => ({ type: 'lake', sides });
+const river = (sides) => ({ type: 'river', sides });
+
+/** Edge letter per feature type. Two edges match only if their letters do. */
+export const EDGE_LETTER = {
+  city: 'c', road: 'r', monastery: 'f',
+  forest: 'w', mountain: 'm', lake: 'l', river: 'v',
+};
+
+/** Features you can't put a follower on. */
+export const NO_MEEPLE = new Set(['mountain', 'lake', 'river']);
+
 // ---------------------------------------------------------------------------
 // Tile groups. Toggle these on and off to change what's in the draw pile.
 // ---------------------------------------------------------------------------
@@ -51,6 +77,11 @@ export const GROUPS = [
   { id: 'marches', name: 'War terrain', note: 'Keeps, forts, hills, fords, beacons.', classic: false, expedition: false, adventure: false },
   { id: 'descent', name: 'Dangers', note: 'Stairs down, bandits, wolves, barrows.', classic: false, expedition: false, adventure: false },
   { id: 'cloud', name: 'Cloud kingdom', note: 'Skyholds, windvanes, raincatches.', classic: false, expedition: false, adventure: false },
+  { id: 'mountains', name: 'Mountains', note: 'Pay the moment the chain grows, scaling with its size. Nothing can be claimed on them.', classic: false, expedition: false, adventure: false },
+  { id: 'forests', name: 'Forests', note: '1 per tile, +1 per log. No complete/incomplete distinction — a forest is just as big as it is.', classic: false, expedition: false, adventure: false },
+  { id: 'lakes', name: 'Lakes', note: 'Shores and corners, never all four sides. A city beside water is worth more.', classic: false, expedition: false, adventure: false },
+  { id: 'innscath', name: 'Inns & cathedrals', note: 'Carcassonne expansion 1. Doubles a finished road, triples a finished city — and pays nothing if they never finish.', classic: false, expedition: false, adventure: false },
+  { id: 'traders', name: 'Trade goods', note: 'Carcassonne expansion 2. Wine, grain and cloth, to whoever closes the city holding them.', classic: false, expedition: false, adventure: false },
 ];
 
 export const TILE_TYPES = [
@@ -139,11 +170,93 @@ export const TILE_TYPES = [
   { id: 'Kb', n: 4, group: 'cloud', name: 'Windvane',   feats: [road([N, S])],  marks: [mark('vane')] },
   { id: 'Kc', n: 4, group: 'cloud', name: 'Raincatch',  feats: [],              marks: [mark('raincatch')] },
 
+  // --- mountains ------------------------------------------------------------
+  // Mountain edges only meet mountain edges, so a range grows as one mass and
+  // can't be joined by anything else. Passes are the only way through.
+  { id: 'Pa', n: 6, group: 'mountains', name: 'Mountain spur',   feats: [mountain([N])] },
+  { id: 'Pb', n: 5, group: 'mountains', name: 'Mountain ridge',  feats: [mountain([N, S])] },
+  { id: 'Pc', n: 5, group: 'mountains', name: 'Mountain bend',   feats: [mountain([N, E])] },
+  { id: 'Pd', n: 3, group: 'mountains', name: 'Mountain massif', feats: [mountain([N, E, W])] },
+  { id: 'Pe', n: 3, group: 'mountains', name: 'Mountain pass',   feats: [mountain([N, S]), road([E, W])] },
+  { id: 'Pf', n: 1, group: 'mountains', name: 'The peak',        feats: [mountain([N, E, S, W])] },
+
+  // --- forests --------------------------------------------------------------
+  { id: 'Fa', n: 6, group: 'forests', name: 'Forest edge',        feats: [forest([N])] },
+  { id: 'Fb', n: 3, group: 'forests', name: 'Forest edge + log',  feats: [forest([N], true)] },
+  { id: 'Fc', n: 3, group: 'forests', name: 'Forest across',      feats: [forest([E, W])] },
+  { id: 'Fd', n: 5, group: 'forests', name: 'Forest corner',      feats: [forest([N, W])] },
+  { id: 'Fe', n: 2, group: 'forests', name: 'Forest corner + log',feats: [forest([N, W], true)] },
+  { id: 'Ff', n: 2, group: 'forests', name: 'Deep forest',        feats: [forest([N, E, W])] },
+  { id: 'Fg', n: 3, group: 'forests', name: 'Forest track',       feats: [forest([N]), road([E, W])] },
+  { id: 'Fh', n: 2, group: 'forests', name: 'Old growth',         feats: [forest([N, E, S, W], true)] },
+
+  // --- lakes ----------------------------------------------------------------
+  // Shores and corners only — a tile that was lake on all four sides would be
+  // a hole in the map nothing could ever touch.
+  { id: 'Wa', n: 5, group: 'lakes', name: 'Lake shore',        feats: [lake([N])] },
+  { id: 'Wb', n: 5, group: 'lakes', name: 'Lake corner',       feats: [lake([N, W])] },
+  { id: 'Wc', n: 3, group: 'lakes', name: 'Lake narrows',      feats: [lake([E, W])] },
+  { id: 'Wd', n: 3, group: 'lakes', name: 'Lakeside road',     feats: [lake([N]), road([E, W])] },
+  { id: 'We', n: 2, group: 'lakes', name: 'Lakeside town',     feats: [lake([N, W]), city([S])] },
+  { id: 'Wf', n: 2, group: 'lakes', name: 'Lake headland',     feats: [lake([N, E, W])] },
+
+  // --- Inns & Cathedrals (Carcassonne expansion 1) --------------------------
+  // An inn doubles its road and a cathedral triples its city — but both pay
+  // nothing at all if the feature never closes.
+  { id: 'Ia', n: 3, group: 'innscath', name: 'Road + inn',        feats: [road([N, S])],          marks: [mark('inn', 0)] },
+  { id: 'Ib', n: 3, group: 'innscath', name: 'Road bend + inn',   feats: [road([W, S])],          marks: [mark('inn', 0)] },
+  { id: 'Ic', n: 2, group: 'innscath', name: 'Road 3-way + inn',  feats: [road([E]), road([S]), road([W])], marks: [mark('inn', 0)] },
+  { id: 'Id', n: 2, group: 'innscath', name: 'City + cathedral',  feats: [city([N, E, W])],       marks: [mark('cathedral', 0)] },
+  { id: 'Ie', n: 2, group: 'innscath', name: 'City across + cathedral', feats: [city([E, W])],    marks: [mark('cathedral', 0)] },
+
+  // --- Trade goods (Carcassonne expansion 2) --------------------------------
+  { id: 'Ta', n: 3, group: 'traders', name: 'City + wine',   feats: [city([N, E])],          marks: [mark('wine', 0)] },
+  { id: 'Tb', n: 3, group: 'traders', name: 'City + grain',  feats: [city([N, W])],          marks: [mark('grain', 0)] },
+  { id: 'Tc', n: 3, group: 'traders', name: 'City + cloth',  feats: [city([E, W])],          marks: [mark('cloth', 0)] },
+  { id: 'Td', n: 2, group: 'traders', name: 'City road + wine',  feats: [city([N]), road([E, W])], marks: [mark('wine', 0)] },
+  { id: 'Te', n: 2, group: 'traders', name: 'City road + grain', feats: [city([N]), road([S])],    marks: [mark('grain', 0)] },
+
   { id: 'La', n: 2, group: 'citylife', name: 'Market',   feats: [city([N, W])],           marks: [mark('market', 0)] },
   { id: 'Lb', n: 2, group: 'citylife', name: 'Keep',     feats: [city([N, E, W], true)],  marks: [mark('keep', 0)] },
   { id: 'Lc', n: 2, group: 'citylife', name: 'Library',  feats: [city([E, W])],           marks: [mark('library', 0)] },
   { id: 'Ld', n: 2, group: 'citylife', name: 'Armoury',  feats: [city([N, E])],           marks: [mark('armoury', 0)] },
 ];
+
+// ---------------------------------------------------------------------------
+// The River — Carcassonne's mini-expansion, laid before the game proper.
+//
+// A separate pool, like the cave deck. The spring goes down first, the rest are
+// laid in turn, and the lake caps it. Then the base game starts building off
+// whatever countryside the river left behind.
+//
+// The one real restriction is that the river may not double back on itself:
+// two curves in a row bending the same way would make a U-turn. Only an
+// *immediate* reversal is illegal — a river that meanders back near itself
+// several tiles later is fine.
+// ---------------------------------------------------------------------------
+
+export const RIVER_SPRING = 'w0';
+export const RIVER_MOUTH = 'w9';
+
+export const RIVER_TYPES = [
+  { id: 'w0', n: 1, group: 'river', name: 'Spring',            feats: [river([N])],                    marks: [mark('spring')] },
+  { id: 'w1', n: 2, group: 'river', name: 'River straight',    feats: [river([N, S])] },
+  { id: 'w2', n: 3, group: 'river', name: 'River bend',        feats: [river([N, E])] },
+  { id: 'w3', n: 1, group: 'river', name: 'River + bridge',    feats: [river([N, S]), road([E, W])] },
+  { id: 'w4', n: 1, group: 'river', name: 'River bend + town', feats: [river([N, E]), city([S])] },
+  { id: 'w5', n: 1, group: 'river', name: 'River + monastery', feats: [river([N, S]), abbey()] },
+  { id: 'w6', n: 1, group: 'river', name: 'River bend + road', feats: [river([W, S]), road([N, E])] },
+  { id: 'w7', n: 1, group: 'river', name: 'River + city gate', feats: [river([N, S]), city([W])] },
+  { id: 'w8', n: 1, group: 'river', name: 'River bend + wood', feats: [river([S, W]), forest([N])] },
+  { id: 'w9', n: 1, group: 'river', name: 'The lake',          feats: [river([N])],                    marks: [mark('mouth')] },
+];
+
+/**
+ * The Abbey — Carcassonne expansion 5. One per player, held in hand rather
+ * than drawn, and it ignores edge matching entirely because it can only go
+ * into a hole that's already surrounded on all four sides.
+ */
+export const ABBEY_TILE = { id: 'ABB', n: 0, group: 'abbey', name: 'Abbey', feats: [abbey()] };
 
 // ---------------------------------------------------------------------------
 // Cave tiles — a separate pool used only inside caves. 'r' edges are passages,
@@ -231,6 +344,15 @@ export const MARKS = {
   healer:  { label: "Healer's hut", score: 1, heal: 3, loot: { supplies: 1 } },
   chest:   { label: 'Wayside cache', score: 1, loot: { gold: 4 } },
 
+  // world + expansions
+  inn:       { label: 'Inn',       score: 0, note: 'Doubles its road when it closes — and voids it if it never does.' },
+  cathedral: { label: 'Cathedral', score: 0, note: 'Triples its city when it closes — and voids it if it never does.' },
+  wine:      { label: 'Wine',      score: 0, goods: 'wine' },
+  grain:     { label: 'Grain',     score: 0, goods: 'grain' },
+  cloth:     { label: 'Cloth',     score: 0, goods: 'cloth' },
+  spring:    { label: 'Spring',    score: 0, note: 'Where the river starts.' },
+  mouth:     { label: 'The lake',  score: 0, note: 'Where the river ends.' },
+
   // cloud
   skyhold:   { label: 'Skyhold',   score: 3, note: 'Crystallises the moment its city closes.' },
   vane:      { label: 'Windvane',  score: 1, note: 'Anchors its tile against the drift.' },
@@ -271,7 +393,7 @@ function prepare(list) {
     t.shields = 0;
     for (const f of t.feats) {
       if (f.shield) t.shields++;
-      for (const s of f.sides) t.edges[s] = f.type === 'city' ? 'c' : 'r';
+      for (const s of f.sides) t.edges[s] = EDGE_LETTER[f.type] || 'r';
     }
     t.spots = t.feats.map(featureSpot);
     // A mark anchored to a feature borrows that feature's spot, pulled in from
@@ -287,9 +409,21 @@ function prepare(list) {
 prepare(TILE_TYPES);
 prepare(CAVE_TYPES);
 prepare(CITY_TYPES);
+prepare(RIVER_TYPES);
+prepare([ABBEY_TILE]);
 
 export const TILES = Object.fromEntries(
-  [...TILE_TYPES, ...CAVE_TYPES, ...CITY_TYPES].map((t) => [t.id, t]));
+  [...TILE_TYPES, ...CAVE_TYPES, ...CITY_TYPES, ...RIVER_TYPES, ABBEY_TILE].map((t) => [t.id, t]));
+
+/** The river pool, spring and mouth held back to bookend it. */
+export function buildRiverDeck(rng = Math.random) {
+  const deck = [];
+  for (const t of RIVER_TYPES) {
+    if (t.id === RIVER_SPRING || t.id === RIVER_MOUTH) continue;
+    for (let i = 0; i < t.n; i++) deck.push(t.id);
+  }
+  return shuffle(deck, rng);
+}
 
 // Declared as a function so it's hoisted above the prepare() calls that run
 // at module load — a const arrow here is a temporal-dead-zone crash.

@@ -219,8 +219,13 @@ footer { font-size: 10.5px; line-height: 1.6; }
 
 /* --- modifiers ----------------------------------------------------------- */
 
-#modifiers { display: flex; flex-direction: column; gap: 5px; }
-#modifiers label { cursor: help; }
+#mechanics { display: flex; flex-direction: column; gap: 5px; }
+#mechanics label { cursor: help; }
+#mechanics h3 {
+  font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--accent-dim); margin: 7px 0 1px;
+}
+#mechanics h3:first-child { margin-top: 0; }
 
 /* --- mode-specific panel bits -------------------------------------------- */
 

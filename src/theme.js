@@ -36,6 +36,20 @@ export const THEME = {
   shield: '#4a6f8a',
   shieldEdge: '#2b4356',
 
+  // --- world features ------------------------------------------------------
+  // Forests go darker and bluer than field so a wood reads as denser country;
+  // rock is warm grey; water is the one genuinely cool thing on the board,
+  // which is what makes a lake read at a glance under the dusk wash.
+  forest: '#4e6a3f',
+  forestDark: '#3c5432',
+  forestCanopy: '#5c7a48',
+  rock: '#7d7468',
+  rockDark: '#5d564d',
+  rockSnow: '#cfc7bb',
+  water: '#3f6d86',
+  waterDeep: '#2c5068',
+  waterEdge: '#6d9db2',
+
   border: 'rgba(30,24,18,0.5)',
 
   // --- accents -------------------------------------------------------------

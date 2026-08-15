@@ -23,6 +23,7 @@
 import { Mode } from './mode.js';
 import { buildDeck, MARKS } from '../tiles.js';
 import { PLAYER_COLORS } from '../theme.js';
+import { canLift } from '../mechanics.js';
 
 const HAND = 3;
 const DECK_SIZE = 40;
@@ -49,12 +50,15 @@ export class Cirrus extends Mode {
 
   // --- lifting --------------------------------------------------------------
 
+  /**
+   * The shared rule, plus the one Cirrus adds: a windvane pins its tile down.
+   * `canLift` already refuses anchored, claimed, built-on and load-bearing
+   * tiles, so this stays in step with the `lift` mechanic everywhere else.
+   */
   liftable(x, y) {
-    const board = this.game.board;
-    const cell = board.get(x, y);
-    if (!cell || cell.anchored || cell.meeple) return false;
-    if (cell.type.marks.some((m) => m.kind === 'vane')) return false;
-    return board.staysConnected(x, y);
+    const cell = this.game.board.get(x, y);
+    if (!cell || cell.type.marks.some((m) => m.kind === 'vane')) return false;
+    return canLift(this.game.board, x, y);
   }
 
   allLiftable() {

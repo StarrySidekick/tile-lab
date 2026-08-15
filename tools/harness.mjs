@@ -14,10 +14,14 @@
 // down to play it.
 // ---------------------------------------------------------------------------
 
-import { Game, MODES, MODIFIERS } from '../src/game.js';
+import { Game, MODES, MECHANICS } from '../src/game.js';
 import { makePiece, rotatePiece, validatePiece } from '../src/pieces.js';
 import { Board } from '../src/board.js';
 import { TILES } from '../src/tiles.js';
+import { liftableCells } from '../src/mechanics.js';
+import { GROUPS } from '../src/tiles.js';
+
+const ALL_GROUPS = GROUPS.map((g) => g.id);
 
 const MAX_STEPS = 4000;
 
@@ -34,9 +38,9 @@ function playOut(opts) {
   let steps = 0;
 
   while (game.phase !== 'over' && steps++ < MAX_STEPS) {
-    const before = `${game.phase}|${game.turn}|${game.board.size}|${game.deck.length}`;
+    const before = state(game);
     step(game, rng);
-    const after = `${game.phase}|${game.turn}|${game.board.size}|${game.deck.length}`;
+    const after = state(game);
     if (before === after) {
       // Nothing moved — the mode has no legal action, which is a bug in it.
       throw new Error(`stuck in phase "${game.phase}" (turn ${game.turn}, deck ${game.deck.length})`);
@@ -50,6 +54,20 @@ function playOut(opts) {
   };
 }
 
+/**
+ * Enough of the game to tell "nothing happened" from "something happened that
+ * didn't put a tile down" — taking out the abbey or toggling the big follower
+ * are real moves that leave the board untouched.
+ */
+function state(game) {
+  return [
+    game.phase, game.turn, game.board.size, game.deck.length,
+    game.tile?.id, game.usingAbbey, game.useBig, game.tilesLeft,
+    game.market?.length, game.player.meeples, game.player.abbeys,
+    game.river?.deck.length, game.pendingWalk ? 1 : 0,
+  ].join('|');
+}
+
 function step(game, rng) {
   const pick = (list) => list[Math.floor(rng() * list.length)];
 
@@ -61,6 +79,8 @@ function step(game, rng) {
     case 'place': {
       const spots = legalSpots(game);
       if (!spots.length) { game.holdPosition?.(); game.finish(); return; }
+      // The abbey is a genuinely different placement, so try it sometimes.
+      if (game.canPlayAbbey() && rng() < 0.4) { game.playAbbey(); return; }
       const spot = pick(spots);
       while (game.rot !== spot.rot && game.m.rotate === undefined) game.rotate(1);
       if (game.m.rotate) for (let i = 0; i < spot.rot; i++) game.rotate(1);
@@ -74,6 +94,8 @@ function step(game, rng) {
     }
     case 'meeple': {
       const opts = game.meepleOptions();
+      if (game.canRecall() && rng() < 0.08) return void game.beginRecall();
+      if (game.has('bigMeeple') && game.player.big > 0 && rng() < 0.3) game.toggleBig();
       if (opts.length && rng() < 0.7) game.placeMeeple(pick(opts).i);
       else game.skipMeeple();
       return;
@@ -92,10 +114,23 @@ function step(game, rng) {
       return;
     }
     case 'lift': {
-      const spots = game.m.allLiftable();
-      if (!spots.length) return void game.m.cancelLift();
+      const spots = game.m.allLiftable ? game.m.allLiftable() : liftableCells(game.board);
+      if (!spots.length) return void (game.m.cancelLift ? game.m.cancelLift() : game.cancelLift());
       const s = pick(spots);
-      if (!game.m.onCellClick(s.x, s.y)) game.m.cancelLift();
+      if (!game.cellClick(s.x, s.y)) { if (game.m.cancelLift) game.m.cancelLift(); else game.cancelLift(); }
+      return;
+    }
+    case 'recall': {
+      const mine = game.myMeeples();
+      if (!mine.length) return void game.skipMeeple();
+      const c = pick(mine);
+      game.recallAt(c.x, c.y);
+      return;
+    }
+    case 'walk': {
+      if (rng() < 0.4) return void game.declineWalk();
+      const t = pick(game.pendingWalk.targets);
+      if (!game.walkTo(t.x, t.y)) game.declineWalk();
       return;
     }
     case 'story': {
@@ -130,27 +165,25 @@ function step(game, rng) {
 
 /** Legal placements for whatever the mode is currently offering. */
 function legalSpots(game) {
+  if (game.usingAbbey) return game.abbeyGaps().map((g) => ({ ...g, rot: 0 }));
+  if (game.riverActive) return game.riverPlacements(game.tile);
   if (game.m.piece) {
     return game.board.legalPiecePlacements(game.m.piece).map((p) => ({ ...p, rot: 0 }));
   }
   if (!game.tile) return [];
-  const opts = game.placeOpts();
+  // Go through canPlaceAt rather than board.canPlace, so every mechanic that
+  // narrows placement (covering rules, the waterline, a mode's own veto) is
+  // honoured instead of reimplemented here and drifting out of step.
   const out = [];
-  for (const { x, y } of game.board.candidates(opts)) {
+  const saved = game.rot;
+  for (const { x, y } of game.board.candidates(game.placeOpts())) {
     for (let rot = 0; rot < 4; rot++) {
-      if (game.board.canPlace(x, y, game.tile, rot, opts) &&
-          (!game.m.canPlaceAt || rotCheck(game, x, y, rot))) out.push({ x, y, rot });
+      game.rot = rot;
+      if (game.canPlaceAt(x, y)) out.push({ x, y, rot });
     }
   }
-  return out;
-}
-
-function rotCheck(game, x, y, rot) {
-  const saved = game.rot;
-  game.rot = rot;
-  const ok = game.m.canPlaceAt(x, y);
   game.rot = saved;
-  return ok;
+  return out;
 }
 
 function mulberry(a) {
@@ -269,16 +302,22 @@ function main() {
     // Classic is the plain case, Cirrus removes tiles, and Sprawl places
     // several at once — between them they cover the ways a modifier can go
     // wrong.
-    console.log('\nmodifiers, against a plain mode, a removing one and a piece one');
-    for (const mod of MODIFIERS) {
-      if (mod.id === 'fog') continue;                 // purely a render flag
+    console.log('\nmechanics, against a plain mode, a removing one and a piece one');
+    for (const mech of MECHANICS) {
+      if (mech.id === 'fog') continue;                // purely a render flag
       for (const host of ['classic', 'cirrus', 'sprawl']) {
-        runMode(MODE_OF(host), Math.max(4, games / 2), { options: { [mod.id]: true } }, `+${mod.id}`);
+        runMode(MODE_OF(host), Math.max(4, games / 2), { options: { [mech.id]: true } }, `+${mech.id}`);
       }
     }
-    console.log('\nall modifiers at once');
-    const all = Object.fromEntries(MODIFIERS.map((m) => [m.id, true]));
-    runMode(MODE_OF('classic'), Math.max(4, games / 2), { options: all }, '+everything');
+
+    console.log('\ntiles per turn');
+    for (const n of [2, 3, 5]) {
+      runMode(MODE_OF('classic'), Math.max(4, games / 2), { tilesPerTurn: n }, ` x${n}`);
+    }
+    console.log('\nall mechanics at once');
+    const all = Object.fromEntries(MECHANICS.map((m) => [m.id, true]));
+    runMode(MODE_OF('classic'), Math.max(4, games / 2), { options: all, groups: ALL_GROUPS }, '+everything');
+    runMode(MODE_OF('world'), Math.max(4, games / 2), { options: all, groups: ALL_GROUPS }, '+everything');
   }
 
   console.log(failures ? `\n${failures} failure(s)` : '\nall good');

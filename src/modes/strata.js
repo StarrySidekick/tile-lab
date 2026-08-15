@@ -23,8 +23,8 @@
 import { Mode } from './mode.js';
 import { buildDeck } from '../tiles.js';
 import { PLAYER_COLORS } from '../theme.js';
+import { coverProblem, MAX_STACK } from '../mechanics.js';
 
-const MAX_H = 2;          // 0-indexed, so three levels
 const COVER_COST = 2;
 const GROUND_GAIN = 1;
 const STONE_CAP = 8;
@@ -41,23 +41,17 @@ export class Strata extends Mode {
 
   // --- covering rules -------------------------------------------------------
 
-  /** Why you can't build here, or null if you can. */
+  /**
+   * The shared cover rules, plus the one Strata adds: it costs stone. The
+   * height ceiling and the "nothing that scored, nothing claimed" rules live
+   * in mechanics.js so the `stack` mechanic behaves identically elsewhere.
+   */
   coverProblem(x, y) {
-    const under = this.game.board.get(x, y);
-    if (!under) return null;
-    if (under.h >= MAX_H) return 'already three levels high';
-    if (under.meeple) return 'someone is standing on it';
-    if (this.scoredHere(under)) return 'that feature has already scored';
+    const shared = coverProblem(this.game.board, x, y);
+    if (shared) return shared;
+    if (!this.game.board.get(x, y)) return null;
     if (this.stone[this.game.current] < COVER_COST) return 'not enough stone';
     return null;
-  }
-
-  scoredHere(cell) {
-    const board = this.game.board;
-    return cell.type.feats.some((f, i) => {
-      const d = board.featureOf(cell.x, cell.y, i);
-      return d && d.scored;
-    });
   }
 
   canPlaceAt(x, y) {
@@ -79,7 +73,7 @@ export class Strata extends Mode {
       this.stone[g.current] = Math.min(STONE_CAP, this.stone[g.current] + GROUND_GAIN);
       g.say(`${g.player.name} lays ${cell.type.id} at (${x}, ${y}) — +${GROUND_GAIN} stone.`);
     }
-    this.tallest = Math.max(this.tallest, cell.h);
+    this.tallest = Math.min(MAX_STACK, Math.max(this.tallest, cell.h));
     g.lastPlaced = cell;
     g.tile = null;
     g.emit('place');

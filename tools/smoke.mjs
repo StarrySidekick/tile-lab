@@ -125,32 +125,58 @@ for (const mode of modes) {
   }
 }
 
-// The modifiers all touch the UI too — the market row especially.
-for (const mod of ['market', 'agendas', 'fog', 'twoFaced', 'tide']) {
+// Every mechanic touches the UI too — the market row and the extra action
+// buttons especially, and those only exist in a browser.
+const mechanics = await page.evaluate(() => window.LAB.MECHANICS.map((m) => m.id));
+for (const mech of mechanics) {
   errors.length = 0;
   await page.selectOption('#mode', 'classic');
-  await page.check(`#modifiers input[data-mod="${mod}"]`);
+  await page.check(`#mechanics input[data-mech="${mech}"]`);
   await page.click('#newGame');
   await page.waitForTimeout(100);
   await page.evaluate(() => {
     const g = window.LAB.game;
-    for (let i = 0; i < 12 && g.phase !== 'over'; i++) {
+    const legal = () => {
+      const out = [];
+      const saved = g.rot;
+      for (const { x, y } of g.board.candidates(g.placeOpts())) {
+        for (let rot = 0; rot < 4; rot++) { g.rot = rot; if (g.canPlaceAt(x, y)) out.push({ x, y, rot }); }
+      }
+      g.rot = saved;
+      return out;
+    };
+    for (let i = 0; i < 20 && g.phase !== 'over'; i++) {
       if (g.phase === 'market') { g.takeFromMarket(0); continue; }
       if (g.phase === 'place') {
-        const s = g.board.legalPlacements(g.tile, g.placeOpts())[0];
+        const s = legal()[0];
         if (!s) break;
-        for (let r = 0; r < s.rot; r++) g.rotate(1);
+        g.rot = s.rot;
         g.cellClick(s.x, s.y);
         continue;
       }
       if (g.phase === 'meeple') { g.skipMeeple(); continue; }
+      if (g.phase === 'walk') { g.declineWalk(); continue; }
       break;
     }
   });
-  await page.uncheck(`#modifiers input[data-mod="${mod}"]`);
-  if (errors.length) { failures++; console.log(`  ✗ +${mod}: ${errors[0].split('\n')[0]}`); }
-  else console.log(`  ✓ +${mod}`);
+  await page.uncheck(`#mechanics input[data-mech="${mech}"]`);
+  if (errors.length) { failures++; console.log(`  ✗ +${mech}: ${errors[0].split('\n')[0]}`); }
+  else console.log(`  ✓ +${mech}`);
 }
+
+// And the tiles-per-turn setting, which changes the turn loop itself.
+for (const n of ['1', '3', '5']) {
+  errors.length = 0;
+  await page.selectOption('#tilesPerTurn', n);
+  await page.click('#newGame');
+  await page.waitForTimeout(80);
+  const left = await page.evaluate(() => window.LAB.game.tilesLeft);
+  if (errors.length || left !== Number(n)) {
+    failures++;
+    console.log(`  ✗ ${n} tiles/turn: ${errors[0] || `tilesLeft was ${left}`}`);
+  } else console.log(`  ✓ ${n} tiles/turn`);
+}
+await page.selectOption('#tilesPerTurn', '1');
 
 await browser.close();
 server.close();

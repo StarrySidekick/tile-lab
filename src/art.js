@@ -216,6 +216,79 @@ function turret(ctx, w, h, fill) {
 }
 
 const MARK_ART = {
+  // --- expansions ------------------------------------------------------------
+  inn(ctx) {
+    district(ctx, '#8a5a3a', (c) => {           // a sign hanging off the front
+      c.strokeStyle = THEME.timber;
+      c.lineWidth = 0.06;
+      c.beginPath(); c.moveTo(0.34, 0.04); c.lineTo(0.52, 0.04); c.stroke();
+      c.fillStyle = THEME.gold;
+      c.beginPath(); c.rect(0.44, 0.06, 0.16, 0.14); c.fill(); c.stroke();
+    });
+  },
+  cathedral(ctx) {
+    ctx.fillStyle = THEME.plaster;
+    ctx.beginPath(); ctx.rect(-0.30, -0.10, 0.60, 0.46); ctx.fill(); ctx.stroke();
+    for (const x of [-0.18, 0.18]) {            // towers
+      ctx.beginPath(); ctx.rect(x - 0.09, -0.34, 0.18, 0.30); ctx.fill(); ctx.stroke();
+      roofTri(ctx, x, -0.34, 0.24, 0.20, THEME.roofDark);
+    }
+    roofTri(ctx, 0, -0.14, 0.44, 0.26, THEME.roof);
+    ctx.fillStyle = THEME.shield;               // rose window
+    ctx.beginPath(); ctx.arc(0, 0.10, 0.10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  },
+  wine(ctx) {
+    ctx.fillStyle = '#6d2f45';
+    ctx.beginPath();
+    ctx.moveTo(-0.16, -0.34); ctx.lineTo(0.16, -0.34);
+    ctx.quadraticCurveTo(0.20, 0.06, 0.26, 0.34);
+    ctx.lineTo(-0.26, 0.34);
+    ctx.quadraticCurveTo(-0.20, 0.06, -0.16, -0.34);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.plaster;
+    ctx.beginPath(); ctx.rect(-0.18, 0.02, 0.36, 0.16); ctx.fill();
+  },
+  grain(ctx) {
+    ctx.strokeStyle = '#b99a4e';
+    ctx.lineWidth = 0.08;
+    for (const x of [-0.18, 0, 0.18]) {
+      ctx.beginPath(); ctx.moveTo(x, 0.38); ctx.lineTo(x, -0.24); ctx.stroke();
+      ctx.fillStyle = '#d9be6e';
+      ctx.beginPath();
+      ctx.ellipse(x, -0.30, 0.10, 0.17, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.055;
+  },
+  cloth(ctx) {
+    ctx.fillStyle = '#4a6f8a';
+    ctx.beginPath();
+    ctx.moveTo(-0.34, -0.26); ctx.lineTo(0.34, -0.26); ctx.lineTo(0.34, 0.18);
+    ctx.quadraticCurveTo(0.17, 0.38, 0, 0.18);
+    ctx.quadraticCurveTo(-0.17, -0.02, -0.34, 0.18);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 0.045;
+    for (const y of [-0.14, 0.00]) {
+      ctx.beginPath(); ctx.moveTo(-0.30, y); ctx.lineTo(0.30, y); ctx.stroke();
+    }
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.055;
+  },
+  spring(ctx) {
+    ctx.fillStyle = THEME.rockDark;             // rocks around the source
+    for (const [x, y, r] of [[-0.30, 0.18, 0.16], [0.30, 0.14, 0.14], [0.02, -0.28, 0.13]]) {
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+  },
+  mouth(ctx) {
+    ctx.fillStyle = 'rgba(190,220,235,0.5)';    // widening water
+    ctx.beginPath();
+    ctx.ellipse(0, 0.06, 0.42, 0.30, 0, 0, Math.PI * 2);
+    ctx.fill();
+  },
+
   // --- marches ---------------------------------------------------------------
   stronghold(ctx) {
     turret(ctx, 0.34, 0.72, THEME.city);
@@ -662,6 +735,171 @@ const MARK_ART = {
   },
 };
 
+// --- world features ---------------------------------------------------------
+// Forests, mountains and water all reuse the city silhouette machinery: the
+// same "which sides does this reach" shape, filled and detailed differently.
+// That means a forest corner and a city corner line up exactly across a seam,
+// which is what stops the board looking like two games stapled together.
+
+/**
+ * Clip to a feature's silhouette but draw the scenery inside it UPRIGHT.
+ *
+ * `cityShape` returns the shape plus the quarter-turns needed to line it up,
+ * and a city's masonry hatch doesn't care which way that is. Mountains and
+ * water do: peaks have to point up and ripples have to lie flat, whichever
+ * edges the feature happens to reach. So the rotation is applied to build the
+ * clip and then undone before anything is drawn through it.
+ */
+function inShape(ctx, k, path, fn) {
+  const a = (k & 3) * Math.PI / 2;
+  ctx.save();
+  ctx.translate(0.5, 0.5); ctx.rotate(a); ctx.translate(-0.5, -0.5);
+  ctx.beginPath();
+  path(ctx);
+  ctx.clip();
+  ctx.translate(0.5, 0.5); ctx.rotate(-a); ctx.translate(-0.5, -0.5);
+  fn(ctx);
+  ctx.restore();
+}
+
+/** Fill and outline a feature's silhouette. */
+function shape(ctx, k, path, fill, line, width = 0.03) {
+  withRot(ctx, k, () => {
+    ctx.beginPath();
+    path(ctx);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineWidth = width;
+    ctx.strokeStyle = line;
+    ctx.stroke();
+  });
+}
+
+function drawForest(ctx, f) {
+  const { k, path } = cityShape(f.sides);
+  shape(ctx, k, path, THEME.forest, THEME.forestDark);
+  inShape(ctx, k, path, (c) => {
+    // Canopy blobs on a fixed lattice, so a tile always draws the same.
+    for (let i = 0; i < 26; i++) {
+      const x = ((i * 37) % 100) / 100;
+      const y = ((i * 61) % 100) / 100;
+      const r = 0.06 + ((i * 17) % 5) * 0.012;
+      c.beginPath();
+      c.arc(x, y, r, 0, Math.PI * 2);
+      c.fillStyle = i % 3 === 0 ? THEME.forestCanopy : THEME.forestDark;
+      c.fill();
+    }
+  });
+}
+
+/** A log stack — the forest's pennant, worth one extra point. */
+function drawLog(ctx, [x, y]) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(0.30, 0.30);
+  ctx.lineWidth = 0.10;
+  ctx.strokeStyle = '#3a2c1e';
+  for (const [dx, dy] of [[-0.28, 0.18], [0.28, 0.18], [0, -0.22]]) {
+    ctx.beginPath();
+    ctx.ellipse(dx, dy, 0.30, 0.24, 0, 0, Math.PI * 2);
+    ctx.fillStyle = THEME.timber;
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(dx, dy, 0.13, 0.10, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#8a6c4a';
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawMountain(ctx, f) {
+  const { k, path } = cityShape(f.sides);
+  shape(ctx, k, path, THEME.rock, THEME.rockDark);
+  inShape(ctx, k, path, (c) => {
+    // Three peaks at different heights, so a range still reads when the
+    // silhouette is only a sliver along one edge — a one-sided mountain tile
+    // has no room at the bottom of the tile for anything to stand on.
+    for (const [cx, base, w, h] of [[0.62, 1.05, 0.80, 0.85], [0.24, 0.98, 0.58, 0.58], [0.46, 0.44, 0.44, 0.36]]) {
+      c.beginPath();
+      c.moveTo(cx - w / 2, base);
+      c.lineTo(cx, base - h);
+      c.lineTo(cx + w / 2, base);
+      c.closePath();
+      c.fillStyle = THEME.rockDark;
+      c.fill();
+      c.beginPath();
+      c.moveTo(cx, base - h);
+      c.lineTo(cx + w / 2, base);
+      c.lineTo(cx, base);
+      c.closePath();
+      c.fillStyle = THEME.rock;
+      c.fill();
+      c.beginPath();                       // snow cap
+      c.moveTo(cx - w * 0.15, base - h * 0.74);
+      c.lineTo(cx, base - h);
+      c.lineTo(cx + w * 0.15, base - h * 0.74);
+      c.quadraticCurveTo(cx, base - h * 0.62, cx - w * 0.15, base - h * 0.74);
+      c.closePath();
+      c.fillStyle = THEME.rockSnow;
+      c.fill();
+    }
+  });
+}
+
+function drawWater(ctx, f, deep) {
+  const { k, path } = cityShape(f.sides);
+  shape(ctx, k, path, deep ? THEME.waterDeep : THEME.water, THEME.waterEdge);
+  inShape(ctx, k, path, (c) => {
+    c.strokeStyle = 'rgba(190,220,235,0.30)';
+    c.lineWidth = 0.022;
+    for (let y = 0.12; y < 1; y += 0.18) {
+      c.beginPath();
+      c.moveTo(-0.1, y);
+      for (let x = -0.1; x < 1.2; x += 0.25) c.quadraticCurveTo(x + 0.06, y - 0.05, x + 0.125, y);
+      c.stroke();
+    }
+  });
+}
+
+/**
+ * The river is drawn as a band along its sides rather than as a shaped mass,
+ * because a river reads as a line and a lake reads as an area.
+ */
+function drawRiver(ctx, f) {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const w of [0.30, 0.22]) {
+    ctx.beginPath();
+    if (f.sides.length === 1) {
+      const [mx, my] = SIDE_MID[f.sides[0]];
+      ctx.moveTo(mx, my);
+      ctx.lineTo(0.5, 0.5);
+    } else {
+      for (let i = 0; i < f.sides.length; i++) {
+        const [mx, my] = SIDE_MID[f.sides[i]];
+        if (i === 0) ctx.moveTo(mx, my);
+        else ctx.quadraticCurveTo(0.5, 0.5, mx, my);
+      }
+    }
+    ctx.strokeStyle = w > 0.25 ? THEME.waterEdge : THEME.water;
+    ctx.lineWidth = w;
+    ctx.stroke();
+  }
+  // A spring or a mouth is a pool where the line stops.
+  if (f.sides.length === 1) {
+    ctx.beginPath();
+    ctx.arc(0.5, 0.5, 0.22, 0, Math.PI * 2);
+    ctx.fillStyle = THEME.waterDeep;
+    ctx.fill();
+    ctx.lineWidth = 0.03;
+    ctx.strokeStyle = THEME.waterEdge;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /** Draw a landmark centred at (x, y) in unit tile space. */
 export function drawMark(ctx, kind, [x, y], s = 0.46) {
   const art = MARK_ART[kind];
@@ -722,6 +960,13 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     }
   }
 
+  // Water goes down before roads so a bridge crosses over it, and forests and
+  // mountains go down before cities so a wall reads as built against them.
+  for (const f of type.feats) if (f.type === 'lake') drawWater(ctx, f, false);
+  for (const f of type.feats) if (f.type === 'forest') drawForest(ctx, f);
+  for (const f of type.feats) if (f.type === 'mountain') drawMountain(ctx, f);
+  for (const f of type.feats) if (f.type === 'river') drawRiver(ctx, f);
+
   for (const f of type.feats) if (f.type === 'road') drawRoad(ctx, f, terrain);
 
   // Two or more dead-end road stubs meeting = a junction, not a through road.
@@ -743,6 +988,9 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
       const [sx, sy] = type.spots[i];
       drawShield(ctx, [sx, sy - 0.16]);
     }
+  });
+  type.feats.forEach((f, i) => {
+    if (f.type === 'forest' && f.shield) drawLog(ctx, type.spots[i]);
   });
   for (const f of type.feats) if (f.type === 'monastery') drawAbbey(ctx);
 

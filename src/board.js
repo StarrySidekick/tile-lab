@@ -202,7 +202,7 @@ export class Board {
     for (const cell of order) {
       if (!cell.meeple) continue;
       const d = this.featureOf(cell.x, cell.y, cell.meeple.feat);
-      if (d) d.meeples.push({ player: cell.meeple.player, x: cell.x, y: cell.y, feat: cell.meeple.feat });
+      if (d) d.meeples.push({ ...cell.meeple, x: cell.x, y: cell.y });
       else cell.meeple = null;         // the feature it sat on no longer exists
     }
     for (const d of this.allComponents()) {
@@ -452,13 +452,71 @@ export class Board {
 
   // --- scoring --------------------------------------------------------------
 
-  /** Points a component is worth. `final` = end-of-game (incomplete) scoring. */
+  /**
+   * Points a component is worth. `final` = end-of-game (incomplete) scoring.
+   *
+   * A forest deliberately ignores `final`: it has no complete/incomplete
+   * distinction, it's simply as big as it is. Lakes and rivers are worth
+   * nothing on their own — they pay through the cities beside them.
+   */
   value(d, final = false) {
     const n = d.tiles.size;
     if (d.type === 'city') return final ? n + d.shields : 2 * n + 2 * d.shields;
     if (d.type === 'road') return n;
     if (d.type === 'monastery') return 1 + this.surroundCount(d.at.x, d.at.y);
+    if (d.type === 'forest') return n + d.shields;
     return 0;
+  }
+
+  /** Every tile of a component, as cells. */
+  cellsOf(d) {
+    const out = [];
+    for (const k of d.tiles) {
+      const [x, y] = k.split(',').map(Number);
+      const c = this.get(x, y);
+      if (c) out.push(c);
+    }
+    return out;
+  }
+
+  /**
+   * Distinct bodies of water touching a component, by type. A city beside a
+   * lake is worth more, and this is what counts the "beside".
+   */
+  adjacentWater(d) {
+    const bodies = { lake: new Set(), river: new Set() };
+    for (const cell of this.cellsOf(d)) {
+      for (let s = 0; s < 4; s++) {
+        const nb = this.neighbor(cell.x, cell.y, s);
+        if (!nb) continue;
+        nb.type.feats.forEach((f, i) => {
+          if (f.type !== 'lake' && f.type !== 'river') return;
+          bodies[f.type].add(this.find(`${keyOf(nb.x, nb.y)}#${i}`));
+        });
+      }
+    }
+    return { lakes: bodies.lake.size, rivers: bodies.river.size };
+  }
+
+  /** Marks carried anywhere on a component — inns, cathedrals, trade goods. */
+  marksOn(d) {
+    const root = this.find(d.parts[0]);
+    const out = [];
+    for (const cell of this.cellsOf(d)) {
+      cell.type.marks.forEach((m, i) => {
+        // Only marks anchored to a feature belong to it; a landmark sitting at
+        // the tile centre belongs to the tile, not to the road running past it.
+        if (m.on == null) return;
+        if (this.find(`${keyOf(cell.x, cell.y)}#${m.on}`) !== root) return;
+        out.push({ ...m, x: cell.x, y: cell.y, index: i });
+      });
+    }
+    return out;
+  }
+
+  /** A gap enclosed on all four sides — the only place an Abbey may go. */
+  isEnclosedGap(x, y) {
+    return !this.cells.has(keyOf(x, y)) && this.inBounds(x, y) && this.degree(x, y) === 4;
   }
 
   /** Mean stack height of a component's tiles, for Strata. */
@@ -472,28 +530,31 @@ export class Board {
     return sum / d.tiles.size;
   }
 
-  /** Players with the most meeples on a component (ties share full points). */
+  /**
+   * Players with the most followers on a component (ties share full points).
+   * A big follower counts as two, which is the whole of what it does.
+   */
   majority(d) {
     const counts = new Map();
-    for (const m of d.meeples) counts.set(m.player, (counts.get(m.player) || 0) + 1);
+    for (const m of d.meeples) counts.set(m.player, (counts.get(m.player) || 0) + (m.big ? 2 : 1));
     let best = 0;
     for (const c of counts.values()) best = Math.max(best, c);
     return [...counts.entries()].filter(([, c]) => c === best).map(([p]) => p);
   }
 
-  addMeeple(x, y, featIdx, player) {
+  addMeeple(x, y, featIdx, player, big = false) {
     const cell = this.get(x, y);
-    cell.meeple = { player, feat: featIdx };
-    this.featureOf(x, y, featIdx).meeples.push({ player, x, y, feat: featIdx });
+    cell.meeple = { player, feat: featIdx, big };
+    this.featureOf(x, y, featIdx).meeples.push({ player, x, y, feat: featIdx, big });
   }
 
-  /** Pull meeples off a scored component and return them to their owners. */
+  /** Pull followers off a scored component and hand them back to their owners. */
   reclaim(d) {
     const out = [];
     for (const m of d.meeples) {
       const cell = this.get(m.x, m.y);
       if (cell) cell.meeple = null;
-      out.push(m.player);
+      out.push(m);
     }
     d.meeples = [];
     return out;

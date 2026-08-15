@@ -32,7 +32,7 @@
   </div>
 
   <script type="module">
-    import { TILE_TYPES, CAVE_TYPES, GROUPS } from './src/tiles.js';
+    import { TILE_TYPES, CAVE_TYPES, RIVER_TYPES, GROUPS, NO_MEEPLE } from './src/tiles.js';
     import { drawTile, drawMeeple, PLAYER_COLORS } from './src/art.js';
     import { makePiece, rotatePiece, validatePiece } from './src/pieces.js';
 
@@ -52,7 +52,12 @@
       drawTile(ctx, t, { cave });
       ctx.restore();
       t.spots.forEach(([sx, sy], i) => {
+        // Water and mountains can't be claimed, so their anchors are ghosted
+        // rather than drawn — otherwise the atlas implies a move you can't make.
+        const claimable = !NO_MEEPLE.has(t.feats[i].type);
+        ctx.globalAlpha = claimable ? 1 : 0.22;
         drawMeeple(ctx, sx * SIZE, sy * SIZE, SIZE * 0.15, PLAYER_COLORS[i % PLAYER_COLORS.length]);
+        ctx.globalAlpha = 1;
       });
 
       const feats = t.feats
@@ -120,7 +125,7 @@
       out.appendChild(grid);
     }
 
-    const links = ['all', ...GROUPS.map((g) => g.id), 'pieces', 'cave']
+    const links = ['all', ...GROUPS.map((g) => g.id), 'river', 'pieces', 'cave']
       .map((g) => `<a href="?group=${g}"${(only || 'all') === g ? ' style="color:var(--accent)"' : ''}>${g}</a>`)
       .join(' · ');
     out.insertAdjacentHTML('beforeend', `<p class="note">Show: ${links}</p>`);
@@ -129,6 +134,9 @@
       if (only && only !== 'all' && only !== g.id) continue;
       const list = TILE_TYPES.filter((t) => t.group === g.id);
       if (list.length) section(g.name, g.note, list);
+    }
+    if (!only || only === 'all' || only === 'river') {
+      section('The River', 'Laid before the game proper, spring first and lake last. It may not double back on itself.', RIVER_TYPES);
     }
     if (!only || only === 'all' || only === 'pieces') pieceSection();
     if (!only || only === 'all' || only === 'cave') {
