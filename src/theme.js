@@ -59,6 +59,17 @@ export const THEME = {
   tealDeep: '#2f6f68',
   violet: '#6b5a8c',       // twilight realm
 
+  // --- relief lighting -----------------------------------------------------
+  // One sun, low in the north-west, for the whole board. Warm on the faces it
+  // catches, cool violet in the faces it misses — the same split the palette
+  // uses everywhere else. Kept weak on purpose: this is meant to read as a
+  // painted board catching the light, not as a lit 3D scene.
+  lit: 'rgba(255,238,206,0.30)',
+  litStrong: 'rgba(255,241,214,0.42)',
+  shade: 'rgba(26,18,34,0.42)',
+  shadeStrong: 'rgba(20,13,28,0.55)',
+  cast: 'rgba(13,11,17,0.40)',
+
   // --- UI ------------------------------------------------------------------
   panel: '#1f1b25',
   panel2: '#282232',

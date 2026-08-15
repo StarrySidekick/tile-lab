@@ -233,6 +233,8 @@ src/pieces.js      polyomino generation for Sprawl
 src/theme.js       the entire colour scheme, in one place
 src/board.js       grid, placement, connectivity, removal, stacking, scoring
 src/art.js         procedural tile + landmark drawing (no assets)
+src/light.js       the relief lighting model — one sun for the whole board
+src/sprites.js     tile sprite cache, so the art is drawn once and then blitted
 src/game.js        the host: turn flow, deck, players, modifiers
 src/modes/         one file per mode, behind a small set of hooks
 src/interior.js    caves and city streets — a sub-map on the same loop
@@ -344,6 +346,36 @@ Twilight Princess: desaturated and warm-shifted, olive rather than emerald
 greens, grey-brown stone, and a dusk vignette with a faint amber wash over the
 whole frame. Saturation stays low so the gold accents and twilight teal are the
 only things that read as bright.
+
+### Relief lighting
+
+The board is lit by a single sun, fixed in world space, low in the north-west.
+Raised things — city walls, treelines, ridges — catch it on the faces pointing
+at it and lose it on the faces that don't; water is lit inside out because it
+sits below the field; roads and rivers are grooves worn into the ground.
+
+There is no 3D anything. `src/light.js` shades the *boundary* of a 2D shape as
+if the shape were a plateau, by stroking its outline twice, clipped to itself:
+the band nudged toward the light only survives where the boundary faces away
+from it, and vice versa. The clip does the trigonometry, so curved and diagonal
+boundaries come out right for free.
+
+Two details carry the whole illusion:
+
+* **The light counter-rotates with the tile.** Art is drawn in a canonical
+  orientation and the canvas is rotated to place it, so a shadow baked into the
+  art would spin with the tile and four rotations of one type would be lit from
+  four directions. `spin()` cancels that out.
+* **Tile edges are never lit.** Every silhouette carries a `rim` — the part of
+  its outline that is a real boundary rather than a tile edge. A city crossing a
+  seam has no rim there, so it reads as one city instead of two walled-off
+  halves.
+
+Because a tile's art depends on nothing but its type, rotation and terrain,
+there is a finite set of pictures the game can draw. `src/sprites.js` renders
+each one once and blits it thereafter, which makes the lighting free — a full
+board went from 1.29 ms/frame to 0.33 ms/frame, faster than it was *before* the
+lighting existed. Past 512px a tile falls back to running the paths directly.
 
 ### Sound
 

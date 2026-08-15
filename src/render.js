@@ -7,6 +7,8 @@
 // ---------------------------------------------------------------------------
 
 import { drawTile, drawMeeple, PLAYER_COLORS } from './art.js';
+import { tileSprite } from './sprites.js';
+import { LIGHT } from './light.js';
 import { THEME, applyDusk } from './theme.js';
 import { rotPoint } from './tiles.js';
 import { liftableCells } from './mechanics.js';
@@ -69,6 +71,29 @@ export class Renderer {
 
   centerOn(x, y) { this.cam.x = x + 0.5; this.cam.y = y + 0.5; }
 
+  /**
+   * Paint one tile at a grid position — the one call every tile goes through.
+   *
+   * Prefers a cached sprite and falls back to running the paths, which is what
+   * happens when a tile is drawn bigger than the largest sprite. The two paths
+   * produce identical pictures; the sprite is just the same drawing, already
+   * done. Note the rotation is handled differently in each: the sprite has it
+   * baked in, so it must NOT be applied again here.
+   */
+  paintTile(x, y, rot, type, terrain = 'surface', zoom = this.cam.zoom, origin = null) {
+    const dpr = window.devicePixelRatio || 1;
+    const sprite = tileSprite(type, rot, terrain, zoom * dpr);
+    if (!sprite) {
+      this.inCell(x, y, rot, (c) => drawTile(c, type, { terrain, rot }), zoom, origin);
+      return;
+    }
+    const [sx, sy] = origin ? origin(x, y) : this.toScreen(x, y);
+    // A hair of overlap. Tiles land on fractional pixels, and without it two
+    // neighbours can each give up a sliver of their shared edge to rounding
+    // and leave a backdrop-coloured hairline between them.
+    this.ctx.drawImage(sprite, sx, sy, zoom + 0.5, zoom + 0.5);
+  }
+
   inCell(x, y, rot, fn, zoom = this.cam.zoom, origin = null) {
     const ctx = this.ctx;
     const [sx, sy] = origin ? origin(x, y) : this.toScreen(x, y);
@@ -101,7 +126,7 @@ export class Renderer {
       if (lift) this.drawStackShadow(cell, lift);
       ctx.save();
       if (fog && !fog.has(`${cell.x},${cell.y}`)) ctx.globalAlpha = 0.26;
-      this.inCell(cell.x, cell.y - lift, cell.rot, (c) => drawTile(c, cell.type));
+      this.paintTile(cell.x, cell.y - lift, cell.rot, cell.type);
       ctx.restore();
       if (overlay) this.drawCellOverlay(cell, overlay, lift);
     }
@@ -158,13 +183,19 @@ export class Renderer {
 
   // --- overlays the modes ask for -------------------------------------------
 
-  /** Strata: a dropped shadow under a raised tile sells the height. */
+  /**
+   * Strata: a dropped shadow under a raised tile sells the height. It falls
+   * the same way every other shadow on the board does — a lifted tile is the
+   * biggest raised thing in the game, so it's the one that would look most
+   * wrong lit from its own private direction.
+   */
   drawStackShadow(cell, lift) {
     const ctx = this.ctx;
     const [sx, sy] = this.toScreen(cell.x, cell.y);
     const z = this.cam.zoom;
+    const d = lift + 0.03;
     ctx.fillStyle = 'rgba(8,6,12,0.55)';
-    ctx.fillRect(sx + z * 0.04, sy + z * 0.04, z, z);
+    ctx.fillRect(sx - LIGHT.x * d * z, sy - LIGHT.y * d * z, z, z);
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.fillRect(sx, sy - lift * z + z, z, lift * z);
   }
@@ -308,7 +339,7 @@ export class Renderer {
     if (covering && !ok) return;              // don't smear a ghost over the board
     ctx.save();
     ctx.globalAlpha = ok ? 0.92 : 0.32;
-    this.inCell(h.x, h.y, game.rot, (c) => drawTile(c, game.tile));
+    this.paintTile(h.x, h.y, game.rot, game.tile);
     ctx.restore();
 
     const [sx, sy] = this.toScreen(h.x, h.y);
@@ -349,7 +380,7 @@ export class Renderer {
     ctx.save();
     ctx.globalAlpha = ok ? 0.92 : 0.30;
     for (const c of piece.cells) {
-      this.inCell(h.x + c.dx, h.y + c.dy, c.rot, (cc) => drawTile(cc, c.type));
+      this.paintTile(h.x + c.dx, h.y + c.dy, c.rot, c.type);
     }
     ctx.restore();
     ctx.lineWidth = 3;
@@ -575,7 +606,7 @@ export class Renderer {
     const origin = (x, y) => this.caveToScreen(g, inv, x, y);
 
     for (const cell of inv.board.cells.values()) {
-      this.inCell(cell.x, cell.y, cell.rot, (c) => drawTile(c, cell.type, { terrain }), g.zoom, origin);
+      this.paintTile(cell.x, cell.y, cell.rot, cell.type, terrain, g.zoom, origin);
     }
 
     if (game.phase === 'interior-place' && inv.tile) {
@@ -592,7 +623,7 @@ export class Renderer {
         if (c && inv.canPlace(c.x, c.y)) {
           ctx.save();
           ctx.globalAlpha = 0.9;
-          this.inCell(c.x, c.y, inv.rot, (cc) => drawTile(cc, inv.tile, { terrain }), g.zoom, origin);
+          this.paintTile(c.x, c.y, inv.rot, inv.tile, terrain, g.zoom, origin);
           ctx.restore();
         }
       }

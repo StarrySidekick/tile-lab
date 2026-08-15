@@ -287,7 +287,7 @@ function drawPreview() {
       c.translate(0.5, 0.5);
       c.rotate((cell.rot & 3) * Math.PI / 2);
       c.translate(-0.5, -0.5);
-      drawTile(c, cell.type);
+      drawTile(c, cell.type, { rot: cell.rot });
       c.restore();
     }
     return;
@@ -299,7 +299,7 @@ function drawPreview() {
   c.rotate(cur.rot * Math.PI / 2);
   c.translate(-size / 2, -size / 2);
   c.scale(size, size);
-  drawTile(c, cur.type, { terrain: cur.terrain });
+  drawTile(c, cur.type, { terrain: cur.terrain, rot: cur.rot });
   c.restore();
 }
 
