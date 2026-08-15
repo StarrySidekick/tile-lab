@@ -233,7 +233,8 @@ src/pieces.js      polyomino generation for Sprawl
 src/theme.js       the entire colour scheme, in one place
 src/board.js       grid, placement, connectivity, removal, stacking, scoring
 src/art.js         procedural tile + landmark drawing (no assets)
-src/light.js       the relief lighting model — one sun for the whole board
+src/light.js       where the light comes from — one sun for the whole board
+src/shape.js       area silhouettes, and the corner rule that makes tiles match
 src/sprites.js     tile sprite cache, so the art is drawn once and then blitted
 src/game.js        the host: turn flow, deck, players, modifiers
 src/modes/         one file per mode, behind a small set of hooks
@@ -347,36 +348,65 @@ greens, grey-brown stone, and a dusk vignette with a faint amber wash over the
 whole frame. Saturation stays low so the gold accents and twilight teal are the
 only things that read as bright.
 
-### Relief lighting
+### How the board is drawn
 
 The board is lit by a single sun, fixed in world space, low in the north-west.
-Raised things — city walls, treelines, ridges — catch it on the faces pointing
-at it and lose it on the faces that don't; water is lit inside out because it
-sits below the field; roads and rivers are grooves worn into the ground.
+Everything that stands up is drawn as an object with a face toward it and a
+face away — a curtain wall with a shaded foot and a lit walkway, a hipped roof
+whose four pitches each take their colour from how squarely they face the sun,
+a tower, a tree. Roads and rivers and water get no lighting at all, because
+they don't stand up.
 
-There is no 3D anything. `src/light.js` shades the *boundary* of a 2D shape as
-if the shape were a plateau, by stroking its outline twice, clipped to itself:
-the band nudged toward the light only survives where the boundary faces away
-from it, and vice versa. The clip does the trigonometry, so curved and diagonal
-boundaries come out right for free.
+An earlier pass tried to fake height by shading the *boundary* of flat regions.
+That was the wrong model: a city is not a raised slab of ground, it's walls and
+roofs, and shading its outline just drew a bright line along every seam.
 
-Two details carry the whole illusion:
+#### Areas have to line up
 
-* **The light counter-rotates with the tile.** Art is drawn in a canonical
-  orientation and the canvas is rotated to place it, so a shadow baked into the
-  art would spin with the tile and four rotations of one type would be lit from
-  four directions. `spin()` cancels that out.
-* **Tile edges are never lit.** Every silhouette carries a `rim` — the part of
-  its outline that is a real boundary rather than a tile edge. A city crossing a
-  seam has no rim there, so it reads as one city instead of two walled-off
-  halves.
+Cities, forests, mountains and lakes cover some subset of a tile's four sides
+and must match whatever is on the other side of every seam. `src/shape.js`
+builds that outline under two rules:
 
-Because a tile's art depends on nothing but its type, rotation and terrain,
-there is a finite set of pictures the game can draw. `src/sprites.js` renders
-each one once and blits it thereafter, which makes the lighting free — a full
-board went from 1.29 ms/frame to 0.33 ms/frame, faster than it was *before* the
-lighting existed. Past 512px a tile falls back to running the paths directly.
+* An area covers a whole side that it reaches, corner to corner — except that
+  it pulls back by `TRIM` at any corner it doesn't wrap all the way around.
+* **Whether a corner is wrapped is a property of the vertex, not the tile.** It
+  is true only when all four tiles meeting there carry the same feature around
+  it. All four compute the same answer, so two tiles sharing an edge always
+  agree about both of its endpoints and their outlines meet exactly.
 
+The old art had four hand-drawn shapes that disagreed about this — a band city
+crossed its edge at `0.14→0.86` while a cap city crossed at `0→1` — so a band
+beside a cap left a sliver of city facing a sliver of field at both ends of the
+seam. That was the corner mismatch, and it's now impossible by construction.
+
+Where the outline meets a tile edge it leaves *perpendicular* to it, so the
+neighbour's outline arrives at the same point at the same angle and the two
+halves read as one curve.
+
+#### Walls only exist where the city ends
+
+Each silhouette exposes a `rim`: the part of its outline that is a real
+boundary rather than a tile edge. The curtain wall follows the rim, so a city
+continuing into the next tile has no wall at the seam and a block of city is
+one town behind one wall. A feature covering all four sides of a fully wrapped
+tile has no rim at all — correct, since it's the middle of something bigger.
+
+Where the wall does cross a seam it gets a bastion, drawn at a point both tiles
+compute identically; each draws its own half and the two halves make one tower.
+
+The renderer supplies the corner masks (`Renderer.cornersFor`), so tile art is
+a function of type, rotation, terrain **and** what's next door. That's still a
+finite set of pictures, so `src/sprites.js` renders each once and blits it
+thereafter — a full board draws in 0.39 ms/frame, against 1.29 ms for the
+original much simpler art, because the old renderer re-ran every vector path
+every frame. Past 512px a tile falls back to running the paths directly.
+
+Two smaller things follow from the same rule. Tiles have no outline drawn round
+them, because that would put the grid straight back over the middle of a merged
+city. And the field hatch is *crossed* rather than a single diagonal, so that
+it looks the same after the quarter turn that places the tile.
+
+### Sound
 ### Sound
 
 Placeholder effects are **synthesised at runtime** — oscillators, filtered noise

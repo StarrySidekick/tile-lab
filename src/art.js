@@ -8,131 +8,235 @@
 
 import { SIDE_MID } from './tiles.js';
 import { THEME, PLAYER_COLORS, PLAYER_NAMES } from './theme.js';
-import { LIGHT, spin, relief, groove, shadow, noShadow } from './light.js';
+import { LIGHT, spin, shadow, noShadow } from './light.js';
+import { featureShape } from './shape.js';
 
 export { PLAYER_COLORS, PLAYER_NAMES };
 
-/** Run `fn` with the unit square rotated k quarter-turns about its centre. */
-function withRot(ctx, k, fn) {
+// --- cities: walled towns ---------------------------------------------------
+//
+// A city is not a raised slab of masonry, it's a walled town: a curtain wall
+// running the edge of the region, packed ground and roofs inside, field
+// outside. All of the height comes from things that are actually drawn — the
+// wall has a shaded foot and a lit walkway, the roofs have a sunward slope and
+// a shaded one — rather than from shading the boundary of a flat area.
+//
+// Everything here hangs off `featureShape`, so it lines up across seams by
+// construction. The wall follows the RIM, which by definition excludes tile
+// edges, so a city that continues into the next tile has no wall at the seam
+// and a block of city reads as one town behind one wall.
+
+/**
+ * The curtain wall: a dark foot, a stone body, and a walkway on top shifted
+ * toward the sun. Three strokes of the same path, which is what keeps it
+ * continuous across a seam — nothing here depends on the tile, only on the rim.
+ */
+function drawWall(ctx, sh, L, width = 0.072) {
+  if (!sh.hasRim) return;
+
+  // The shadow it throws outward, clipped to everything outside the town so it
+  // falls on the field and never back onto the wall.
   ctx.save();
-  ctx.translate(0.5, 0.5);
-  ctx.rotate((k & 3) * Math.PI / 2);
-  ctx.translate(-0.5, -0.5);
-  fn();
+  ctx.beginPath();
+  ctx.rect(0, 0, 1, 1);
+  sh.path(ctx);
+  ctx.clip('evenodd');
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = THEME.cast;
+  ctx.translate(-L.x * 0.045, -L.y * 0.045);
+  for (const [mul, alpha] of [[2.4, 0.30], [1.5, 0.45]]) {
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = width * mul;
+    ctx.beginPath();
+    sh.rim(ctx);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = THEME.cityWall;
+  ctx.lineWidth = width * 1.42;
+  ctx.beginPath(); sh.rim(ctx); ctx.stroke();
+  ctx.strokeStyle = THEME.city;
+  ctx.lineWidth = width;
+  ctx.beginPath(); sh.rim(ctx); ctx.stroke();
+  ctx.translate(L.x * width * 0.30, L.y * width * 0.30);
+  ctx.strokeStyle = THEME.wallLit;
+  ctx.lineWidth = width * 0.40;
+  ctx.beginPath(); sh.rim(ctx); ctx.stroke();
   ctx.restore();
 }
 
-// --- city silhouettes (canonical orientations) ------------------------------
-//
-// Every silhouette comes in two halves: the `path` it fills, and the `rim` —
-// the part of its outline that is a genuine boundary rather than a tile edge.
-// Relief lighting shades the rim and leaves the tile edges alone, so a feature
-// running across a seam reads as one continuous thing instead of two walled-off
-// halves. See light.js.
-
-function capPath(ctx) {            // city on N only
-  ctx.moveTo(0, 0);
-  ctx.lineTo(1, 0);
-  ctx.quadraticCurveTo(0.5, 0.68, 0, 0);
+/**
+ * A bastion where the wall crosses a tile edge.
+ *
+ * The point sits exactly ON the seam, so the tile clip cuts it in half and the
+ * neighbour — which computes the identical crossing point — draws the other
+ * half. Two halves, one tower, and a curtain wall that gets a tower about
+ * every tile the way a real one would.
+ */
+function drawBastion(ctx, [x, y], L, r = 0.052) {
+  const disc = (rr, fill, dx = 0, dy = 0) => {
+    ctx.beginPath();
+    ctx.arc(x + dx, y + dy, rr, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+  };
+  disc(r * 1.24, THEME.cityWall);
+  disc(r, THEME.city);
+  disc(r * 0.56, THEME.wallLit, L.x * r * 0.30, L.y * r * 0.30);
 }
 
-function capRim(ctx) {
-  ctx.moveTo(1, 0);
-  ctx.quadraticCurveTo(0.5, 0.68, 0, 0);
-}
+// Where houses sit inside a town. A loose grid rather than a scatter, because
+// a town should read as blocks and streets; anything that falls outside the
+// walls is clipped away, and the cut lands under the wall where it can't show.
+const HOUSES = [
+  [0.28, 0.26, 0.15, 0], [0.47, 0.22, 0.12, 1], [0.65, 0.28, 0.14, 0], [0.81, 0.22, 0.11, 1],
+  [0.20, 0.44, 0.13, 1], [0.40, 0.42, 0.16, 0], [0.61, 0.46, 0.12, 1], [0.80, 0.42, 0.14, 0],
+  [0.26, 0.64, 0.14, 0], [0.46, 0.62, 0.12, 1], [0.66, 0.66, 0.15, 0], [0.83, 0.62, 0.11, 1],
+  [0.34, 0.82, 0.13, 1], [0.58, 0.80, 0.14, 0], [0.77, 0.83, 0.12, 1],
+];
 
-function cornerPath(ctx) {         // city on N + W, connected
-  ctx.moveTo(1, 0);
-  ctx.lineTo(0, 0);
-  ctx.lineTo(0, 1);
-  ctx.quadraticCurveTo(0.82, 0.82, 1, 0);
-}
+// --- shading helpers --------------------------------------------------------
 
-function cornerRim(ctx) {
-  ctx.moveTo(0, 1);
-  ctx.quadraticCurveTo(0.82, 0.82, 1, 0);
-}
+const hex = (c) => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
 
-function bandPath(ctx) {           // city across E + W
-  ctx.moveTo(0, 0.14);
-  ctx.quadraticCurveTo(0.5, 0.34, 1, 0.14);
-  ctx.lineTo(1, 0.86);
-  ctx.quadraticCurveTo(0.5, 0.66, 0, 0.86);
-  ctx.closePath();
-}
-
-function bandRim(ctx) {
-  ctx.moveTo(0, 0.14);
-  ctx.quadraticCurveTo(0.5, 0.34, 1, 0.14);
-  ctx.moveTo(1, 0.86);
-  ctx.quadraticCurveTo(0.5, 0.66, 0, 0.86);
-}
-
-function threePath(ctx) {          // city on N + E + W (S open)
-  ctx.moveTo(0, 0);
-  ctx.lineTo(1, 0);
-  ctx.lineTo(1, 0.92);
-  ctx.quadraticCurveTo(0.5, 0.56, 0, 0.92);
-  ctx.closePath();
-}
-
-function threeRim(ctx) {
-  ctx.moveTo(1, 0.92);
-  ctx.quadraticCurveTo(0.5, 0.56, 0, 0.92);
+function mix(a, b, t) {
+  const [ar, ag, ab] = hex(a), [br, bg, bb] = hex(b);
+  return `rgb(${Math.round(ar + (br - ar) * t)},${Math.round(ag + (bg - ag) * t)},${Math.round(ab + (bb - ab) * t)})`;
 }
 
 /**
- * Turn a city feature's side-set into { k, path, rim } — a canonical shape plus
- * the quarter-turns needed to line it up with the real sides.
- *
- * A four-sided feature has no rim: every edge of it is a tile edge, so there is
- * no wall to light. That is exactly right — a city filling the whole tile is
- * the middle of a bigger city, not a block sitting on a field.
+ * Pick a face colour from how squarely the face points at the sun.
+ * `t` is the dot product of the face normal with the light, in -1..1.
  */
-function cityShape(sides) {
-  const set = new Set(sides);
-  const n = sides.length;
-  if (n === 4) return { k: 0, path: (ctx) => ctx.rect(0, 0, 1, 1), rim: null };
-  if (n === 1) return { k: sides[0], path: capPath, rim: capRim };
-  if (n === 3) {
-    const open = [0, 1, 2, 3].find((s) => !set.has(s));
-    return { k: (open - 2 + 4) % 4, path: threePath, rim: threeRim };
+const facing = (base, lit, dark, t) => (t >= 0 ? mix(base, lit, t) : mix(base, dark, -t));
+
+/**
+ * One building, seen from just above.
+ *
+ * The roof is hipped — a short ridge with a slope falling away on all four
+ * sides — because that is the shape that reads as three-dimensional from
+ * directly overhead. Each of the four faces points a different way, so each
+ * one takes its colour from how squarely it faces the sun, and the building
+ * turns out to be lit correctly from any direction without a single hand-picked
+ * highlight.
+ */
+function drawHouse(ctx, x, y, w, turn, L, roof) {
+  const a = turn ? w * 0.44 : w * 0.62;      // half-width
+  const b = turn ? w * 0.62 : w * 0.44;      // half-depth
+  const [base, lit, dark] = roof;
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.fillStyle = 'rgba(13,11,17,0.34)';     // shadow on the ground
+  ctx.fillRect(-a - L.x * 0.035, -b - L.y * 0.035, a * 2, b * 2);
+
+  ctx.fillStyle = THEME.plaster;             // walls, peeking out of the sun
+  ctx.fillRect(-a - L.x * 0.018, -b - L.y * 0.018, a * 2, b * 2);
+
+  // Ridge runs along whichever axis is longer, so the roof always slopes the
+  // sensible way for the footprint.
+  const rx = turn ? 0 : a * 0.42;
+  const ry = turn ? b * 0.42 : 0;
+  const faces = [
+    [[-a, -b], [a, -b], [rx, -ry], [-rx, -ry], [0, -1]],   // north pitch
+    [[a, b], [-a, b], [-rx, ry], [rx, ry], [0, 1]],        // south pitch
+    [[-a, b], [-a, -b], [-rx, -ry], [-rx, ry], [-1, 0]],   // west
+    [[a, -b], [a, b], [rx, ry], [rx, -ry], [1, 0]],        // east
+  ];
+  for (const f of faces) {
+    const n = f[4];
+    ctx.beginPath();
+    ctx.moveTo(f[0][0], f[0][1]);
+    for (let i = 1; i < 4; i++) ctx.lineTo(f[i][0], f[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = facing(base, lit, dark, n[0] * L.x + n[1] * L.y);
+    ctx.fill();
   }
-  const [a, b] = sides;
-  if ((a + 2) % 4 === b) return { k: set.has(1) ? 0 : 1, path: bandPath, rim: bandRim };
-  for (let k = 0; k < 4; k++) {
-    if (set.has(k % 4) && set.has((3 + k) % 4)) return { k, path: cornerPath, rim: cornerRim };
-  }
-  return { k: 0, path: cornerPath, rim: cornerRim };
+
+  ctx.strokeStyle = 'rgba(40,26,18,0.55)';   // eaves
+  ctx.lineWidth = 0.012;
+  ctx.strokeRect(-a, -b, a * 2, b * 2);
+  ctx.strokeStyle = mix(base, lit, 0.55);    // the ridge catches the light
+  ctx.lineWidth = 0.015;
+  ctx.beginPath();
+  ctx.moveTo(-rx, -ry);
+  ctx.lineTo(rx, ry);
+  ctx.stroke();
+  ctx.restore();
 }
 
-function drawCity(ctx, f, L) {
-  const { k, path, rim } = cityShape(f.sides);
-  withRot(ctx, k, () => {
+/** A round tower with a conical cap — the one thing that reads as tall. */
+function drawTurret(ctx, x, y, r, L, roof) {
+  ctx.beginPath();                           // shadow
+  ctx.arc(x - L.x * r * 0.85, y - L.y * r * 0.85, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(13,11,17,0.42)';
+  ctx.fill();
+
+  for (const [rr, fill] of [[r * 1.16, THEME.cityWall], [r, THEME.city]]) {
     ctx.beginPath();
-    path(ctx);
-    ctx.fillStyle = THEME.city;
+    ctx.arc(x, y, rr, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
     ctx.fill();
-    ctx.lineWidth = 0.035;
-    ctx.strokeStyle = THEME.cityWall;
-    ctx.stroke();
-    ctx.save();
-    ctx.clip();
-    ctx.strokeStyle = THEME.cityShade;
-    ctx.lineWidth = 0.018;
-    for (let i = -1; i < 2.2; i += 0.16) {
-      ctx.beginPath();
-      ctx.moveTo(i, -0.2);
-      ctx.lineTo(i + 0.9, 1.2);
-      ctx.stroke();
-    }
-    ctx.restore();
-    // Stone stands tallest of anything on the board, and it's the one feature
-    // whose whole point is that it's walled.
-    relief(ctx, path, rim, spin(L, k), {
-      height: 0.055, lit: THEME.litStrong, shade: THEME.shadeStrong,
-    });
+  }
+
+  const cap = r * 0.86;                      // the cone, lit on the sun side
+  ctx.beginPath();
+  ctx.arc(x, y, cap, 0, Math.PI * 2);
+  ctx.fillStyle = roof[2];
+  ctx.fill();
+  const ang = Math.atan2(L.y, L.x);
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, cap, ang - 1.75, ang + 1.75);
+  ctx.closePath();
+  ctx.fillStyle = roof[0];
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, cap, ang - 0.75, ang + 0.75);
+  ctx.closePath();
+  ctx.fillStyle = roof[1];
+  ctx.fill();
+}
+
+function drawCity(ctx, f, L, solid) {
+  const sh = featureShape(f.sides, solid);
+  if (!sh) return;
+
+  ctx.save();
+  ctx.beginPath();
+  sh.path(ctx);
+  ctx.clip();
+
+  ctx.fillStyle = THEME.cityGround;
+  ctx.fillRect(0, 0, 1, 1);
+  ctx.fillStyle = THEME.cityGrit;            // cobble mottling, fixed lattice
+  for (let i = 0; i < 40; i++) {
+    const cx = ((i * 37) % 100) / 100;
+    const cy = ((i * 61) % 100) / 100;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 0.035, 0.022, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const roofs = [
+    [THEME.roof, THEME.roofLit, THEME.roofShade],
+    [THEME.roofDark, THEME.roof, THEME.roofShade],
+    ['#8a6a4a', '#b59470', '#4e3a26'],       // a thatched one, for variety
+  ];
+  HOUSES.forEach(([hx, hy, hw, turn], i) => {
+    drawHouse(ctx, hx, hy, hw, turn, L, roofs[(i + f.sides.length) % roofs.length]);
   });
+  ctx.restore();
+
+  drawWall(ctx, sh, L);
+  for (const p of sh.crossings) drawBastion(ctx, p, L);
 }
 
 // --- roads ------------------------------------------------------------------
@@ -157,7 +261,9 @@ const ROAD_STYLE = {
   city:    { outer: 0.42, inner: 0.36,  edge: '#3a3340',      core: '#9a9086' },
 };
 
-function drawRoad(ctx, f, terrain, L) {
+// A road is a road. It lies flat on the ground and gets no lighting of its own
+// — the only thing on the board with height is something you could walk into.
+function drawRoad(ctx, f, terrain) {
   const s = ROAD_STYLE[terrain] || ROAD_STYLE.surface;
   ctx.lineCap = 'round';
   roadPath(ctx, f);
@@ -168,58 +274,56 @@ function drawRoad(ctx, f, terrain, L) {
   ctx.lineWidth = s.inner;
   ctx.strokeStyle = s.core;
   ctx.stroke();
-  // A cart track is worn into the ground rather than laid on it, so it gets a
-  // groove rather than a wall: dark on the lit side, bright on the far one.
-  groove(ctx, (c) => roadPath(c, f), L, s.inner, {
-    thin: 0.30, lit: 'rgba(255,240,212,0.16)', shade: 'rgba(26,18,34,0.34)',
-  });
 }
 
 // --- monastery --------------------------------------------------------------
 
+/**
+ * A monastery: a walled precinct with a garden, a chapel and a bell tower.
+ *
+ * It gets the same treatment as a city because it is the same kind of thing —
+ * a built structure standing on the field, not a marking printed on it. The
+ * precinct wall is lit like the curtain wall, the roofs have a sunward slope,
+ * and everything throws a shadow the same way.
+ */
 function drawAbbey(ctx, L) {
-  ctx.fillStyle = 'rgba(232,222,208,0.10)';
-  ctx.beginPath();
-  ctx.arc(0.5, 0.5, 0.30, 0, Math.PI * 2);
-  ctx.fill();
+  const cx = 0.5, cy = 0.52, r = 0.30;
 
   ctx.save();
-  shadow(ctx, L, 0.035, 0.045);
-
-  ctx.fillStyle = THEME.plaster;
-  ctx.strokeStyle = THEME.timber;
-  ctx.lineWidth = 0.018;
-  ctx.beginPath();
-  ctx.rect(0.36, 0.46, 0.28, 0.22);
+  ctx.beginPath();                             // shadow the precinct throws
+  ctx.arc(cx - L.x * 0.045, cy - L.y * 0.045, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(13,11,17,0.34)';
   ctx.fill();
-  ctx.stroke();
 
-  ctx.fillStyle = THEME.roof;
-  ctx.beginPath();
-  ctx.moveTo(0.31, 0.46);
-  ctx.lineTo(0.50, 0.31);
-  ctx.lineTo(0.69, 0.46);
-  ctx.closePath();
+  ctx.beginPath();                             // the garth inside the walls
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#6f7a46';
   ctx.fill();
-  ctx.stroke();
 
-  ctx.fillStyle = THEME.roof;
-  ctx.fillRect(0.475, 0.24, 0.05, 0.10);
+  ctx.lineCap = 'round';                       // precinct wall: foot, then top
+  ctx.strokeStyle = THEME.cityWall;
+  ctx.lineWidth = 0.075;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = THEME.city;
+  ctx.lineWidth = 0.055;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+  ctx.save();
+  ctx.translate(L.x * 0.016, L.y * 0.016);
+  ctx.strokeStyle = THEME.wallLit;
+  ctx.lineWidth = 0.022;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
   ctx.restore();
 
-  // The roof is the one plane on the tile whose pitch we actually know, so it
-  // gets lit properly: the slope facing the sun, and the one that doesn't.
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(0.31, 0.46);
-  ctx.lineTo(0.50, 0.31);
-  ctx.lineTo(0.69, 0.46);
-  ctx.closePath();
-  ctx.clip();
-  ctx.fillStyle = L.x < 0 ? THEME.lit : THEME.shade;
-  ctx.fillRect(0.31, 0.31, 0.19, 0.15);
-  ctx.fillStyle = L.x < 0 ? THEME.shade : THEME.lit;
-  ctx.fillRect(0.50, 0.31, 0.19, 0.15);
+  ctx.beginPath();                             // cloister walk around the garth
+  ctx.arc(cx, cy, r * 0.66, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(222,210,187,0.55)';
+  ctx.lineWidth = 0.045;
+  ctx.stroke();
+
+  drawHouse(ctx, cx, cy + 0.04, 0.30, 0, L, [THEME.roof, THEME.roofLit, THEME.roofShade]);
+
+  drawTurret(ctx, cx + 0.185, cy - 0.155, 0.088, L,
+             [THEME.roof, THEME.roofLit, THEME.roofShade]);
   ctx.restore();
 }
 
@@ -807,72 +911,143 @@ const MARK_ART = {
 // which is what stops the board looking like two games stapled together.
 
 /**
- * Clip to a feature's silhouette but draw the scenery inside it UPRIGHT.
- *
- * `cityShape` returns the shape plus the quarter-turns needed to line it up,
- * and a city's masonry hatch doesn't care which way that is. Mountains and
- * water do: peaks have to point up and ripples have to lie flat, whichever
- * edges the feature happens to reach. So the rotation is applied to build the
- * clip and then undone before anything is drawn through it.
+ * Woodland. Trees, not a green slab with a lit edge — the height comes from
+ * each crown having its own shadow and its own sunlit side.
  */
-function inShape(ctx, k, path, fn) {
-  const a = (k & 3) * Math.PI / 2;
+function drawForest(ctx, f, L, solid) {
+  const sh = featureShape(f.sides, solid);
+  if (!sh) return;
   ctx.save();
-  ctx.translate(0.5, 0.5); ctx.rotate(a); ctx.translate(-0.5, -0.5);
   ctx.beginPath();
-  path(ctx);
+  sh.path(ctx);
   ctx.clip();
-  ctx.translate(0.5, 0.5); ctx.rotate(-a); ctx.translate(-0.5, -0.5);
-  fn(ctx);
+
+  ctx.fillStyle = THEME.forestDark;          // shaded floor between the trunks
+  ctx.fillRect(0, 0, 1, 1);
+
+  // Crowns on a fixed lattice, so a tile always draws the same. Dense enough
+  // that the floor only shows as gaps, which is what a wood looks like from
+  // above.
+  for (let i = 0; i < 34; i++) {
+    const x = ((i * 37) % 100) / 100;
+    const y = ((i * 61) % 100) / 100;
+    const r = 0.085 + ((i * 17) % 5) * 0.014;
+    ctx.beginPath();
+    ctx.arc(x - L.x * r * 0.42, y - L.y * r * 0.42, r * 0.94, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(16,24,14,0.50)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = i % 3 === 0 ? THEME.forestCanopy : THEME.forest;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + L.x * r * 0.34, y + L.y * r * 0.34, r * 0.52, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(190,214,148,0.20)';
+    ctx.fill();
+  }
   ctx.restore();
 }
 
-/** Fill and outline a feature's silhouette. */
-function shape(ctx, k, path, fill, line, width = 0.03) {
-  withRot(ctx, k, () => {
+/**
+ * Rock. Each mass is a ridge with a sunward face and a shaded one meeting at a
+ * skyline, which is the only way a mountain reads from directly above.
+ */
+function drawMountain(ctx, f, L, solid) {
+  const sh = featureShape(f.sides, solid);
+  if (!sh) return;
+  ctx.save();
+  ctx.beginPath();
+  sh.path(ctx);
+  ctx.clip();
+
+  ctx.fillStyle = THEME.rockDark;            // scree
+  ctx.fillRect(0, 0, 1, 1);
+  ctx.fillStyle = 'rgba(120,110,98,0.35)';
+  for (let i = 0; i < 26; i++) {
+    const x = ((i * 53) % 100) / 100;
+    const y = ((i * 29) % 100) / 100;
     ctx.beginPath();
-    path(ctx);
-    ctx.fillStyle = fill;
+    ctx.ellipse(x, y, 0.04, 0.026, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.lineWidth = width;
-    ctx.strokeStyle = line;
-    ctx.stroke();
-  });
+  }
+
+  const sunward = L.x < 0 ? -1 : 1;
+  for (const [cx, base, w, h] of [[0.66, 1.08, 0.88, 0.92], [0.26, 1.00, 0.62, 0.62], [0.48, 0.46, 0.48, 0.40]]) {
+    ctx.beginPath();                         // the shadow the mass throws
+    ctx.moveTo(cx - w / 2 - L.x * 0.06, base - L.y * 0.06);
+    ctx.lineTo(cx - L.x * 0.06, base - h - L.y * 0.06);
+    ctx.lineTo(cx + w / 2 - L.x * 0.06, base - L.y * 0.06);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(12,10,16,0.42)';
+    ctx.fill();
+
+    ctx.beginPath();                         // the face out of the sun
+    ctx.moveTo(cx - w / 2, base);
+    ctx.lineTo(cx, base - h);
+    ctx.lineTo(cx + w / 2, base);
+    ctx.closePath();
+    ctx.fillStyle = THEME.rockDark;
+    ctx.fill();
+
+    ctx.beginPath();                         // the face in it
+    ctx.moveTo(cx, base - h);
+    ctx.lineTo(cx + (w / 2) * sunward, base);
+    ctx.lineTo(cx, base);
+    ctx.closePath();
+    ctx.fillStyle = THEME.rock;
+    ctx.fill();
+
+    ctx.beginPath();                         // snow, caught on the skyline
+    ctx.moveTo(cx - w * 0.15, base - h * 0.74);
+    ctx.lineTo(cx, base - h);
+    ctx.lineTo(cx + w * 0.15, base - h * 0.74);
+    ctx.quadraticCurveTo(cx, base - h * 0.60, cx - w * 0.15, base - h * 0.74);
+    ctx.closePath();
+    ctx.fillStyle = THEME.rockSnow;
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
-function drawForest(ctx, f, L) {
-  const { k, path, rim } = cityShape(f.sides);
-  shape(ctx, k, path, THEME.forest, THEME.forestDark);
-  inShape(ctx, k, path, (c) => {
-    // Canopy blobs on a fixed lattice, so a tile always draws the same. Each
-    // one is a little dome: its own crown catches the sun on one side and its
-    // own shadow falls on the canopy below.
-    for (let i = 0; i < 26; i++) {
-      const x = ((i * 37) % 100) / 100;
-      const y = ((i * 61) % 100) / 100;
-      const r = 0.06 + ((i * 17) % 5) * 0.012;
-      c.beginPath();
-      c.arc(x - L.x * r * 0.34, y - L.y * r * 0.34, r, 0, Math.PI * 2);
-      c.fillStyle = 'rgba(20,26,16,0.42)';
-      c.fill();
-      c.beginPath();
-      c.arc(x, y, r, 0, Math.PI * 2);
-      c.fillStyle = i % 3 === 0 ? THEME.forestCanopy : THEME.forestDark;
-      c.fill();
-      c.beginPath();
-      c.arc(x + L.x * r * 0.30, y + L.y * r * 0.30, r * 0.58, 0, Math.PI * 2);
-      c.fillStyle = 'rgba(180,205,140,0.16)';
-      c.fill();
+/**
+ * Standing water. Flat, because it is — the only relief is a pale shelf where
+ * it meets the bank, which is the shallows rather than a shaded wall.
+ */
+function drawWater(ctx, f, deep, solid) {
+  const sh = featureShape(f.sides, solid);
+  if (!sh) return;
+  ctx.save();
+  ctx.beginPath();
+  sh.path(ctx);
+  ctx.clip();
+
+  ctx.fillStyle = deep ? THEME.waterDeep : THEME.water;
+  ctx.fillRect(0, 0, 1, 1);
+
+  if (sh.hasRim) {                           // sand, then shallows, then shore
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const [w, c] of [[0.115, '#a3a071'], [0.075, 'rgba(150,196,214,0.55)'],
+                          [0.028, THEME.waterEdge]]) {
+      ctx.strokeStyle = c;
+      ctx.lineWidth = w;
+      ctx.beginPath(); sh.rim(ctx); ctx.stroke();
     }
-  });
-  withRot(ctx, k, () => {
-    // A treeline stands about as tall as a wall but reads softer, so the light
-    // on it is gentler than the one on stone.
-    relief(ctx, path, rim, spin(L, k), { height: 0.05 });
-  });
+    ctx.restore();
+  }
+
+  ctx.strokeStyle = 'rgba(200,228,240,0.26)';
+  ctx.lineWidth = 0.020;
+  for (let y = 0.14; y < 1; y += 0.19) {
+    ctx.beginPath();
+    ctx.moveTo(-0.1, y);
+    for (let x = -0.1; x < 1.2; x += 0.25) ctx.quadraticCurveTo(x + 0.06, y - 0.05, x + 0.125, y);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
-/** A log stack — the forest's pennant, worth one extra point. */
 function drawLog(ctx, [x, y], L = LIGHT) {
   ctx.save();
   ctx.translate(x, y);
@@ -894,77 +1069,11 @@ function drawLog(ctx, [x, y], L = LIGHT) {
   ctx.restore();
 }
 
-function drawMountain(ctx, f, L) {
-  const { k, path, rim } = cityShape(f.sides);
-  shape(ctx, k, path, THEME.rock, THEME.rockDark);
-  inShape(ctx, k, path, (c) => {
-    // Three peaks at different heights, so a range still reads when the
-    // silhouette is only a sliver along one edge — a one-sided mountain tile
-    // has no room at the bottom of the tile for anything to stand on.
-    // Which flank catches the sun follows the light, not the drawing order —
-    // a range laid across four rotations has to be lit as one range.
-    const sunward = L.x < 0 ? -1 : 1;
-    for (const [cx, base, w, h] of [[0.62, 1.05, 0.80, 0.85], [0.24, 0.98, 0.58, 0.58], [0.46, 0.44, 0.44, 0.36]]) {
-      c.beginPath();                       // the flank in shadow
-      c.moveTo(cx - w / 2, base);
-      c.lineTo(cx, base - h);
-      c.lineTo(cx + w / 2, base);
-      c.closePath();
-      c.fillStyle = THEME.rockDark;
-      c.fill();
-      c.beginPath();                       // the flank facing the sun
-      c.moveTo(cx, base - h);
-      c.lineTo(cx + (w / 2) * sunward, base);
-      c.lineTo(cx, base);
-      c.closePath();
-      c.fillStyle = THEME.rock;
-      c.fill();
-      c.beginPath();                       // snow cap
-      c.moveTo(cx - w * 0.15, base - h * 0.74);
-      c.lineTo(cx, base - h);
-      c.lineTo(cx + w * 0.15, base - h * 0.74);
-      c.quadraticCurveTo(cx, base - h * 0.62, cx - w * 0.15, base - h * 0.74);
-      c.closePath();
-      c.fillStyle = THEME.rockSnow;
-      c.fill();
-    }
-  });
-  withRot(ctx, k, () => {
-    // Rock is the tallest thing on the board and throws the longest shadow.
-    relief(ctx, path, rim, spin(L, k), {
-      height: 0.075, lit: THEME.litStrong, shade: THEME.shadeStrong,
-    });
-  });
-}
-
-function drawWater(ctx, f, deep, L) {
-  const { k, path, rim } = cityShape(f.sides);
-  shape(ctx, k, path, deep ? THEME.waterDeep : THEME.water, THEME.waterEdge);
-  inShape(ctx, k, path, (c) => {
-    c.strokeStyle = 'rgba(190,220,235,0.30)';
-    c.lineWidth = 0.022;
-    for (let y = 0.12; y < 1; y += 0.18) {
-      c.beginPath();
-      c.moveTo(-0.1, y);
-      for (let x = -0.1; x < 1.2; x += 0.25) c.quadraticCurveTo(x + 0.06, y - 0.05, x + 0.125, y);
-      c.stroke();
-    }
-  });
-  withRot(ctx, k, () => {
-    // Water is the one feature that sits BELOW the field, so it's lit inside
-    // out: the near bank shadows the water at its foot, and the far bank is
-    // the bright line you actually see across a lake at dusk.
-    relief(ctx, path, rim, spin(L, k), {
-      height: 0.05, sunken: true, lit: 'rgba(214,238,250,0.34)',
-    });
-  });
-}
-
 /**
  * The river is drawn as a band along its sides rather than as a shaped mass,
  * because a river reads as a line and a lake reads as an area.
  */
-function drawRiver(ctx, f, L) {
+function drawRiver(ctx, f) {
   const course = (c) => {
     c.beginPath();
     if (f.sides.length === 1) {
@@ -989,8 +1098,6 @@ function drawRiver(ctx, f, L) {
     ctx.lineWidth = w;
     ctx.stroke();
   }
-  // A cut bank, same as a road but deeper and wetter.
-  groove(ctx, course, L, 0.22, { lit: 'rgba(214,238,250,0.32)', thin: 0.30 });
   // A spring or a mouth is a pool where the line stops.
   if (f.sides.length === 1) {
     ctx.beginPath();
@@ -1053,11 +1160,17 @@ export function drawMark(ctx, kind, [x, y], s = 0.46, L = LIGHT) {
  * and the whole thing is clipped to the tile square — round line caps on roads
  * would otherwise bleed a few percent past the edge and break the seams.
  */
-export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 'surface', rot = 0 } = {}) {
+export function drawTile(ctx, type, {
+  cave = false, terrain = cave ? 'cave' : 'surface', rot = 0, corners = null,
+} = {}) {
   // The art is drawn unrotated and the caller turns the canvas, so the light
   // has to be turned the other way to stay put in the world. Everything below
   // shades against `L`; nothing bakes in a direction of its own.
   const L = spin(LIGHT, rot);
+  // Per-feature corner masks, canonical orientation, from the renderer. Null
+  // for a tile that isn't on the board yet — a floating tile wraps nothing, so
+  // it draws its own walls all the way round, which is exactly right.
+  const solid = (i) => (corners ? corners[i] || 0 : 0);
 
   ctx.save();
   ctx.beginPath();
@@ -1078,26 +1191,30 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
   } else {
     ctx.fillStyle = THEME.field;
     ctx.fillRect(0, 0, 1, 1);
-    // Faint diagonal hatch, matching the city masonry so the whole tile reads
-    // as one drawing. Horizontal banding here just looked like scanlines.
-    ctx.strokeStyle = 'rgba(90,100,56,0.30)';
-    ctx.lineWidth = 0.02;
-    for (let i = -1; i < 2.2; i += 0.21) {
+    // Crossed hatch, not a single diagonal: the tile art is rotated to place
+    // it, and crossed strokes look identical after a quarter turn while one
+    // diagonal flips. That's the difference between fields that run together
+    // and fields with a seam down every edge.
+    ctx.strokeStyle = 'rgba(92,102,58,0.20)';
+    ctx.lineWidth = 0.016;
+    for (let i = -1.2; i < 2.4; i += 0.25) {
       ctx.beginPath();
       ctx.moveTo(i, -0.2);
-      ctx.lineTo(i + 0.9, 1.2);
+      ctx.lineTo(i + 1.4, 1.2);
+      ctx.moveTo(i + 1.4, -0.2);
+      ctx.lineTo(i, 1.2);
       ctx.stroke();
     }
   }
 
   // Water goes down before roads so a bridge crosses over it, and forests and
   // mountains go down before cities so a wall reads as built against them.
-  for (const f of type.feats) if (f.type === 'lake') drawWater(ctx, f, false, L);
-  for (const f of type.feats) if (f.type === 'forest') drawForest(ctx, f, L);
-  for (const f of type.feats) if (f.type === 'mountain') drawMountain(ctx, f, L);
-  for (const f of type.feats) if (f.type === 'river') drawRiver(ctx, f, L);
+  type.feats.forEach((f, i) => { if (f.type === 'lake') drawWater(ctx, f, false, solid(i)); });
+  type.feats.forEach((f, i) => { if (f.type === 'forest') drawForest(ctx, f, L, solid(i)); });
+  type.feats.forEach((f, i) => { if (f.type === 'mountain') drawMountain(ctx, f, L, solid(i)); });
+  type.feats.forEach((f) => { if (f.type === 'river') drawRiver(ctx, f); });
 
-  for (const f of type.feats) if (f.type === 'road') drawRoad(ctx, f, terrain, L);
+  type.feats.forEach((f) => { if (f.type === 'road') drawRoad(ctx, f, terrain); });
 
   // Two or more dead-end road stubs meeting = a junction, not a through road.
   if (type.feats.filter((f) => f.type === 'road' && f.sides.length === 1).length >= 2) {
@@ -1113,7 +1230,7 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
 
   type.feats.forEach((f, i) => {
     if (f.type !== 'city') return;
-    drawCity(ctx, f, L);
+    drawCity(ctx, f, L, solid(i));
     if (f.shield) {
       const [sx, sy] = type.spots[i];
       drawShield(ctx, [sx, sy - 0.16], L);
@@ -1127,8 +1244,10 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
   type.marks.forEach((m, i) => drawMark(ctx, m.kind, type.markSpots[i], 0.46, L));
 
   ctx.lineWidth = 0.02;
-  ctx.strokeStyle = THEME.border;
-  ctx.strokeRect(0.01, 0.01, 0.98, 0.98);
+  // Deliberately no tile outline. Now that features merge across seams, a box
+  // drawn round every tile would put the grid straight back over the middle of
+  // a city. The backdrop grid still shows through wherever the board is empty,
+  // which is where you actually need it when placing.
   ctx.restore();
 }
 

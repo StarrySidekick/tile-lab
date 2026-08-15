@@ -24,12 +24,17 @@ export const THEME = {
   roadCore: '#dccaa4',
   roadEdge: '#463b29',
 
-  city: '#a89877',         // weathered stone
+  city: '#a89877',         // weathered stone — the curtain wall itself
   cityShade: '#8e7f62',
-  cityWall: '#5c4f3a',
+  cityWall: '#4f4433',     // the wall's shaded foot
+  wallLit: '#c6b593',      // the walkway on top, where the sun lands
+  cityGround: '#8b7e63',   // packed earth inside the walls
+  cityGrit: '#897c61',     // cobble mottling on it
 
-  roof: '#8f5238',         // terracotta
-  roofDark: '#6d3d2a',
+  roof: '#a05c3c',         // terracotta
+  roofDark: '#7d4229',
+  roofLit: '#c17d54',      // the slope facing the sun
+  roofShade: '#5f3220',    // and the one that doesn't
   plaster: '#ded2bb',
   timber: '#5b4530',
 
@@ -59,15 +64,13 @@ export const THEME = {
   tealDeep: '#2f6f68',
   violet: '#6b5a8c',       // twilight realm
 
-  // --- relief lighting -----------------------------------------------------
+  // --- light ---------------------------------------------------------------
   // One sun, low in the north-west, for the whole board. Warm on the faces it
   // catches, cool violet in the faces it misses — the same split the palette
-  // uses everywhere else. Kept weak on purpose: this is meant to read as a
-  // painted board catching the light, not as a lit 3D scene.
+  // uses everywhere else. Kept weak on purpose: this should read as a painted
+  // board catching the light, not as a lit 3D scene.
   lit: 'rgba(255,238,206,0.30)',
-  litStrong: 'rgba(255,241,214,0.42)',
   shade: 'rgba(26,18,34,0.42)',
-  shadeStrong: 'rgba(20,13,28,0.55)',
   cast: 'rgba(13,11,17,0.40)',
 
   // --- UI ------------------------------------------------------------------

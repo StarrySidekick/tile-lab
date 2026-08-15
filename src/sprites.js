@@ -45,10 +45,13 @@ function surface(px) {
  *
  * `px` is the size the caller intends to draw it at, in device pixels.
  */
-export function tileSprite(type, rot, terrain, px) {
+export function tileSprite(type, rot, terrain, px, corners = null) {
   const size = BUCKETS.find((b) => b >= px);
   if (!size) return null;                       // past 512px, draw vectors
-  const key = `${type.id}|${rot & 3}|${terrain}|${size}`;
+  // Corner masks belong in the key: the same tile in the same rotation is a
+  // genuinely different picture depending on whether its features merge with
+  // the neighbours, which is the whole point of drawing them seamlessly.
+  const key = `${type.id}|${rot & 3}|${terrain}|${size}|${corners ? corners.join('') : ''}`;
 
   const hit = cache.get(key);
   if (hit) {
@@ -63,7 +66,7 @@ export function tileSprite(type, rot, terrain, px) {
   ctx.translate(0.5, 0.5);
   ctx.rotate((rot & 3) * Math.PI / 2);
   ctx.translate(-0.5, -0.5);
-  drawTile(ctx, type, { terrain, rot });
+  drawTile(ctx, type, { terrain, rot, corners });
 
   cache.set(key, canvas);
   bytes += size * size * 4;

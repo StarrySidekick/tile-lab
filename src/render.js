@@ -9,6 +9,7 @@
 import { drawTile, drawMeeple, PLAYER_COLORS } from './art.js';
 import { tileSprite } from './sprites.js';
 import { LIGHT } from './light.js';
+import { cornerMask } from './shape.js';
 import { THEME, applyDusk } from './theme.js';
 import { rotPoint } from './tiles.js';
 import { liftableCells } from './mechanics.js';
@@ -16,6 +17,9 @@ import { liftableCells } from './mechanics.js';
 // Move targets, in the order you want to notice them. Green is the plain "you
 // can go here"; teal is a special move (a road dash, a warp, a fight); red is
 // one that costs you something.
+// Features that own an area and therefore merge across tiles.
+const AREA_FEATURES = new Set(['city', 'forest', 'mountain', 'lake']);
+
 const MOVE_OK = { rgb: '124,196,108', line: '#7cc46c' };
 const MOVE_SPECIAL = { rgb: '95,191,174', line: THEME.teal };
 const MOVE_COSTLY = { rgb: '196,104,80', line: '#c46850' };
@@ -80,11 +84,11 @@ export class Renderer {
    * done. Note the rotation is handled differently in each: the sprite has it
    * baked in, so it must NOT be applied again here.
    */
-  paintTile(x, y, rot, type, terrain = 'surface', zoom = this.cam.zoom, origin = null) {
+  paintTile(x, y, rot, type, terrain = 'surface', zoom = this.cam.zoom, origin = null, corners = null) {
     const dpr = window.devicePixelRatio || 1;
-    const sprite = tileSprite(type, rot, terrain, zoom * dpr);
+    const sprite = tileSprite(type, rot, terrain, zoom * dpr, corners);
     if (!sprite) {
-      this.inCell(x, y, rot, (c) => drawTile(c, type, { terrain, rot }), zoom, origin);
+      this.inCell(x, y, rot, (c) => drawTile(c, type, { terrain, rot, corners }), zoom, origin);
       return;
     }
     const [sx, sy] = origin ? origin(x, y) : this.toScreen(x, y);
@@ -92,6 +96,27 @@ export class Renderer {
     // neighbours can each give up a sliver of their shared edge to rounding
     // and leave a backdrop-coloured hairline between them.
     this.ctx.drawImage(sprite, sx, sy, zoom + 0.5, zoom + 0.5);
+  }
+
+  /**
+   * Which of a cell's feature corners merge with the neighbours.
+   *
+   * One mask per feature, in the tile's own canonical orientation, since that
+   * is the space the art is drawn in. A corner counts only when all four tiles
+   * around the vertex carry the feature around it — so the four of them agree
+   * without consulting each other, and their outlines meet exactly. Tiles that
+   * aren't on the board (the hover ghost, the previews) pass null and wall
+   * themselves in on all sides, which is what an unplaced tile should look
+   * like.
+   */
+  cornersFor(board, cell) {
+    return cell.type.feats.map((f) => {
+      if (!AREA_FEATURES.has(f.type)) return 0;
+      const world = cornerMask(board, cell, f.type);
+      let local = 0;                            // world corner c is local c - rot
+      for (let c = 0; c < 4; c++) if ((world >> c) & 1) local |= 1 << ((c - cell.rot + 4) & 3);
+      return local;
+    });
   }
 
   inCell(x, y, rot, fn, zoom = this.cam.zoom, origin = null) {
@@ -126,7 +151,8 @@ export class Renderer {
       if (lift) this.drawStackShadow(cell, lift);
       ctx.save();
       if (fog && !fog.has(`${cell.x},${cell.y}`)) ctx.globalAlpha = 0.26;
-      this.paintTile(cell.x, cell.y - lift, cell.rot, cell.type);
+      this.paintTile(cell.x, cell.y - lift, cell.rot, cell.type, 'surface',
+                     this.cam.zoom, null, this.cornersFor(game.board, cell));
       ctx.restore();
       if (overlay) this.drawCellOverlay(cell, overlay, lift);
     }
