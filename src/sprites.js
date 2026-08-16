@@ -16,6 +16,10 @@
 // to be: the whole point of the light model is that the sun does NOT turn with
 // the tile, so the four rotations of a type are four genuinely different
 // pictures. See light.js.
+//
+// Nothing else varies. Feature outlines run corner to corner on every side
+// they reach (see shape.js), so a tile's art doesn't depend on its neighbours
+// and never has to be redrawn when one arrives.
 // ---------------------------------------------------------------------------
 
 import { drawTile } from './art.js';
@@ -45,13 +49,10 @@ function surface(px) {
  *
  * `px` is the size the caller intends to draw it at, in device pixels.
  */
-export function tileSprite(type, rot, terrain, px, corners = null) {
+export function tileSprite(type, rot, terrain, px) {
   const size = BUCKETS.find((b) => b >= px);
   if (!size) return null;                       // past 512px, draw vectors
-  // Corner masks belong in the key: the same tile in the same rotation is a
-  // genuinely different picture depending on whether its features merge with
-  // the neighbours, which is the whole point of drawing them seamlessly.
-  const key = `${type.id}|${rot & 3}|${terrain}|${size}|${corners ? corners.join('') : ''}`;
+  const key = `${type.id}|${rot & 3}|${terrain}|${size}`;
 
   const hit = cache.get(key);
   if (hit) {
@@ -66,7 +67,7 @@ export function tileSprite(type, rot, terrain, px, corners = null) {
   ctx.translate(0.5, 0.5);
   ctx.rotate((rot & 3) * Math.PI / 2);
   ctx.translate(-0.5, -0.5);
-  drawTile(ctx, type, { terrain, rot, corners });
+  drawTile(ctx, type, { terrain, rot });
 
   cache.set(key, canvas);
   bytes += size * size * 4;

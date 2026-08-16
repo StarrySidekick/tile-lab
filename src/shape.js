@@ -3,172 +3,146 @@
 //
 // Cities, forests, mountains and lakes are all "areas": they cover some subset
 // of a tile's four sides and have to line up exactly with whatever is drawn on
-// the other side of every seam. This file builds that outline.
+// the other side of every seam.
 //
-// The old art had four hand-drawn shapes that disagreed about where they met a
-// tile edge — a band city crossed at 0.14..0.86 while a cap city crossed at
-// 0..1 — so a band next to a cap left a sliver of city facing a sliver of
-// field at both ends of the seam. That mismatch is what made the corners look
-// wrong, and no amount of shading was going to fix it.
+// There is one rule, and everything else falls out of it:
 //
-// The rule here is:
+//   AN AREA COVERS EVERY SIDE IT REACHES, CORNER TO CORNER.
 //
-//   · An area always covers a whole side that it reaches, running corner to
-//     corner — EXCEPT that it pulls back by `TRIM` at any tile corner it does
-//     not wrap all the way around.
+// That's it. Because edge matching guarantees a city edge only ever meets
+// another city edge, and both tiles cover that edge completely, the two halves
+// are continuous along the whole seam with nothing left over at either end. No
+// neighbour lookup, no negotiation between tiles, nothing to keep in sync.
 //
-//   · Whether a corner is wrapped is a property of the VERTEX, not of the
-//     tile: it's true only when all four tiles meeting there carry the same
-//     feature around it. Every one of those four tiles computes the same
-//     answer, so two tiles sharing an edge always agree about both of its
-//     endpoints, and the outlines meet exactly.
+// It took two wrong turns to get here. The original art had four hand-drawn
+// shapes that disagreed about where they met an edge — a cap city crossed it
+// corner to corner while a band city only crossed 0.14..0.86 — so a band next
+// to a cap left a sliver of city facing a sliver of field at both ends. The
+// fix after that pulled every shape back from any corner it didn't wrap, which
+// made the shapes agree with each other but left the same awkward stub at
+// every seam, and needed each tile to know what its neighbours were doing.
+// Running corner to corner is both simpler and correct.
 //
-// The payoff is that a block of city becomes one mass with a single outer wall
-// and no internal boundaries, while a corner the feature genuinely doesn't
-// wrap keeps a small courtyard — which is a real fact about the board, not an
-// artifact.
+// The corners take care of themselves. A tile corner is a single point: an
+// area that reaches two adjacent sides simply fills it, and one that reaches
+// only one side comes to that point and turns. Since the four tiles round a
+// vertex all agree about which of the four edges leaving it are city, their
+// outlines meet there without anyone having to check.
 //
-// The other rule that matters: where the outline meets a tile edge it leaves
-// PERPENDICULAR to that edge. The neighbour's outline arrives at the same
-// point at the same angle, so the two halves read as one continuous curve
-// across the seam no matter which tile types are involved.
+// The other rule that matters: where an outline leaves a tile edge it leaves
+// PERPENDICULAR to it. Two cap cities stacked one above the other then read as
+// a single oval rather than two domes touching, because both boundaries pass
+// through the shared corners vertically.
 // ---------------------------------------------------------------------------
-
-/** How far an area pulls back from a corner it doesn't wrap. */
-export const TRIM = 0.15;
 
 /** Tile corners, clockwise from top-left. Side s runs from C[s] to C[s+1]. */
 const C = [[0, 0], [1, 0], [1, 1], [0, 1]];
 
-/** Inward normal of each side — the direction the outline leaves an edge. */
+/** Inward normal of each side — the direction an outline leaves that edge. */
 const IN = [[0, 1], [-1, 0], [0, -1], [1, 0]];
 
-const lerp = ([ax, ay], [bx, by], t) => [ax + (bx - ax) * t, ay + (by - ay) * t];
+// How far control points reach when the outline crosses a gap of skipped
+// sides. Two skipped sides is a quarter sweep; three is a dome hanging off a
+// single edge.
+const REACH = [0, 0, 0.58, 0.52];
 
-// How far the control points reach when the outline crosses a gap of skipped
-// sides. One skipped side is a near-straight run between opposite edges; three
-// is a dome hanging off a single edge.
-const REACH = [0, 0.30, 0.58, 0.62];
-const BOW = 0.05;                      // gentle outward bulge on a 1-side gap
+// A gap of exactly ONE skipped side runs between the two ends of that side, so
+// a plain cubic with perpendicular tangents would lie flat along the edge and
+// swallow the whole tile. It gets a waypoint pulled in off the middle of the
+// skipped edge instead, which is what carves the grass wedge on a city-across
+// tile — widest in the middle, tapering to nothing at the corners.
+const WEDGE = 0.30;      // how deep the wedge bites
+const WEDGE_EDGE = 0.22; // control reach at the corners
+const WEDGE_MID = 0.24;  // control reach either side of the waypoint
+
+const add = ([x, y], [dx, dy], m) => [x + dx * m, y + dy * m];
 
 /**
- * Build the outline of an area feature.
- *
- * `sides` are the canonical (unrotated) sides the feature reaches. `solid` is a
- * 4-bit mask in the same canonical space: bit c set means the feature wraps
- * tile corner c and merges with its neighbours there.
+ * Build the outline of an area feature from the canonical sides it reaches.
  *
  * Returns:
- *   path(ctx)      the filled region
- *   rim(ctx)       only the parts of the outline that are NOT on a tile edge —
- *                  i.e. where the feature actually ends and a wall belongs.
- *                  A feature covering all four sides of a fully wrapped tile
- *                  has no rim at all, which is correct: it's the middle of
- *                  something bigger, not a block sitting on a field.
- *   crossings      the points where the rim meets a tile edge, so the wall can
- *                  be given a bastion there. Both tiles sharing the seam
- *                  produce the same point and each draws its own half.
+ *   path(ctx)   the filled region
+ *   rim(ctx)    only the parts of the outline that are NOT on a tile edge —
+ *               where the feature actually ends and a wall belongs. A feature
+ *               covering all four sides has no rim at all, which is correct:
+ *               it is the middle of something bigger, not a block on a field.
+ *   towers      a point at the middle of each stretch of rim, far enough from
+ *               any seam that a tower drawn there is nobody else's business.
  */
-export function featureShape(sides, solid = 0) {
+export function featureShape(sides) {
   const list = [0, 1, 2, 3].filter((s) => sides.includes(s));
   if (!list.length) return null;
 
-  const wrapped = (c) => ((solid >> (c & 3)) & 1) === 1;
-  const start = (s) => lerp(C[s], C[(s + 1) & 3], wrapped(s) ? 0 : TRIM);
-  const end = (s) => lerp(C[s], C[(s + 1) & 3], wrapped(s + 1) ? 1 : 1 - TRIM);
-
-  // One connector per feature side, joining the end of that side's run to the
-  // start of the next one. `gap` counts the sides skipped on the way.
-  const links = list.map((s, i) => {
+  // One link per gap between consecutive covered sides. Sides that are already
+  // adjacent need nothing: the first ends at exactly the corner the next
+  // begins at, so the area simply carries on round the corner.
+  const links = [];
+  for (let i = 0; i < list.length; i++) {
+    const s = list[i];
     const next = list[(i + 1) % list.length];
     const gap = list.length === 1 ? 3 : (next - s - 1 + 4) & 3;
-    return { s, next, gap, from: end(s), to: start(next) };
-  });
+    if (gap > 0) links.push({ s, next, gap });
+  }
 
-  const draw = (ctx, link, moveFirst) => {
-    const { s, next, gap, from, to } = link;
-    if (moveFirst) ctx.moveTo(from[0], from[1]);
-    if (gap === 0) {
-      // Two feature sides meeting at a corner the feature doesn't wrap: round
-      // the corner off, leaving a little of the field showing through.
-      const k = C[(s + 1) & 3];
-      ctx.quadraticCurveTo(k[0], k[1], to[0], to[1]);
+  const draw = (ctx, { s, next, gap }) => {
+    const from = C[(s + 1) & 3];
+    const to = C[next];
+    if (gap === 1) {
+      const skipped = (s + 1) & 3;
+      const mid = add([(C[skipped][0] + C[(skipped + 1) & 3][0]) / 2,
+                       (C[skipped][1] + C[(skipped + 1) & 3][1]) / 2], IN[skipped], WEDGE);
+      const run = [to[0] - from[0], to[1] - from[1]];             // along the edge
+      const c1 = add(from, IN[s], WEDGE_EDGE);
+      const c2 = add(mid, run, -WEDGE_MID / 2);
+      const c3 = add(mid, run, WEDGE_MID / 2);
+      const c4 = add(to, IN[next], WEDGE_EDGE);
+      ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], mid[0], mid[1]);
+      ctx.bezierCurveTo(c3[0], c3[1], c4[0], c4[1], to[0], to[1]);
       return;
     }
     const m = REACH[gap];
-    const c1 = [from[0] + IN[s][0] * m, from[1] + IN[s][1] * m];
-    const c2 = [to[0] + IN[next][0] * m, to[1] + IN[next][1] * m];
-    if (gap === 1) {                    // bulge gently into the skipped side
-      const skipped = (s + 1) & 3;
-      c1[0] -= IN[skipped][0] * BOW; c1[1] -= IN[skipped][1] * BOW;
-      c2[0] -= IN[skipped][0] * BOW; c2[1] -= IN[skipped][1] * BOW;
-    }
+    const c1 = add(from, IN[s], m);
+    const c2 = add(to, IN[next], m);
     ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], to[0], to[1]);
   };
 
-  // A connector is "empty" when the corner is wrapped: the two runs already
-  // meet at the corner itself, and there is no wall to draw there.
-  const live = links.filter((l) => !(l.gap === 0 && wrapped(l.s + 1)));
+  const towerOf = ({ s, next, gap }) => {
+    const from = C[(s + 1) & 3];
+    const to = C[next];
+    if (gap === 1) {
+      const skipped = (s + 1) & 3;
+      return add([(C[skipped][0] + C[(skipped + 1) & 3][0]) / 2,
+                  (C[skipped][1] + C[(skipped + 1) & 3][1]) / 2], IN[skipped], WEDGE);
+    }
+    const m = REACH[gap];
+    const c1 = add(from, IN[s], m);
+    const c2 = add(to, IN[next], m);
+    return [(from[0] + 3 * c1[0] + 3 * c2[0] + to[0]) / 8,
+            (from[1] + 3 * c1[1] + 3 * c2[1] + to[1]) / 8];
+  };
 
   return {
     path(ctx) {
-      const first = list[0];
-      const p = start(first);
-      ctx.moveTo(p[0], p[1]);
+      ctx.moveTo(C[list[0]][0], C[list[0]][1]);
       for (let i = 0; i < list.length; i++) {
         const s = list[i];
-        const e = end(s);
-        ctx.lineTo(e[0], e[1]);
-        const link = links[i];
-        if (link.gap === 0 && wrapped(s + 1)) continue;   // runs already touch
-        draw(ctx, link, false);
+        const corner = C[(s + 1) & 3];
+        ctx.lineTo(corner[0], corner[1]);           // the full side, end to end
+        const link = links.find((l) => l.s === s);
+        if (link) draw(ctx, link);
       }
       ctx.closePath();
     },
 
     rim(ctx) {
-      for (const link of live) draw(ctx, link, true);
+      for (const link of links) {
+        const from = C[(link.s + 1) & 3];
+        ctx.moveTo(from[0], from[1]);
+        draw(ctx, link);
+      }
     },
 
-    hasRim: live.length > 0,
-    crossings: live.flatMap((l) => [l.from, l.to]),
+    hasRim: links.length > 0,
+    towers: links.map(towerOf),
   };
-}
-
-/**
- * Does `cell` carry a single feature of `kind` around tile corner `c`?
- *
- * Corner c sits between world sides c-1 and c. Both have to belong to the SAME
- * feature — two separate cities touching the same corner are two cities, and
- * drawing them merged would be a lie about the board.
- */
-export function wrapsCorner(board, cell, c, kind) {
-  if (!cell) return false;
-  const a = board.featAt(cell, (c + 3) & 3);
-  if (a === null || a !== board.featAt(cell, c & 3)) return false;
-  return cell.type.feats[a].type === kind;
-}
-
-// Around any vertex: the four tiles that meet there, and which of their own
-// corners is the one in question.
-const AROUND = [[-1, -1, 2], [0, -1, 3], [-1, 0, 1], [0, 0, 0]];
-
-/**
- * The 4-bit corner mask for one feature of one cell, in WORLD orientation.
- *
- * A corner counts as solid only when every tile around that vertex wraps it,
- * which is what lets four tiles agree without talking to each other.
- */
-export function cornerMask(board, cell, kind) {
-  let mask = 0;
-  for (let c = 0; c < 4; c++) {
-    const vx = cell.x + C[c][0];
-    const vy = cell.y + C[c][1];
-    let all = true;
-    for (const [dx, dy, corner] of AROUND) {
-      if (!wrapsCorner(board, board.get(vx + dx, vy + dy), corner, kind)) { all = false; break; }
-    }
-    if (all) mask |= 1 << c;
-  }
-  return mask;
 }

@@ -234,7 +234,7 @@ src/theme.js       the entire colour scheme, in one place
 src/board.js       grid, placement, connectivity, removal, stacking, scoring
 src/art.js         procedural tile + landmark drawing (no assets)
 src/light.js       where the light comes from — one sun for the whole board
-src/shape.js       area silhouettes, and the corner rule that makes tiles match
+src/shape.js       area silhouettes — the corner-to-corner rule that makes tiles match
 src/sprites.js     tile sprite cache, so the art is drawn once and then blitted
 src/game.js        the host: turn flow, deck, players, modifiers
 src/modes/         one file per mode, behind a small set of hooks
@@ -365,23 +365,39 @@ roofs, and shading its outline just drew a bright line along every seam.
 
 Cities, forests, mountains and lakes cover some subset of a tile's four sides
 and must match whatever is on the other side of every seam. `src/shape.js`
-builds that outline under two rules:
+builds that outline, and there is exactly one rule:
 
-* An area covers a whole side that it reaches, corner to corner — except that
-  it pulls back by `TRIM` at any corner it doesn't wrap all the way around.
-* **Whether a corner is wrapped is a property of the vertex, not the tile.** It
-  is true only when all four tiles meeting there carry the same feature around
-  it. All four compute the same answer, so two tiles sharing an edge always
-  agree about both of its endpoints and their outlines meet exactly.
+> **An area covers every side it reaches, corner to corner.**
 
-The old art had four hand-drawn shapes that disagreed about this — a band city
-crossed its edge at `0.14→0.86` while a cap city crossed at `0→1` — so a band
-beside a cap left a sliver of city facing a sliver of field at both ends of the
-seam. That was the corner mismatch, and it's now impossible by construction.
+Because edge matching guarantees a city edge only ever meets another city edge,
+and both tiles cover that edge completely, the two halves are continuous along
+the whole seam with nothing left over at either end. The shape is a pure
+function of the tile's own sides — no neighbour lookup, no negotiation between
+tiles, nothing to keep in sync.
 
-Where the outline meets a tile edge it leaves *perpendicular* to it, so the
-neighbour's outline arrives at the same point at the same angle and the two
-halves read as one curve.
+Corners take care of themselves. A tile corner is a single point: an area
+reaching two adjacent sides fills it, and one reaching a single side comes to
+that point and turns. The four tiles around a vertex already agree about which
+of the four edges leaving it are city, so their outlines meet without anyone
+having to check.
+
+It took two wrong turns to get here, both worth recording. The original art had
+four hand-drawn shapes that disagreed about where they met an edge — a cap city
+crossed corner to corner while a band city only crossed `0.14→0.86` — so a band
+next to a cap left a sliver of city facing a sliver of field at both ends of
+the seam. The fix after that pulled every shape back from any corner it didn't
+wrap: the shapes then agreed with each other, but every seam still had the same
+awkward stub, and it cost a per-tile corner mask computed from the neighbours.
+Running corner to corner is simpler *and* correct, and deleted that machinery
+outright.
+
+One more rule: where an outline leaves a tile edge it leaves **perpendicular**
+to it. Two cap cities stacked one above the other then read as a single oval
+rather than two domes touching. A gap of exactly one skipped side is the
+awkward case — a plain curve with perpendicular tangents would lie flat along
+the edge and swallow the tile — so it routes through a waypoint pulled in off
+the middle of that edge, which is what carves the grass wedge on a
+city-across tile: widest in the middle, tapering to nothing at the corners.
 
 #### Walls only exist where the city ends
 
@@ -391,15 +407,17 @@ continuing into the next tile has no wall at the seam and a block of city is
 one town behind one wall. A feature covering all four sides of a fully wrapped
 tile has no rim at all — correct, since it's the middle of something bigger.
 
-Where the wall does cross a seam it gets a bastion, drawn at a point both tiles
-compute identically; each draws its own half and the two halves make one tower.
+Bastions sit at the middle of each stretch of rim, always well inside a tile: a
+tower on a seam would have to be agreed with the neighbour, and one at a corner
+would come out as two opposite quarter-circles whenever only two of the four
+tiles there had a wall.
 
-The renderer supplies the corner masks (`Renderer.cornersFor`), so tile art is
-a function of type, rotation, terrain **and** what's next door. That's still a
-finite set of pictures, so `src/sprites.js` renders each once and blits it
-thereafter — a full board draws in 0.39 ms/frame, against 1.29 ms for the
-original much simpler art, because the old renderer re-ran every vector path
-every frame. Past 512px a tile falls back to running the paths directly.
+Tile art depends on nothing but type, rotation and terrain, so there is a
+finite set of pictures the game can ever draw: `src/sprites.js` renders each
+once and blits it thereafter. A full board draws in 0.33 ms/frame, against
+1.29 ms for the original much simpler art, because the old renderer re-ran
+every vector path every frame. Past 512px a tile falls back to running the
+paths directly.
 
 Two smaller things follow from the same rule. Tiles have no outline drawn round
 them, because that would put the grid straight back over the middle of a merged

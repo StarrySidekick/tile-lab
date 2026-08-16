@@ -71,12 +71,12 @@ function drawWall(ctx, sh, L, width = 0.072) {
 }
 
 /**
- * A bastion where the wall crosses a tile edge.
+ * A bastion partway along the wall.
  *
- * The point sits exactly ON the seam, so the tile clip cuts it in half and the
- * neighbour — which computes the identical crossing point — draws the other
- * half. Two halves, one tower, and a curtain wall that gets a tower about
- * every tile the way a real one would.
+ * Sited at the middle of each stretch of rim, which is always well inside the
+ * tile — a tower on a seam would have to be agreed with the neighbour, and one
+ * at a corner would come out as two opposite quarter-circles whenever only two
+ * of the four tiles there had a wall.
  */
 function drawBastion(ctx, [x, y], L, r = 0.052) {
   const disc = (rr, fill, dx = 0, dy = 0) => {
@@ -205,8 +205,8 @@ function drawTurret(ctx, x, y, r, L, roof) {
   ctx.fill();
 }
 
-function drawCity(ctx, f, L, solid) {
-  const sh = featureShape(f.sides, solid);
+function drawCity(ctx, f, L) {
+  const sh = featureShape(f.sides);
   if (!sh) return;
 
   ctx.save();
@@ -236,7 +236,7 @@ function drawCity(ctx, f, L, solid) {
   ctx.restore();
 
   drawWall(ctx, sh, L);
-  for (const p of sh.crossings) drawBastion(ctx, p, L);
+  for (const p of sh.towers) drawBastion(ctx, p, L);
 }
 
 // --- roads ------------------------------------------------------------------
@@ -914,8 +914,8 @@ const MARK_ART = {
  * Woodland. Trees, not a green slab with a lit edge — the height comes from
  * each crown having its own shadow and its own sunlit side.
  */
-function drawForest(ctx, f, L, solid) {
-  const sh = featureShape(f.sides, solid);
+function drawForest(ctx, f, L) {
+  const sh = featureShape(f.sides);
   if (!sh) return;
   ctx.save();
   ctx.beginPath();
@@ -952,8 +952,8 @@ function drawForest(ctx, f, L, solid) {
  * Rock. Each mass is a ridge with a sunward face and a shaded one meeting at a
  * skyline, which is the only way a mountain reads from directly above.
  */
-function drawMountain(ctx, f, L, solid) {
-  const sh = featureShape(f.sides, solid);
+function drawMountain(ctx, f, L) {
+  const sh = featureShape(f.sides);
   if (!sh) return;
   ctx.save();
   ctx.beginPath();
@@ -1013,8 +1013,8 @@ function drawMountain(ctx, f, L, solid) {
  * Standing water. Flat, because it is — the only relief is a pale shelf where
  * it meets the bank, which is the shallows rather than a shaded wall.
  */
-function drawWater(ctx, f, deep, solid) {
-  const sh = featureShape(f.sides, solid);
+function drawWater(ctx, f, deep) {
+  const sh = featureShape(f.sides);
   if (!sh) return;
   ctx.save();
   ctx.beginPath();
@@ -1160,17 +1160,11 @@ export function drawMark(ctx, kind, [x, y], s = 0.46, L = LIGHT) {
  * and the whole thing is clipped to the tile square — round line caps on roads
  * would otherwise bleed a few percent past the edge and break the seams.
  */
-export function drawTile(ctx, type, {
-  cave = false, terrain = cave ? 'cave' : 'surface', rot = 0, corners = null,
-} = {}) {
+export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 'surface', rot = 0 } = {}) {
   // The art is drawn unrotated and the caller turns the canvas, so the light
   // has to be turned the other way to stay put in the world. Everything below
   // shades against `L`; nothing bakes in a direction of its own.
   const L = spin(LIGHT, rot);
-  // Per-feature corner masks, canonical orientation, from the renderer. Null
-  // for a tile that isn't on the board yet — a floating tile wraps nothing, so
-  // it draws its own walls all the way round, which is exactly right.
-  const solid = (i) => (corners ? corners[i] || 0 : 0);
 
   ctx.save();
   ctx.beginPath();
@@ -1209,9 +1203,9 @@ export function drawTile(ctx, type, {
 
   // Water goes down before roads so a bridge crosses over it, and forests and
   // mountains go down before cities so a wall reads as built against them.
-  type.feats.forEach((f, i) => { if (f.type === 'lake') drawWater(ctx, f, false, solid(i)); });
-  type.feats.forEach((f, i) => { if (f.type === 'forest') drawForest(ctx, f, L, solid(i)); });
-  type.feats.forEach((f, i) => { if (f.type === 'mountain') drawMountain(ctx, f, L, solid(i)); });
+  type.feats.forEach((f) => { if (f.type === 'lake') drawWater(ctx, f, false); });
+  type.feats.forEach((f) => { if (f.type === 'forest') drawForest(ctx, f, L); });
+  type.feats.forEach((f) => { if (f.type === 'mountain') drawMountain(ctx, f, L); });
   type.feats.forEach((f) => { if (f.type === 'river') drawRiver(ctx, f); });
 
   type.feats.forEach((f) => { if (f.type === 'road') drawRoad(ctx, f, terrain); });
@@ -1230,7 +1224,7 @@ export function drawTile(ctx, type, {
 
   type.feats.forEach((f, i) => {
     if (f.type !== 'city') return;
-    drawCity(ctx, f, L, solid(i));
+    drawCity(ctx, f, L);
     if (f.shield) {
       const [sx, sy] = type.spots[i];
       drawShield(ctx, [sx, sy - 0.16], L);
