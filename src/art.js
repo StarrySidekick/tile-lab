@@ -27,15 +27,28 @@ export { PLAYER_COLORS, PLAYER_NAMES };
 // and a block of city reads as one town behind one wall.
 
 /**
- * The curtain wall: a dark foot, a stone body, and a walkway on top shifted
- * toward the sun. Three strokes of the same path, which is what keeps it
- * continuous across a seam — nothing here depends on the tile, only on the rim.
+ * The curtain wall.
+ *
+ * Drawn INSIDE the town rather than centred on its boundary, and that detail is
+ * the whole point. Stroking the rim at double width and clipping to the town
+ * leaves a band of exactly `width` lying inside the edge.
+ *
+ * A wall centred on the boundary puts half its thickness out on the field. That
+ * looks fine in the middle of a side, but the boundary runs into the tile
+ * CORNERS — that's what makes areas meet across a seam — and there the outer
+ * half falls into a neighbouring tile that has no city and will never draw it.
+ * The tile clip then slices the wall off flat along the seam, which is exactly
+ * the join the corner-to-corner rule was supposed to hide.
+ *
+ * Kept inside the town, the wall cannot leave the tile at all, because the town
+ * cannot. Two tiles' walls run into the same corner from opposite sides and
+ * meet as one.
  */
 function drawWall(ctx, sh, L, width = 0.072) {
   if (!sh.hasRim) return;
 
-  // The shadow it throws outward, clipped to everything outside the town so it
-  // falls on the field and never back onto the wall.
+  // What it throws onto the field, clipped to everything outside the town so
+  // it lands on grass and never back on the wall.
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, 1, 1);
@@ -44,8 +57,8 @@ function drawWall(ctx, sh, L, width = 0.072) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.strokeStyle = THEME.cast;
-  ctx.translate(-L.x * 0.045, -L.y * 0.045);
-  for (const [mul, alpha] of [[2.4, 0.30], [1.5, 0.45]]) {
+  ctx.translate(-L.x * 0.04, -L.y * 0.04);
+  for (const [mul, alpha] of [[2.2, 0.30], [1.3, 0.45]]) {
     ctx.globalAlpha = alpha;
     ctx.lineWidth = width * mul;
     ctx.beginPath();
@@ -55,17 +68,34 @@ function drawWall(ctx, sh, L, width = 0.072) {
   ctx.restore();
 
   ctx.save();
+  ctx.beginPath();
+  sh.path(ctx);
+  ctx.clip();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.strokeStyle = THEME.cityWall;
-  ctx.lineWidth = width * 1.42;
+  const w2 = width * 2;                      // half of it is clipped away
+
+  ctx.strokeStyle = THEME.city;              // the stone body
+  ctx.lineWidth = w2;
   ctx.beginPath(); sh.rim(ctx); ctx.stroke();
-  ctx.strokeStyle = THEME.city;
-  ctx.lineWidth = width;
-  ctx.beginPath(); sh.rim(ctx); ctx.stroke();
-  ctx.translate(L.x * width * 0.30, L.y * width * 0.30);
+
+  // The walkway on top. Nudged AWAY from the sun, so the clip keeps it only on
+  // the stretches of wall that face the sun and drops it entirely on the ones
+  // that don't — the direction of the light picks out which walls are lit
+  // without anything having to know which way a given stretch runs.
+  ctx.save();
+  ctx.translate(-L.x * width * 0.55, -L.y * width * 0.55);
   ctx.strokeStyle = THEME.wallLit;
-  ctx.lineWidth = width * 0.40;
+  ctx.lineWidth = w2 * 0.34;
+  ctx.beginPath(); sh.rim(ctx); ctx.stroke();
+  ctx.restore();
+
+  // The outer face goes on LAST so it is always the outermost thing. Drawn
+  // before the walkway, it survived only where the nudge happened to move the
+  // walkway inward — so the wall grew a dark edge on some stretches and lost it
+  // on others, which read as the wall changing shape at a tile corner.
+  ctx.strokeStyle = THEME.cityWall;
+  ctx.lineWidth = w2 * 0.26;
   ctx.beginPath(); sh.rim(ctx); ctx.stroke();
   ctx.restore();
 }

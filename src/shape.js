@@ -29,10 +29,8 @@
 // vertex all agree about which of the four edges leaving it are city, their
 // outlines meet there without anyone having to check.
 //
-// The other rule that matters: where an outline leaves a tile edge it leaves
-// PERPENDICULAR to it. Two cap cities stacked one above the other then read as
-// a single oval rather than two domes touching, because both boundaries pass
-// through the shared corners vertically.
+// Outlines meet tile edges only at corners, and they leave a corner along the
+// diagonal — see CORNER_T for why that matters more than it sounds.
 // ---------------------------------------------------------------------------
 
 /** Tile corners, clockwise from top-left. Side s runs from C[s] to C[s+1]. */
@@ -41,19 +39,30 @@ const C = [[0, 0], [1, 0], [1, 1], [0, 1]];
 /** Inward normal of each side — the direction an outline leaves that edge. */
 const IN = [[0, 1], [-1, 0], [0, -1], [1, 0]];
 
-// How far control points reach when the outline crosses a gap of skipped
-// sides. Two skipped sides is a quarter sweep; three is a dome hanging off a
-// single edge.
-const REACH = [0, 0, 0.58, 0.52];
+// An outline leaves a tile corner along the DIAGONAL, heading for the middle of
+// the tile.
+//
+// The earlier rule was "leave perpendicular to the edge", which is right in the
+// middle of a side but wrong at a corner: perpendicular to one edge means
+// running flush along the other one. The boundary then hugged the seam for a
+// stretch, and since the wall is drawn inside the town with its dark lip and
+// its shadow on the outside, there was nowhere for either to go — the wall came
+// out sliced flat exactly where two tiles were supposed to join invisibly.
+//
+// Leaving on the diagonal, the boundary is clear of both edges immediately, so
+// the wall keeps its outer face and its shadow right up to the corner. Two
+// tiles meeting at that corner leave it in opposite diagonals, which turns a
+// merged city into a lens with a rounded point rather than a flat-ended oval.
+const CORNER_T = C.map(([x, y]) => {
+  const dx = 0.5 - x, dy = 0.5 - y;
+  const n = Math.hypot(dx, dy);
+  return [dx / n, dy / n];
+});
 
-// A gap of exactly ONE skipped side runs between the two ends of that side, so
-// a plain cubic with perpendicular tangents would lie flat along the edge and
-// swallow the whole tile. It gets a waypoint pulled in off the middle of the
-// skipped edge instead, which is what carves the grass wedge on a city-across
-// tile — widest in the middle, tapering to nothing at the corners.
-const WEDGE = 0.30;      // how deep the wedge bites
-const WEDGE_EDGE = 0.22; // control reach at the corners
-const WEDGE_MID = 0.24;  // control reach either side of the waypoint
+// Every gap routes through one waypoint, which is what actually sets the shape:
+// how deep a grass wedge bites into a city-across tile, how far a cap city
+// hangs off its edge. Indexed by how many sides the gap skips.
+const WAYPOINT = [0, 0.25, 0.42, 0.60];
 
 const add = ([x, y], [dx, dy], m) => [x + dx * m, y + dy * m];
 
@@ -84,41 +93,37 @@ export function featureShape(sides) {
     if (gap > 0) links.push({ s, next, gap });
   }
 
-  const draw = (ctx, { s, next, gap }) => {
-    const from = C[(s + 1) & 3];
-    const to = C[next];
-    if (gap === 1) {
-      const skipped = (s + 1) & 3;
-      const mid = add([(C[skipped][0] + C[(skipped + 1) & 3][0]) / 2,
-                       (C[skipped][1] + C[(skipped + 1) & 3][1]) / 2], IN[skipped], WEDGE);
-      const run = [to[0] - from[0], to[1] - from[1]];             // along the edge
-      const c1 = add(from, IN[s], WEDGE_EDGE);
-      const c2 = add(mid, run, -WEDGE_MID / 2);
-      const c3 = add(mid, run, WEDGE_MID / 2);
-      const c4 = add(to, IN[next], WEDGE_EDGE);
-      ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], mid[0], mid[1]);
-      ctx.bezierCurveTo(c3[0], c3[1], c4[0], c4[1], to[0], to[1]);
-      return;
+  // Where a gap bulges out to. For one or three skipped sides that's off the
+  // middle of the (middle) skipped edge; for two it's the corner between them,
+  // pulled in toward the tile.
+  const waypoint = ({ s, gap }) => {
+    if (gap === 2) {
+      const k = (s + 2) & 3;
+      return add(C[k], CORNER_T[k], WAYPOINT[2]);
     }
-    const m = REACH[gap];
-    const c1 = add(from, IN[s], m);
-    const c2 = add(to, IN[next], m);
-    ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], to[0], to[1]);
+    const g = gap === 1 ? (s + 1) & 3 : (s + 2) & 3;
+    const mid = [(C[g][0] + C[(g + 1) & 3][0]) / 2, (C[g][1] + C[(g + 1) & 3][1]) / 2];
+    return add(mid, IN[g], WAYPOINT[gap]);
   };
 
-  const towerOf = ({ s, next, gap }) => {
-    const from = C[(s + 1) & 3];
-    const to = C[next];
-    if (gap === 1) {
-      const skipped = (s + 1) & 3;
-      return add([(C[skipped][0] + C[(skipped + 1) & 3][0]) / 2,
-                  (C[skipped][1] + C[(skipped + 1) & 3][1]) / 2], IN[skipped], WEDGE);
-    }
-    const m = REACH[gap];
-    const c1 = add(from, IN[s], m);
-    const c2 = add(to, IN[next], m);
-    return [(from[0] + 3 * c1[0] + 3 * c2[0] + to[0]) / 8,
-            (from[1] + 3 * c1[1] + 3 * c2[1] + to[1]) / 8];
+  // One smooth hop, given where it starts and ends and which way it's pointing
+  // at each end.
+  const hop = (ctx, p0, t0, p1, t1) => {
+    const d = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) * 0.44;
+    ctx.bezierCurveTo(p0[0] + t0[0] * d, p0[1] + t0[1] * d,
+                      p1[0] - t1[0] * d, p1[1] - t1[1] * d, p1[0], p1[1]);
+  };
+
+  const draw = (ctx, link) => {
+    const a = C[(link.s + 1) & 3];
+    const b = C[link.next];
+    const w = waypoint(link);
+    const ta = CORNER_T[(link.s + 1) & 3];               // leaving into the tile
+    const tb = CORNER_T[link.next];                      // arriving at the corner
+    const n = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const tw = [(b[0] - a[0]) / n, (b[1] - a[1]) / n];   // straight through
+    hop(ctx, a, ta, w, tw);
+    hop(ctx, w, tw, b, [-tb[0], -tb[1]]);
   };
 
   return {
@@ -143,6 +148,6 @@ export function featureShape(sides) {
     },
 
     hasRim: links.length > 0,
-    towers: links.map(towerOf),
+    towers: links.map(waypoint),
   };
 }

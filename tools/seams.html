@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Seam check</title>
+<style>body{margin:0;background:#17141d;font:12px system-ui;color:#9a9089}
+ .row{display:flex;gap:26px;padding:14px}
+ .pair{display:grid;grid-template-columns:repeat(2,var(--s));grid-auto-rows:var(--s);--s:300px}
+ canvas{display:block}
+ h2{color:#d4af5f;font:600 12px system-ui;margin:10px 0 2px 14px}</style>
+<body>
+<script type="module">
+import { drawTile } from '../src/art.js';
+import { TILES } from '../src/tiles.js';
+
+// Each case is a 2x2 block of [tileId, rot] laid out so that the tiles which
+// share a seam also share a city across it. If the corner-to-corner rule and
+// the inside-the-town wall are both right, no wall should show a flat cut
+// anywhere along a seam.
+const CASES = [
+  ['E/E stacked', [['E', 2], null], [['E', 0], null]],
+  ['E/E across',  [['E', 1], ['E', 3]], [null, null]],
+  ['N/N corner',  [['N', 1], ['N', 2]], [['N', 0], ['N', 3]]],
+  ['G band row',  [['G', 0], ['G', 0]], [null, null]],
+  ['R 3-sided',   [['R', 2], null], [['R', 0], null]],
+];
+
+const S = 300;
+for (const [name, ...rows] of CASES) {
+  document.body.insertAdjacentHTML('beforeend', `<h2>${name}</h2>`);
+  const grid = document.createElement('div');
+  grid.className = 'pair';
+  for (const row of rows) {
+    for (const cell of row) {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = S * 2;
+      cv.style.width = cv.style.height = S + 'px';
+      const ctx = cv.getContext('2d');
+      if (cell) {
+        const [id, rot] = cell;
+        ctx.scale(S * 2, S * 2);
+        ctx.translate(0.5, 0.5); ctx.rotate((rot & 3) * Math.PI / 2); ctx.translate(-0.5, -0.5);
+        drawTile(ctx, TILES[id], { rot });
+      }
+      grid.appendChild(cv);
+    }
+  }
+  document.body.appendChild(grid);
+}
+window.READY = true;
+</script>
