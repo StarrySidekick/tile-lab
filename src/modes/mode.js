@@ -14,6 +14,8 @@
 //   actions()         the contextual buttons in the panel
 //   panel()           HTML replacing the score table, or null to keep it
 //   anythingLeft()    whether there's anything left to deal you
+//   valueOf(d)        price a feature your own way
+//   flightTargets()   extra squares a follower may go to this turn
 //   botPlaceBonus()   what a computer player can't see in your scoring
 //   botMoveValue()    …and what it can't see in your movement
 //
@@ -58,6 +60,18 @@ export class Mode {
   endRound() {}
   onDrowned() {}
   finish() {}
+
+  /**
+   * Price a feature your own way, or return null to use the board's rules.
+   * Girando pays a city 1 per tile, like a road.
+   */
+  valueOf() { return null; }
+
+  /**
+   * Extra squares a follower may be put on this turn, beyond the tile just
+   * laid: `{x, y, i, f, flying}`. Girando's flying machine is the only user.
+   */
+  flightTargets() { return []; }
 
   // --- walking --------------------------------------------------------------
 

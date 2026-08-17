@@ -216,7 +216,7 @@ for (const mode of modes) {
         g.cellClick(s.x, s.y);
       } else if (g.phase === 'meeple') {
         const o = g.meepleOptions();
-        if (o.length) g.placeMeeple(o[0].i); else g.skipMeeple();
+        if (o.length) g.placeMeeple(o[0].i, o[0]); else g.skipMeeple();
       } else break;
       if (window.LAB.fx.items.some((e) => e.kind === 'float')) break;
     }
@@ -327,7 +327,7 @@ for (const [what, mode, mech, kind] of [
         g.cellClick(s.x, s.y);
       } else if (g.phase === 'meeple') {
         const o = g.meepleOptions();
-        if (o.length) g.placeMeeple(o[0].i); else g.skipMeeple();
+        if (o.length) g.placeMeeple(o[0].i, o[0]); else g.skipMeeple();
       } else if (g.phase === 'lift') {
         g.m.cancelLift();
       } else break;
@@ -364,7 +364,7 @@ for (const [what, mode, mech, kind] of [
         g.cellClick(s.x, s.y);
       } else if (g.phase === 'meeple') {
         const o = g.meepleOptions();
-        if (o.length) g.placeMeeple(o[0].i); else g.skipMeeple();
+        if (o.length) g.placeMeeple(o[0].i, o[0]); else g.skipMeeple();
       } else break;
     }
     const born = window.LAB.fx.items.filter((e) => e.kind === 'float').map((e) => e.born);

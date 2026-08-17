@@ -471,16 +471,22 @@ export class Renderer {
     }
   }
 
+  /**
+   * Where a follower may go. Usually the tile just laid, but an option carries
+   * its own square — Girando's flying machine offers features halfway across
+   * the board, drawn in the flight's own colour so you can tell the two kinds
+   * of claim apart before you commit one.
+   */
   drawMeepleTargets(game) {
     const ctx = this.ctx;
     this.meepleSpots = [];
-    const cell = game.lastPlaced;
-    if (!cell) return;
-    const color = PLAYER_COLORS[game.current];
     const pulse = 1 + Math.sin(performance.now() / 400) * 0.08;
 
-    for (const { i, f } of game.meepleOptions()) {
-      const spot = rotPoint(cell.type.spots[i], cell.rot);
+    for (const o of game.meepleOptions()) {
+      const cell = game.board.get(o.x, o.y);
+      if (!cell || !this.onScreen(o.x, o.y)) continue;
+      const color = o.flying ? THEME.teal : PLAYER_COLORS[game.current];
+      const spot = rotPoint(cell.type.spots[o.i], cell.rot);
       const [sx, sy] = this.toScreen(cell.x + spot[0], cell.y + spot[1]);
       const r = this.cam.zoom * 0.19 * pulse;
       ctx.beginPath();
@@ -490,8 +496,8 @@ export class Renderer {
       ctx.lineWidth = 3;
       ctx.strokeStyle = color;
       ctx.stroke();
-      drawMeeple(ctx, sx, sy, this.cam.zoom * 0.26, color);
-      this.meepleSpots.push({ i, sx, sy, r: this.cam.zoom * 0.24, type: f.type });
+      drawMeeple(ctx, sx, sy, this.cam.zoom * 0.26, PLAYER_COLORS[game.current]);
+      this.meepleSpots.push({ i: o.i, x: o.x, y: o.y, sx, sy, r: this.cam.zoom * 0.24, type: o.f.type });
     }
   }
 

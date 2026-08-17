@@ -7,8 +7,11 @@
 // to the sky: you place tiles and claim features like Carcassonne, and then
 // the wind rearranges the country underneath you.
 //
-// THE ZEPHYR is the engine. Play one and it blows down its lane — everything
-// in that row or column, downwind, slides one square. Tiles that end up
+// THE ZEPHYR is the engine, and a fifth of the deck is zephyrs. Play one and
+// it blows down its lane — everything in that row or column, downwind, slides
+// one square. A gust runs the whole length of the lane: crystallised ground
+// doesn't move and a tile jammed against it has nowhere to go, but the wind
+// carries on past them and shoves everything loose beyond. Tiles that end up
 // touching nothing fall out of the sky and go back in the deck. Followers
 // standing on a road get blown off it; followers inside a city are behind
 // walls and ride it out. A zephyr caught by another zephyr fires in its turn,
@@ -24,34 +27,57 @@
 // might now be finished, or might never be. Every edge matches, so they always
 // fit; what changes is what runs through them.
 //
-// THE SKYWALL is the only thing that stops any of this — nothing in its lee
-// gets touched. Crystallised tiles don't move either, so everything you finish
-// becomes a windbreak, and the board slowly grows a skeleton it can't lose.
+// THE SKYWALL is the only thing that stops a gust — and only face on. A wall
+// stands across one axis: wind running into it stops dead and everything in
+// its lee is untouched, wind running along it goes straight past. Turning one
+// is deciding which way the country is allowed to be shoved.
+//
+// THE ABBAZIA takes any edge and CAPS everything it touches: a road running
+// into one ends there, a city walls itself off against it, and both can finish
+// without ever meeting anything. It is also, being an ordinary tile, perfectly
+// blowable — and when it goes, everything it was holding shut is open country
+// again, unfinished, and can be finished and paid for a second time.
+//
+// THE FLYING MACHINE sends a follower out along the lane it points down. It
+// can land on any tile out there, including features somebody else already
+// holds — the only thing it can't do is land on a tile with a figure standing
+// on it. And a zephyr crossed on the way is a wind you're IN: the flight turns
+// and follows it, so a zephyr pointed the wrong way is a wall for fliers and
+// everything past it is unreachable.
 //
 // FLUTITANTES are terrain built on a hull. They're the only tiles you may pick
 // up and move yourself, and the only ones that survive being stranded in open
 // sky. They're what's left of Cirrus's lifting, narrowed to the tiles that are
 // supposed to do it.
 //
+// There are no cloisters in the sky: every one of them is a temple. A city
+// pays 1 a tile, exactly like a road — two a tile made finishing one worth
+// chasing through the weather, and this is a mode where the weather decides.
+//
 // The thesis is in one line: SCORING IS NOT GUARANTEED. Nothing pays until it
-// closes, nothing that hasn't closed pays at the end, and the wind is under no
-// obligation to leave your city where you built it.
+// closes, nothing that hasn't closed pays at the end, an Abbazia blowing away
+// can un-finish what you already banked, and the wind is under no obligation
+// to leave your city where you built it.
 // ---------------------------------------------------------------------------
 
 import { Mode } from './mode.js';
-import { TILE_TYPES, MARKS, CENTRE_FEATURES, buildDeck } from '../tiles.js';
+import { TILE_TYPES, MARKS, CENTRE_FEATURES, SIDE_STEP, buildDeck } from '../tiles.js';
 import { PLAYER_COLORS } from '../theme.js';
-import { partOfScored } from '../mechanics.js';
+import { partOfScored, claimableFeatures } from '../mechanics.js';
 import { storm, zephyrOn, worldDir, isRaft, isWall } from '../wind.js';
 
-const HAND = 3;
-const DECK_SIZE = 46;
+const DECK_SIZE = 56;
 const SEASON = 20;           // rounds; tiles come back, so the clock has to be real
 const TEMPLE_SHOVE = 2;      // for blowing a temple with a zephyr
 const MAX_CHAIN = 6;         // temples setting off temples
+const FLIGHT_RANGE = 24;     // squares, before we assume the zephyrs are a loop
 
-/** Girando plays the open junctions instead of the base set's terminators. */
-const OPEN_JUNCTIONS = { W: 'Gw', L: 'Gl' };
+/**
+ * What Girando plays instead of parts of the base set. The 3-way junctions
+ * carry a road THROUGH instead of ending it — fewer closures, more weather —
+ * and there are no cloisters in the sky: every one of them is a temple.
+ */
+const SWAPS = { W: 'Gw', L: 'Gl', A: 'Kta', B: 'Kt' };
 
 export class Girando extends Mode {
   /**
@@ -72,13 +98,11 @@ export class Girando extends Mode {
       const j = Math.floor(rng() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
-    // A road running into a 3-way junction should carry on through it, not
-    // stop there. Fewer closures means fewer crystals means more weather.
-    return deck.map((id) => OPEN_JUNCTIONS[id] || id);
+    return deck.map((id) => SWAPS[id] || id);
   }
 
   setup() {
-    this.hands = this.game.players.map(() => []);
+    this.flight = null;
     this.crystals = 0;
     this.gusts = 0;
     this.fallen = 0;
@@ -86,18 +110,6 @@ export class Girando extends Mode {
     this.queued = [];
     const seed = this.game.board.get(0, 0);
     if (seed) seed.anchored = true;          // the founding stone stays put
-  }
-
-  // --- the hand -------------------------------------------------------------
-
-  /** The hand IS the market row — same picker, different refill rule. */
-  drawNext() {
-    this.game.fillMarket(HAND, this.hands[this.game.current]);
-  }
-
-  /** Hands are private, so the host can't see them to know when to stop. */
-  anythingLeft() {
-    return this.game.deck.length > 0 || this.hands[this.game.current].length > 0;
   }
 
   // --- placing --------------------------------------------------------------
@@ -109,7 +121,76 @@ export class Girando extends Mode {
       this.game.say(`${this.game.player.name} lets the zephyr out.`);
       this.weather({ dir: worldDir(cell, z), from: { x: cell.x, y: cell.y } }, this.game.current);
     }
+    // The flight is worked out after the weather, because the weather may have
+    // just rearranged everything the machine was going to fly over.
+    this.flight = this.flightPath(cell);
     return 'meeple';
+  }
+
+  endTurn() { this.flight = null; }
+
+  // --- scoring --------------------------------------------------------------
+
+  /**
+   * A city pays 1 a tile here, exactly like a road. Two a tile made finishing
+   * one worth chasing through the weather; one a tile makes a city just a
+   * bigger, slower road, which is the right price in a mode where the wind
+   * decides whether you finish anything at all.
+   */
+  valueOf(d) {
+    return d.type === 'city' ? d.tiles.size + d.shields : null;
+  }
+
+  // --- flying machines ------------------------------------------------------
+
+  /**
+   * The lane a machine sends a follower down: straight out the way it points,
+   * over whatever tiles are there, until the country runs out — but a zephyr
+   * crossed on the way is a wind you're in, not a wind you watch, so the
+   * flight turns and follows it. That's the whole tactic: a zephyr pointing
+   * the wrong way is a wall for fliers, and everything past it is unreachable.
+   */
+  flightPath(cell) {
+    const flier = cell.type.marks.find((m) => m.kind === 'flier');
+    if (!flier) return null;
+    const board = this.game.board;
+    let dir = worldDir(cell, flier);
+    let { x, y } = cell;
+    const path = [];
+    const seen = new Set();
+    for (let step = 0; step < FLIGHT_RANGE; step++) {
+      const [dx, dy] = SIDE_STEP[dir];
+      x += dx; y += dy;
+      const key = `${x},${y}`;
+      if (seen.has(key)) break;                  // zephyrs pointed in a circle
+      seen.add(key);
+      const over = board.get(x, y);
+      if (!over) break;                          // open sky: nowhere to land
+      path.push(over);
+      const z = zephyrOn(over);
+      if (z) dir = worldDir(over, z);            // you don't choose to ride it
+    }
+    return path.length ? path : null;
+  }
+
+  /**
+   * Anywhere along that flight will do — and unlike an ordinary claim, it
+   * doesn't matter whether somebody already holds the feature. What it can't
+   * do is land on a tile with a follower already standing on it; one tile
+   * holds one figure.
+   */
+  flightTargets() {
+    if (!this.flight) return [];
+    const board = this.game.board;
+    const out = [];
+    for (const cell of this.flight) {
+      if (!board.get(cell.x, cell.y) || cell.meeple) continue;
+      for (const { i, f } of claimableFeatures(cell.type)) {
+        if (!board.featureOf(cell.x, cell.y, i)) continue;
+        out.push({ x: cell.x, y: cell.y, i, f, flying: true });
+      }
+    }
+    return out;
   }
 
   // --- the weather ----------------------------------------------------------
@@ -130,6 +211,7 @@ export class Girando extends Mode {
       let job = [spec, by];
       for (let n = 0; job && n < MAX_CHAIN; n++) {
         for (const report of storm(this.game.board, job[0])) this.applyGust(report, job[1]);
+        this.reopen();
         this.settle(job[1]);
         job = this.queued.shift();
       }
@@ -186,6 +268,26 @@ export class Girando extends Mode {
           at: { x: cell.x + 0.5, y: cell.y + 0.5 }, cells: [{ x: cell.x, y: cell.y }],
         });
       }
+    }
+  }
+
+  /**
+   * …and the wind can UN-finish things. An Abbazia was capping that road; the
+   * wind took the Abbazia away, and the road is open country again. It has to
+   * stop counting as scored, or it can never pay a second time — which is the
+   * whole reason the Abbazia is allowed to be blown around while it's holding
+   * something shut.
+   */
+  reopen() {
+    const board = this.game.board;
+    for (const d of board.allComponents()) {
+      if (!d.scored) continue;
+      const done = CENTRE_FEATURES.has(d.type)
+        ? board.surroundCount(d.at.x, d.at.y) === 8
+        : d.open === 0;
+      if (done) continue;
+      board.unmark(d);
+      this.game.say(`The ${d.type} at (${d.at.x}, ${d.at.y}) is open country again.`);
     }
   }
 
@@ -380,7 +482,7 @@ export class Girando extends Mode {
       return `<div class="player ${active ? 'active' : ''}">
           <span class="swatch" style="background:${PLAYER_COLORS[i]}"></span>
           <span class="pname">${p.name}</span>
-          <span class="pmeta">${this.hands[i].length} in hand ${meeples}</span>
+          <span class="pmeta">${meeples}</span>
           <span class="pscore">${p.score}</span>
         </div>`;
     }).join('');
@@ -396,9 +498,7 @@ Girando.spec = {
   meeples: true,
   minPlayers: 1,
   maxPlayers: 4,
-  market: false,             // the hand is its own row
-  marketDiscards: false,
   tideStart: 5,
   opening: 'A first stone hangs in the cloud. Everything else is weather.',
-  hint: 'Claim features as normal — but a zephyr blows its whole lane one square, temples blow the entire board, and nothing unfinished ever pays.',
+  hint: 'Claim as normal — but a zephyr blows its whole lane, temples blow the whole board, an Abbazia caps whatever it touches until the wind takes it, and nothing unfinished ever pays.',
 };

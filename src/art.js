@@ -751,6 +751,62 @@ const MARK_ART = {
     ctx.lineWidth = 0.055;
   },
 
+  /**
+   * An Abbazia: a walled house that everything stops at. Drawn big and squared
+   * off, against the temple's open ring — one of them ends what it touches,
+   * the other blows it about, and you have to tell them apart at a glance.
+   */
+  abbazia(ctx) {
+    ctx.fillStyle = THEME.cityGround;                 // the precinct
+    ctx.beginPath(); ctx.rect(-0.72, -0.62, 1.44, 1.30); ctx.fill();
+    ctx.fillStyle = THEME.cityWall;                   // its wall, all the way round
+    ctx.lineWidth = 0.05;
+    ctx.strokeStyle = 'rgba(30,24,18,0.6)';
+    ctx.beginPath(); ctx.rect(-0.72, -0.62, 1.44, 1.30); ctx.stroke();
+    for (let x = -0.72; x < 0.7; x += 0.24) {         // crenellations along the top
+      ctx.fillStyle = THEME.city;
+      ctx.beginPath(); ctx.rect(x, -0.72, 0.13, 0.14); ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = THEME.plaster;                    // the house itself
+    ctx.beginPath(); ctx.rect(-0.36, -0.30, 0.72, 0.72); ctx.fill(); ctx.stroke();
+    roofTri(ctx, 0, -0.30, 0.86, 0.34, THEME.roof);
+    ctx.fillStyle = THEME.timber;                     // a door, and no windows
+    ctx.beginPath(); ctx.rect(-0.11, 0.10, 0.22, 0.32); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.shield;
+    ctx.beginPath(); ctx.arc(0, -0.10, 0.09, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = 0.055;
+    ctx.strokeStyle = THEME.timber;
+  },
+
+  /** A flying machine on its strip, pointing the way a follower can leave. */
+  flier(ctx) {
+    ctx.fillStyle = 'rgba(228,240,248,0.16)';         // the wind it launches into
+    ctx.beginPath();
+    ctx.moveTo(0, -0.72); ctx.lineTo(0.30, -0.30); ctx.lineTo(-0.30, -0.30);
+    ctx.closePath(); ctx.fill();
+
+    ctx.save();
+    ctx.translate(0, 0.06);
+    ctx.fillStyle = THEME.plaster;                    // wings
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 0.52, 0.17, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = THEME.timber;                   // ribs
+    ctx.lineWidth = 0.035;
+    for (const x of [-0.32, -0.14, 0.14, 0.32]) {
+      ctx.beginPath(); ctx.moveTo(x, -0.13); ctx.lineTo(x, 0.13); ctx.stroke();
+    }
+    ctx.fillStyle = THEME.timber;                     // fuselage, nose forward
+    ctx.beginPath();
+    ctx.moveTo(0, -0.44); ctx.lineTo(0.11, 0.10); ctx.lineTo(-0.11, 0.10);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(30,24,18,0.6)';
+    ctx.stroke();
+    ctx.restore();
+    ctx.lineWidth = 0.055;
+    ctx.strokeStyle = THEME.timber;
+  },
+
   /** A flutitante: the terrain above is ordinary, the hull under it isn't. */
   raft(ctx) {
     // Small and low: it's the hull the terrain is built on, not the subject of

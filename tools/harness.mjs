@@ -111,7 +111,7 @@ function step(game, rng) {
       const opts = game.meepleOptions();
       if (game.canRecall() && rng() < 0.08) return void game.beginRecall();
       if (game.has('bigMeeple') && game.player.big > 0 && rng() < 0.3) game.toggleBig();
-      if (opts.length && rng() < 0.7) game.placeMeeple(pick(opts).i);
+      if (opts.length && rng() < 0.7) { const o = pick(opts); game.placeMeeple(o.i, o); }
       else game.skipMeeple();
       return;
     }
@@ -385,6 +385,51 @@ function checkWind() {
     if (!b.get(0, 0)) return fail('a crystallised temple stays where it is', 'it blew itself away');
   }
 
+  // A wall only stops a wind that runs into its face.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz', 1);                  // blowing east
+    lay(b, 1, 0, 'Kl');                     // a wall facing north — along this wind
+    lay(b, 2, 0, 'U'); lay(b, 2, 1, 'U');
+    gust(b, { dir: 1, from: { x: 0, y: 0 } });
+    if (!at(b, 3, 0)) return fail('a wall side-on lets the wind past', 'the lee was sheltered');
+
+    const c = new Board();
+    lay(c, 0, 0, 'Kz', 1);
+    lay(c, 1, 0, 'Kl', 1);                  // …and now facing east, into the wind
+    lay(c, 2, 0, 'U'); lay(c, 2, 1, 'U');
+    gust(c, { dir: 1, from: { x: 0, y: 0 } });
+    if (!at(c, 2, 0)) return fail('a wall face-on shelters its lee', 'the lee moved anyway');
+  }
+
+  // Crystallised ground doesn't move and doesn't stop the wind: what's jammed
+  // against it stays, and what's beyond it goes anyway.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // north
+    lay(b, 0, -1, 'U');                     // will jam against the crystal
+    lay(b, 0, -2, 'U').anchored = true;     // the crystal
+    lay(b, 0, -3, 'U'); lay(b, 1, -4, 'U'); // beyond it, with a corner to land on
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (!at(b, 0, -1)) return fail('a tile jammed against a crystal stays', 'it moved');
+    if (!at(b, 0, -2)) return fail('a crystal does not move', 'it did');
+    if (!at(b, 0, -4)) return fail('the wind carries on past a crystal', 'the far side sat still');
+  }
+
+  // The Abbazia caps what it touches, and un-caps it when the wind takes it.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'U');                      // a road, open at both ends
+    const road = () => b.featureOf(0, 0, 0);
+    if (road().open !== 2) return fail('a fresh road has two open ends', road().open);
+    lay(b, 0, -1, 'Kab');                   // an Abbazia on one end
+    if (road().open !== 1) return fail('an Abbazia caps what it touches', road().open);
+    lay(b, 0, 1, 'Kab');
+    if (road().open !== 0) return fail('two Abbazias finish a road', road().open);
+    b.remove(0, -1);
+    if (road().open !== 1) return fail('taking one away opens it again', road().open);
+  }
+
   // Mismatched seams join nothing — the wind can shove a road into a city.
   {
     const b = new Board();
@@ -398,7 +443,7 @@ function checkWind() {
     if (road.tiles.size !== 1) return fail('a mismatched seam joins nothing', `road spans ${road.tiles.size}`);
   }
 
-  console.log('  ✓ lanes, corners, walls, windbreaks, vanes, chains, followers, temples, bad seams');
+  console.log('  ✓ lanes, corners, walls, windbreaks, crystals, vanes, chains, followers, temples, Abbazias, bad seams');
 }
 
 // --- runs -------------------------------------------------------------------

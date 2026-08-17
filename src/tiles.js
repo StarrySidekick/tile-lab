@@ -67,6 +67,17 @@ const mountain = (sides) => ({ type: 'mountain', sides });
 const lake = (sides) => ({ type: 'lake', sides });
 const river = (sides) => ({ type: 'river', sides });
 
+/**
+ * The wildcard edge. An Abbazia presents one on all four sides: it fits
+ * anywhere, and rather than joining what it touches it CAPS it — the road or
+ * city on the other side loses that open slot and can finish without ever
+ * meeting anything. Take the Abbazia away again and the slot comes back.
+ */
+export const CAP = '*';
+
+/** Do two edges meet? Same letter, or one of them takes anything. */
+export const edgesMeet = (a, b) => a === b || a === CAP || b === CAP;
+
 /** Edge letter per feature type. Two edges match only if their letters do. */
 export const EDGE_LETTER = {
   city: 'c', road: 'r', monastery: 'f', temple: 'f',
@@ -95,7 +106,7 @@ export const GROUPS = [
   { id: 'adventure', name: 'Adventure sites', note: 'Wayshrines, ruins, campsites, merchants.', classic: false, expedition: false, adventure: true },
   { id: 'marches', name: 'War terrain', note: 'Keeps, forts, hills, fords, beacons.', classic: false, expedition: false, adventure: false },
   { id: 'descent', name: 'Dangers', note: 'Stairs down, bandits, wolves, barrows.', classic: false, expedition: false, adventure: false },
-  { id: 'cloud', name: 'Cloud kingdom', note: 'Zephyrs, temples, windvanes, vestibules, skywalls and flutitantes.', classic: false, expedition: false, adventure: false },
+  { id: 'cloud', name: 'Cloud kingdom', note: 'Zephyrs, temples, Abbazias, flying machines, windvanes, vestibules, skywalls and flutitantes.', classic: false, expedition: false, adventure: false },
   { id: 'mountains', name: 'Mountains', note: 'Pay the moment the chain grows, scaling with its size. Nothing can be claimed on them.', classic: false, expedition: false, adventure: false },
   { id: 'forests', name: 'Forests', note: '1 per tile, +1 per log. No complete/incomplete distinction — a forest is just as big as it is.', classic: false, expedition: false, adventure: false },
   { id: 'lakes', name: 'Lakes', note: 'Shores and corners, never all four sides. A city beside water is worth more.', classic: false, expedition: false, adventure: false },
@@ -190,26 +201,44 @@ export const TILE_TYPES = [
   // score: the zephyr blows a lane, the temple blows everything, the windvane
   // and the vestibule re-point themselves in the wind and re-cut what's
   // finished, and the skywall is the only thing that stops any of it.
-  { id: 'Ka', n: 3, group: 'cloud', name: 'Skyhold',    feats: [city([N, W])],  marks: [mark('skyhold', 0)] },
+  { id: 'Ka', n: 2, group: 'cloud', name: 'Skyhold',    feats: [city([N, W])],  marks: [mark('skyhold', 0)] },
 
-  // A gust, pointing north on the tile and wherever you turn it in the world.
-  { id: 'Kz', n: 4, group: 'cloud', name: 'Zephyr',       feats: [],                marks: [mark('zephyr', null, N)] },
-  { id: 'Kzr', n: 2, group: 'cloud', name: 'Zephyr road', feats: [road([E, W])],    marks: [mark('zephyr', null, N)] },
+  // Gusts, pointing north on the tile and wherever you turn it in the world.
+  // Twelve of them, on every kind of ground there is: wind that only ever
+  // arrived on empty fields would be wind you could plan around.
+  { id: 'Kz',  n: 4, group: 'cloud', name: 'Zephyr',        feats: [],                        marks: [mark('zephyr', null, N)] },
+  { id: 'Kzr', n: 3, group: 'cloud', name: 'Zephyr road',   feats: [road([E, W])],            marks: [mark('zephyr', null, N)] },
+  { id: 'Kzb', n: 2, group: 'cloud', name: 'Zephyr bend',   feats: [road([S, E])],            marks: [mark('zephyr', null, N)] },
+  { id: 'Kzc', n: 2, group: 'cloud', name: 'Zephyr wall',   feats: [city([W])],               marks: [mark('zephyr', null, N)] },
+  { id: 'Kzt', n: 1, group: 'cloud', name: 'Zephyr gate',   feats: [city([S]), road([E, W])], marks: [mark('zephyr', null, N)] },
 
   // The vane and the vestibule are the same idea twice: four ways in, only two
   // of them joined, and the wind decides which two. Every edge matches, so
   // they always fit — what changes is what runs THROUGH them.
-  { id: 'Kw', n: 3, group: 'cloud', name: 'Windvane',   swing: true, feats: [road([N, S]), road([E]), road([W])] },
+  { id: 'Kw', n: 2, group: 'cloud', name: 'Windvane',   swing: true, feats: [road([N, S]), road([E]), road([W])] },
   { id: 'Kv', n: 2, group: 'cloud', name: 'Vestibule',  swing: true, feats: [city([N, S]), city([E]), city([W])] },
 
-  { id: 'Kt', n: 3, group: 'cloud', name: 'Temple',     feats: [temple(N)] },
-  { id: 'Kl', n: 2, group: 'cloud', name: 'Skywall',    feats: [],              marks: [mark('wall')] },
+  { id: 'Kt',  n: 2, group: 'cloud', name: 'Temple',        feats: [temple(N)] },
+  { id: 'Kta', n: 0, group: 'cloud', name: 'Temple + road', feats: [temple(N), road([S])] },
+
+  // A wall only stops what runs into its face. The mark's direction is the way
+  // it looks, so the wall itself lies across that axis and the wind slides
+  // straight past it the other way.
+  { id: 'Kl', n: 3, group: 'cloud', name: 'Skywall',    feats: [],              marks: [mark('wall', null, N)] },
+
+  // The Abbazia: every edge is a wildcard, and everything it touches ends
+  // there. Blow it away and all of that is unfinished again.
+  { id: 'Kab', n: 4, group: 'cloud', name: 'Abbazia', wild: true, feats: [], marks: [mark('abbazia')] },
+
+  // A flying machine and its strip. Placing one lets a follower fly out along
+  // the way it points, riding any zephyr it crosses.
+  { id: 'Kfl', n: 3, group: 'cloud', name: 'Flying machine', feats: [road([S])], marks: [mark('flier', null, N)] },
 
   // Flutitantes: terrain built on a hull. You may move one instead of playing
   // a tile, and the wind can strand one in open sky without sinking it.
   { id: 'Kf', n: 2, group: 'cloud', name: 'Flutitante road',  feats: [road([N, S])], marks: [mark('raft')] },
   { id: 'Kg', n: 2, group: 'cloud', name: 'Flutitante hold',  feats: [city([N, W])], marks: [mark('raft')] },
-  { id: 'Kh', n: 2, group: 'cloud', name: 'Flutitante field', feats: [],             marks: [mark('raft')] },
+  { id: 'Kh', n: 1, group: 'cloud', name: 'Flutitante field', feats: [],             marks: [mark('raft')] },
 
   // Not dealt: Girando swaps these in for the base 3-way junctions, so a road
   // running into one carries on instead of ending. Fewer things close, which
@@ -403,7 +432,9 @@ export const MARKS = {
   // cloud
   skyhold: { label: 'Skyhold', score: 3, note: 'Crystallises the moment its city closes.' },
   zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane one square when played, and again whenever the wind reaches it.' },
-  wall:    { label: 'Skywall', score: 0, note: 'Immovable. Nothing downwind of it in a lane is touched by the wind.' },
+  wall:    { label: 'Skywall', score: 0, note: 'Immovable, and it stops a wind that runs into its face. Wind along it passes by.' },
+  abbazia: { label: 'Abbazia', score: 0, note: 'Caps every feature it touches — and un-caps them if the wind takes it away.' },
+  flier:   { label: 'Flying machine', score: 0, note: 'Place it and a follower may fly out along it, riding any zephyr it crosses.' },
   raft:    { label: 'Flutitante', score: 0, note: 'Move it instead of playing a tile. It floats — the wind can strand it in open sky.' },
 };
 
@@ -439,8 +470,10 @@ function prepare(list) {
     // Edge letters: c=city, r=road, f=field/rock. Used for the matching rule.
     t.edges = ['f', 'f', 'f', 'f'];
     t.shields = 0;
+    if (t.wild) t.edges = [CAP, CAP, CAP, CAP];
     for (const f of t.feats) {
       if (f.shield) t.shields++;
+      if (t.wild) continue;                    // an Abbazia takes anything
       for (const s of f.sides) t.edges[s] = EDGE_LETTER[f.type] || 'r';
     }
     t.spots = t.feats.map(featureSpot);

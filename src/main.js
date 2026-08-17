@@ -312,7 +312,7 @@ canvas.addEventListener('pointerup', (e) => {
 
   if (game.phase === 'meeple') {
     const hit = renderer.hitMeepleSpot(sx, sy);
-    if (hit) game.placeMeeple(hit.i);
+    if (hit) game.placeMeeple(hit.i, hit);
     return;
   }
   if (game.phase === 'move') {

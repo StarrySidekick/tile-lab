@@ -403,23 +403,24 @@ export class Bot {
     const options = g.meepleOptions();
     if (!options.length) return void g.skipMeeple();
 
-    const { x, y } = g.lastPlaced;
     const base = this.positionValue(null);
     const cost = this.claimCost();
     let best = null;
 
+    // An option knows its own square: most are on the tile just laid, but a
+    // mode can offer one anywhere on the board.
     for (const o of options) {
-      const d = g.board.featureOf(x, y, o.i);
+      const d = g.board.featureOf(o.x, o.y, o.i);
       if (!d) continue;
       const value = this.positionValue(g.board.find(d.parts[0])) - cost + this.jitter() * 0.4;
-      if (!best || value > best.value) best = { i: o.i, value, gain: value + cost - base };
+      if (!best || value > best.value) best = { ...o, value, gain: value + cost - base };
     }
 
     if (!best || best.value <= base) return void g.skipMeeple();
     if (this.level.verbs && g.has('bigMeeple') && g.player.big > 0 && best.gain > BIG_FOLLOWER) {
       g.toggleBig();
     }
-    g.placeMeeple(best.i);
+    g.placeMeeple(best.i, best);
   }
 
   /** A follower whose feature just scored, deciding whether to walk on. */

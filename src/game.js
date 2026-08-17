@@ -514,27 +514,42 @@ export class Game {
 
   // --- followers ------------------------------------------------------------
 
+  /**
+   * Where a follower may go this turn. Normally that's the unclaimed features
+   * on the tile you just laid — but a mode may offer somewhere else entirely
+   * (Girando's flying machine sends one down a lane), so every option carries
+   * the square it belongs to rather than assuming `lastPlaced`.
+   */
   meepleOptions() {
     if (this.phase !== 'meeple' || !this.lastPlaced || !this.useMeeples) return [];
     if (this.player.meeples <= 0) return [];
     const { x, y, type } = this.lastPlaced;
-    return claimableFeatures(type).filter(({ i }) => {
-      const d = this.board.featureOf(x, y, i);
-      return d && d.meeples.length === 0;
-    });
+    const here = claimableFeatures(type)
+      .filter(({ i }) => {
+        const d = this.board.featureOf(x, y, i);
+        return d && d.meeples.length === 0;
+      })
+      .map((o) => ({ ...o, x, y }));
+    return [...here, ...(this.m.flightTargets?.() || [])];
   }
 
-  placeMeeple(featIdx) {
+  placeMeeple(featIdx, at = null) {
     if (this.phase !== 'meeple') return false;
-    if (!this.meepleOptions().some((o) => o.i === featIdx)) return false;
-    const { x, y, type } = this.lastPlaced;
+    const spot = this.meepleOptions().find((o) => o.i === featIdx
+      && (!at || (o.x === at.x && o.y === at.y)));
+    if (!spot) return false;
+    const cell = this.board.get(spot.x, spot.y);
+    if (!cell) return false;
     const big = this.useBig && this.player.big > 0;
-    this.board.addMeeple(x, y, featIdx, this.current, big);
+    this.board.addMeeple(spot.x, spot.y, featIdx, this.current, big);
     this.player.meeples--;
     if (big) this.player.big--;
     this.useBig = false;
-    this.say(`${this.player.name} claimed the ${type.feats[featIdx].type}${big ? ' with their big follower' : ''}.`);
-    this.emit('meeple', { feat: featIdx, player: this.current });
+    const what = cell.type.feats[featIdx].type;
+    this.say(spot.flying
+      ? `${this.player.name} flies a follower out to the ${what} at (${spot.x}, ${spot.y}).`
+      : `${this.player.name} claimed the ${what}${big ? ' with their big follower' : ''}.`);
+    this.emit('meeple', { feat: featIdx, player: this.current, at: { x: spot.x + 0.5, y: spot.y + 0.5 } });
     this.endTurn();
     return true;
   }
@@ -864,7 +879,10 @@ export class Game {
    * city sits beside, and the inn or cathedral on it.
    */
   valueOf(d, final) {
-    let pts = this.board.value(d, final);
+    // A mode that scores a feature type its own way says so; anything it
+    // doesn't have an opinion about falls through to the board's rules.
+    const own = this.m.valueOf?.(d, final);
+    let pts = own == null ? this.board.value(d, final) : own;
     if (this.has('inns')) {
       const ic = innsAndCathedrals(this.board, d, final);
       if (ic.void) return 0;

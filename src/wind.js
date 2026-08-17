@@ -13,13 +13,13 @@
 //
 // The four rules that make it a game rather than a shuffle:
 //
-//   SOLID THINGS DON'T MOVE. Crystallised tiles and skywalls stay where they
-//     are, and anything pressed up against one stays too — the wind can't
-//     push a tile into an occupied square, so it simply doesn't move it. That
-//     turns everything you finish into a windbreak.
-//   A SKYWALL SHELTERS ITS LEE. Nothing downwind of a wall, in that lane, is
-//     touched at all. It's the only thing that stops a gust rather than
-//     surviving one.
+//   SOLID THINGS DON'T MOVE, BUT THEY DON'T STOP THE WIND EITHER. Crystallised
+//     tiles and skywalls stay where they are, and a tile pressed up against
+//     one has nowhere to go so it stays too — but the gust carries on past
+//     them and shoves everything loose further down the lane.
+//   A SKYWALL SHELTERS ITS LEE — if it's standing across the wind. A wall
+//     faces one way; wind running into its face stops there, and wind running
+//     along it goes by. It is the only thing that stops a gust.
 //   CORNERS COUNT. A tile that lands touching anything, even diagonally, stays
 //     up. A tile that lands touching nothing falls out of the sky. Diagonal
 //     contact is a state placement can never produce, which is exactly why the
@@ -43,7 +43,19 @@ const markOf = (cell, kind) => cell.type.marks.find((m) => m.kind === kind) || n
 /** Which way a direction-carrying mark points once its tile has been turned. */
 export const worldDir = (cell, m) => ((m.dir ?? 0) + cell.rot) % 4;
 
-export const isWall = (cell) => !!markOf(cell, 'wall');
+const wallOn = (cell) => markOf(cell, 'wall');
+export const isWall = (cell) => !!wallOn(cell);
+
+/**
+ * A wall only stops what runs into its face. Its mark points the way it looks,
+ * so the wall itself lies across that axis: a wind travelling along the same
+ * axis hits the flat of it and stops, and a wind travelling across slides past
+ * the end of it and carries on.
+ */
+export function shelters(cell, dir) {
+  const w = wallOn(cell);
+  return !!w && (worldDir(cell, w) & 1) === (dir & 1);
+}
 export const isRaft = (cell) => !!markOf(cell, 'raft');
 export const zephyrOn = (cell) => markOf(cell, 'zephyr');
 
@@ -82,8 +94,12 @@ export function gust(board, { dir, from = null, everywhere = false }) {
   const lane = (c) => (dx === 0 ? c.x : c.y);
 
   // --- what a skywall shelters ----------------------------------------------
-  // Walk each lane from the upwind end; once a wall has gone by, everything
-  // after it is in its lee and the wind never gets there.
+  // Walk each lane from the upwind end; once a wall standing ACROSS this wind
+  // has gone by, everything after it is in its lee and the wind never gets
+  // there. Nothing else stops a gust — it runs the length of the lane and
+  // shoves everything loose in it, crystallised ground included. Solid tiles
+  // don't move, but the wind doesn't stop at them either; what's behind them
+  // has nowhere to go, and what's beyond them goes anyway.
   const sheltered = new Set();
   const lanes = new Map();
   for (const c of reached) {
@@ -95,7 +111,7 @@ export function gust(board, { dir, from = null, everywhere = false }) {
     let blocked = false;
     for (const c of row) {
       if (blocked) sheltered.add(c);
-      if (isWall(c)) blocked = true;
+      if (shelters(c, dir)) blocked = true;
     }
   }
 
@@ -103,7 +119,7 @@ export function gust(board, { dir, from = null, everywhere = false }) {
 
   // --- the shove -------------------------------------------------------------
   for (const cell of exposed.slice().sort((a, b) => along(b) - along(a))) {
-    if (cell.anchored || isWall(cell)) continue;          // solid things stay
+    if (cell.anchored || isWall(cell)) continue;          // solid things stay put
     const to = { x: cell.x + dx, y: cell.y + dy };
     if (board.get(to.x, to.y)) continue;                  // pressed up against something
     const was = { x: cell.x, y: cell.y };

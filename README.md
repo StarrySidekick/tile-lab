@@ -59,21 +59,23 @@ earn stone, covering spends it, and you can't cover something that already
 scored. Buried tiles still pay 1 to whoever laid them at the end — **covering
 an opponent freezes them rather than erasing them**.
 
-**Girando** — the cloud kingdom, where the board itself is weather. You place
-and claim as in Carcassonne; the difference is that the country won't hold
-still. A **zephyr** blows its whole lane one square downwind — tiles that end up
-touching nothing fall out of the sky and go back in the deck, followers standing
-on a road get blown off it, and a zephyr caught by another zephyr fires in its
-turn. A **temple** is a monastery nobody owns and nothing scores: close the
-country around it and it exhales, moving *every* lane the way it faces. Shove
-one with a gust and it pays you 2. **Windvanes** and **vestibules** have four
-ways in and only two of them joined, and the wind decides which two, so a road
-that ran through one is a dead end after the next gust. A **skywall** is the
-only thing that stops any of it. Closing a feature *crystallises* it into
-permanent land — which is also how you build a windbreak. **Flutitantes** are
-terrain on a hull: the only tiles you may pick up and move yourself, and the
-only ones that survive being stranded in open sky. Nothing pays until it closes,
-and nothing unfinished pays at the end.
+**Girando** — the cloud kingdom, where the board itself is weather. You draw
+one tile and claim as in Carcassonne; the difference is that the country won't
+hold still.
+
+| | |
+|---|---|
+| **Zephyr** | A fifth of the deck. Played, it blows its lane one square downwind — the whole length of it. Crystallised ground doesn't move and what's jammed against it can't either, but the gust carries on past and shoves everything loose beyond. Tiles that land touching nothing (corners count) fall out of the sky and go back in the deck. Followers on a road are blown off; followers in a city ride it out. A zephyr caught by a gust fires in its turn |
+| **Temple** | A monastery nobody owns and nothing scores — there are no cloisters in the sky, every one is a temple. Close the country around it and it exhales: *every* lane moves the way it faces. Shove one with a gust and it pays you 2 |
+| **Abbazia** | Takes any edge, and **caps** everything it touches — a road ends there, a city walls itself against it, and both can finish without meeting anything. It's an ordinary tile, so the wind can take it away again, and then everything it was holding shut is unfinished and can be **scored a second time** |
+| **Flying machine** | Place one and a follower flies out along the lane it points down, landing on any feature out there *including one somebody already holds* — but not on a tile with a figure standing on it. A zephyr crossed on the way is a wind you're in: the flight turns and follows it, so a zephyr pointed the wrong way is a wall for fliers |
+| **Windvane / vestibule** | Four ways in, two of them joined, and the wind decides which two. A road that ran through one is a dead end after the next gust |
+| **Skywall** | The only thing that stops a gust, and only face-on: wind into its face stops dead, wind along it goes past |
+| **Flutitante** | Terrain on a hull. The only tiles you may pick up and move yourself, and the only ones that survive being stranded in open sky |
+
+Closing a feature *crystallises* it into permanent land, which is also how you
+build a windbreak. A city pays 1 a tile, exactly like a road. Nothing pays until
+it closes, and nothing unfinished pays at the end.
 
 **World** — the countryside gets the rest of its geography, in four families
 you can also switch on inside any other mode:
@@ -315,8 +317,8 @@ Tiles are grouped, and each group toggles on and off independently:
 - **Adventure sites** — wayshrines, ruins, campsites, merchants
 - **War terrain** — keeps, forts, hills, fords, beacons, muster fields
 - **Dangers** — stairs down, bandit camps, wolf dens, barrows
-- **Cloud kingdom** — zephyrs, temples, windvanes, vestibules, skywalls,
-  flutitantes and skyholds (Girando's pool)
+- **Cloud kingdom** — zephyrs, temples, Abbazias, flying machines, windvanes,
+  vestibules, skywalls, flutitantes and skyholds (Girando's pool)
 - **Mountains** — spurs, ridges, bends, massifs, passes, and one peak
 - **Forests** — edges, corners, deep forest and old growth, some with logs
 - **Lakes** — shores, corners, narrows, headlands

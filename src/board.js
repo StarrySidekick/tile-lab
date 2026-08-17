@@ -18,7 +18,7 @@
 // `scoredParts` as a set of cell-feature keys.
 // ---------------------------------------------------------------------------
 
-import { SIDE_STEP, opposite, CENTRE_FEATURES } from './tiles.js';
+import { SIDE_STEP, opposite, CENTRE_FEATURES, CAP, edgesMeet } from './tiles.js';
 
 export const keyOf = (x, y) => `${x},${y}`;
 
@@ -82,7 +82,7 @@ export class Board {
       const nb = this.neighbor(x, y, s);
       if (!nb) continue;
       touches++;
-      if (this.edgeAt(probe, s) !== this.edgeAt(nb, opposite(s))) return false;
+      if (!edgesMeet(this.edgeAt(probe, s), this.edgeAt(nb, opposite(s)))) return false;
     }
     return touches > 0 || this.size === 0;
   }
@@ -180,16 +180,36 @@ export class Board {
       if (!nb || nb === cell) continue;
       const mine = this.featAt(cell, s);
       const theirs = this.featAt(nb, opposite(s));
+      const myEdge = this.edgeAt(cell, s);
+      const theirEdge = this.edgeAt(nb, opposite(s));
+      const id = `${keyOf(nb.x, nb.y)}#${theirs}`;
+      // During a rebuild the neighbours are replayed in placement order, so a
+      // later one isn't wired up yet — it'll make this same join from its side.
+      const wired = this.parent.has(id);
+
+      // A wildcard edge CAPS rather than joins: the feature on the other side
+      // loses that open slot and can finish against nothing.
+      //
+      // Whichever of the pair is linked SECOND does the closing — `wired` is
+      // the test for that — so a cap is applied exactly once however the board
+      // was built. Without the guard a rebuild double-counts it, and a road
+      // with an Abbazia at each end never re-opens when one blows away.
+      if (theirEdge === CAP) {
+        if (mine != null && wired) this.data.get(this.find(`${k}#${mine}`)).open -= 1;
+        continue;
+      }
+      if (myEdge === CAP) {
+        if (theirs != null && wired) this.data.get(this.find(id)).open -= 1;
+        continue;
+      }
+
       if (mine == null || theirs == null) continue; // field-to-field seam
       // Placement guarantees matching edges, but the wind doesn't: it can
       // shove a road up against a city wall. A mismatched seam joins nothing
       // and closes nothing — both features stay open, facing a wall they can
       // never finish against, until something moves again.
-      if (this.edgeAt(cell, s) !== this.edgeAt(nb, opposite(s))) continue;
-      const id = `${keyOf(nb.x, nb.y)}#${theirs}`;
-      // During a rebuild the neighbours are replayed in placement order, so a
-      // later one isn't wired up yet — it'll make this same join from its side.
-      if (!this.parent.has(id)) continue;
+      if (myEdge !== theirEdge) continue;
+      if (!wired) continue;
       const root = this.union(`${k}#${mine}`, id);
       this.data.get(root).open -= 2; // both halves of the seam are now closed
     }
@@ -440,6 +460,16 @@ export class Board {
   markScored(d) {
     d.scored = true;
     for (const p of d.parts) this.scoredParts.add(p);
+  }
+
+  /**
+   * Un-finish a feature. Only one thing does this: an Abbazia that was capping
+   * something blows away, and what it was capping is open country again — and
+   * can be finished, and paid for, a second time.
+   */
+  unmark(d) {
+    d.scored = false;
+    for (const p of d.parts) this.scoredParts.delete(p);
   }
 
   /** Features closed by the tile just played at (x,y). Marks them scored. */
