@@ -44,9 +44,29 @@ function bind(g) {
   g.on((kind, data) => {
     sfx.play(kind);
     fx.on(kind, data, g);
+    // You clicked your own move, so you know where it went. The computer's you
+    // have to be shown, or you spend the turn hunting for what changed.
+    if (botTurn() && MOVES.has(kind)) {
+      const at = data.at || (g.lastPlaced ? { x: g.lastPlaced.x + 0.5, y: g.lastPlaced.y + 0.5 } : null);
+      if (at) renderer.glideTo(at.x - 0.5, at.y - 0.5);
+    }
   });
   return g;
 }
+
+const MOVES = new Set(['place', 'step', 'warp']);
+
+/**
+ * Where a tile or a follower comes from when it enters play: the preview, in
+ * world units. It's off the side of the canvas, which is exactly right — the
+ * thing you were looking at is where the thing you played comes from.
+ */
+fx.entryAt = () => {
+  const pv = $('preview').getBoundingClientRect();
+  const cv = canvas.getBoundingClientRect();
+  const [x, y] = renderer.toWorld(pv.left + pv.width / 2 - cv.left, pv.top + pv.height / 2 - cv.top);
+  return { x, y };
+};
 
 const spec = (id) => MODES.find((m) => m.id === id);
 
@@ -201,6 +221,7 @@ function nearBoard(c) {
 
 canvas.addEventListener('pointerdown', (e) => {
   const p = local(e);
+  renderer.glide = null;          // you take the camera back the moment you touch it
   pointers.set(e.pointerId, p);
   // A synthetic pointer (a test, mostly) has nothing to capture.
   try { canvas.setPointerCapture(e.pointerId); } catch { /* not a real pointer */ }
@@ -316,6 +337,7 @@ canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   if (e.shiftKey) { if (!botTurn()) game.rotate(e.deltaY > 0 ? 1 : -1); return; }
   if (game.interior) return;
+  renderer.glide = null;
   renderer.zoomAt(e.offsetX, e.offsetY, e.deltaY > 0 ? 0.9 : 1.1);
 }, { passive: false });
 

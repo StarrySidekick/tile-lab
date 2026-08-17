@@ -76,7 +76,7 @@ export class Strata extends Mode {
     this.tallest = Math.min(MAX_STACK, Math.max(this.tallest, cell.h));
     g.lastPlaced = cell;
     g.tile = null;
-    g.emit('place');
+    g.emit('place', { cells: [cell] });
     g.afterPlace(cell);
     return true;
   }

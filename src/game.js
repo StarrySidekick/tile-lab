@@ -463,7 +463,7 @@ export class Game {
       this.tile = null;
       this.say(`${this.player.name} played ${cell.type.id} at (${x}, ${y})${covering ? ` — level ${cell.h + 1}` : ''}.`);
     }
-    this.emit('place');
+    this.emit('place', { cells: [cell] });
     if (this.riverActive) this.advanceRiver(cell);
     this.checkBuilder(cell);
     this.afterPlace(cell);
@@ -534,7 +534,7 @@ export class Game {
     if (big) this.player.big--;
     this.useBig = false;
     this.say(`${this.player.name} claimed the ${type.feats[featIdx].type}${big ? ' with their big follower' : ''}.`);
-    this.emit('meeple');
+    this.emit('meeple', { feat: featIdx, player: this.current });
     this.endTurn();
     return true;
   }
@@ -572,7 +572,7 @@ export class Game {
     this.player.meeples++;
     if (big) this.player.big++;
     this.say(`${this.player.name} calls a follower home from (${x}, ${y}).`);
-    this.emit('meeple');
+    this.emit('meeple', { recall: true, player: this.current, at: { x: x + 0.5, y: y + 0.5 } });
     this.endTurn();
     return true;
   }
@@ -610,7 +610,11 @@ export class Game {
     if (w.big) this.player.big--;
     this.say(`${this.player.name}'s follower walks on to the ${t.type} at (${x}, ${y}).`);
     this.pendingWalk = null;
-    this.emit('step');
+    this.emit('step', {
+      from: { x: w.from.x + 0.5, y: w.from.y + 0.5 },
+      at: { x: x + 0.5, y: y + 0.5 },
+      key: `meeple:${x},${y}`, player: this.current,
+    });
     this.resumeTurn();
     return true;
   }
@@ -779,6 +783,12 @@ export class Game {
     for (const cell of [...this.board.cells.values()]) {
       if (cell.y < this.waterline || cell.anchored) continue;
       drowned.push(cell);
+    }
+    // Say goodbye before they go: the effect needs the tile it's drawing.
+    if (drowned.length) {
+      this.emit('drown', {
+        cells: drowned.map((c) => ({ x: c.x, y: c.y, type: c.type, rot: c.rot })),
+      });
     }
     for (const cell of drowned) this.board.remove(cell.x, cell.y);
     if (drowned.length) {

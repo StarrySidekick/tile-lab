@@ -151,8 +151,12 @@ export class Descent extends Mode {
       this.supplies -= dest.cost;
       this.game.say('Forced march — 1 supply spent.');
     }
+    const was = { x: this.hero.x + 0.5, y: this.hero.y + 0.62 };
     this.hero.x = x; this.hero.y = y;
-    this.game.emit(dest.steps > 1 ? 'warp' : 'step');
+    this.game.emit(dest.steps > 1 ? 'warp' : 'step', {
+      from: was, at: { x: x + 0.5, y: y + 0.62 }, key: `pawn:${this.hero.id}`,
+      style: { hero: true },
+    });
     this.arrive();
     return true;
   }
@@ -186,7 +190,7 @@ export class Descent extends Mode {
       else if (k === 'supplies') this.supplies += n;
       else if (k === 'relics') { this.relics.push('relic'); }
     }
-    this.game.emit('treasure');
+    this.game.emit('treasure', { at: { x: this.hero.x + 0.5, y: this.hero.y + 0.5 } });
     this.game.say(`${info.label || 'You find something'} — ${Object.entries(info.loot).map(([k, v]) => `+${v * multiplier} ${k}`).join(', ')}.`);
   }
 
@@ -207,7 +211,11 @@ export class Descent extends Mode {
       this.game.say(`${info.label}: you win, ${power} against ${threat}.`);
       const mult = this.relics.includes('lantern') && (kind === 'barrow' || kind === 'ruin') ? 2 : 1;
       this.take(info, mult);
-      this.game.emit('score', { points: info.score || 1 });
+      this.game.emit('score', {
+        points: info.score || 1, player: 0,
+        at: { x: this.hero.x + 0.5, y: this.hero.y + 0.5 },
+        cells: [{ x: this.hero.x, y: this.hero.y }],
+      });
     } else {
       const hurt = Math.max(1, threat - power);
       this.hp -= hurt;

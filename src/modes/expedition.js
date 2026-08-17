@@ -264,10 +264,13 @@ export class Expedition extends Mode {
     const opts = this.reachable(pawn);
     const dest = opts.get(keyOf(x, y));
     if (!dest) return false;
+    const was = { x: pawn.x + 0.5, y: pawn.y + 0.62 };
     pawn.x = x; pawn.y = y;
     const name = this.game.players[pawn.player].name;
     this.game.say(dest.warp ? `${name} warps between watchtowers.` : `${name} moves to (${x}, ${y}).`);
-    this.game.emit(dest.warp ? 'warp' : 'step');
+    this.game.emit(dest.warp ? 'warp' : 'step', {
+      from: was, at: { x: x + 0.5, y: y + 0.62 }, key: `pawn:${pawn.id}`, player: pawn.player,
+    });
     this.resolve(pawn);
     return true;
   }
@@ -339,7 +342,10 @@ export class Expedition extends Mode {
       if (info.score) {
         player.score += info.score;
         this.game.say(`${player.name} finds a ${info.label} in the cave +${info.score}`);
-        this.game.emit('treasure', { kind: m.kind });
+        this.game.emit('treasure', {
+          kind: m.kind, points: info.score, space: 'interior',
+          at: { x: cave.pos.x + 0.5, y: cave.pos.y + 0.5 },
+        });
       }
       if (m.kind === 'shaft') this.leaveCave(cave, 'climbs out through a shaft');
     }

@@ -67,7 +67,7 @@ See [Shared engine work](#shared-engine-work) for how each was actually done.
 
 ## 1. The Marches — war, battle, area control
 
-> **Built** — `src/modes/marches.js`. Area control ended up being done by *banner* flood-fill rather than by field, which needs no tile-format change and gets the supply rule working today; fields would make it finer-grained. The campaign is capped at twelve rounds and territory is counted every fourth, because continuous income compounded into meaningless four-figure scores. Muster chits are auto-spent when they'd win a fight — against a human, choosing to spend and bluffing about it is the interesting half, and that needs a prompt.
+> **Built** — `src/modes/marches.js`. Area control ended up being done by *banner* flood-fill rather than by field, which needs no tile-format change and gets the supply rule working today; fields would make it finer-grained. The campaign is capped at twelve rounds and territory is counted every fourth, because continuous income compounded into meaningless four-figure scores. Muster chits are auto-spent when they'd win a fight — against a human, choosing to spend and bluffing about it is the interesting half, and that needs a prompt. Cut-off ground is now drained of colour on the board, which the mode badly needed: supply is the rule the whole design turns on, and until the board said which of your tiles were paying you it was something you had to work out by eye every round.
 
 **Question it answers:** is the board more interesting as a *contested surface*
 than as a scoring one?

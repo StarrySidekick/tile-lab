@@ -50,6 +50,8 @@ export class Marches extends Mode {
   }
 
   setup() {
+    this.supplyDirty = true;
+    this.suppliedCells = null;
     this.units = [];
     this.nextId = 1;
     this.chits = this.game.players.map(() => 1);
@@ -97,6 +99,7 @@ export class Marches extends Mode {
     const claimed = this.raisesBanner(cell, me);
     if (claimed) {
       cell.banner = me;
+      this.flew(cell, me);
       this.game.say(`${this.game.player.name} raises a banner over (${cell.x}, ${cell.y}).`);
     }
     const mine = this.unitsOf(me);
@@ -172,9 +175,12 @@ export class Marches extends Mode {
 
     if (this.enemyAt(x, y, unit.player)) return this.battle(unit, x, y);
 
+    const was = { x: unit.x + 0.5, y: unit.y + 0.62 };
     unit.x = x; unit.y = y;
     this.claimUnderfoot(unit);
-    this.game.emit(dest.steps === 2 ? 'warp' : 'step');
+    this.game.emit(dest.steps === 2 ? 'warp' : 'step', {
+      from: was, at: { x: x + 0.5, y: y + 0.62 }, key: `pawn:${unit.id}`, player: unit.player,
+    });
     return true;
   }
 
@@ -185,6 +191,7 @@ export class Marches extends Mode {
     const contested = this.unitsAt(unit.x, unit.y).some((u) => u.player !== unit.player);
     if (contested) return;
     cell.banner = unit.player;
+    this.flew(cell, unit.player);
     for (const m of cell.type.marks) {
       if (MARKS[m.kind]?.muster) {
         this.chits[unit.player] = Math.min(MAX_CHITS, this.chits[unit.player] + 1);
@@ -235,6 +242,8 @@ export class Marches extends Mode {
     return true;
   }
 
+  onDrowned() { this.supplyDirty = true; }
+
   reinforce(player, why) {
     const keep = this.keeps[player];
     if (!keep) return;
@@ -253,6 +262,21 @@ export class Marches extends Mode {
     return true;
   }
 
+  /**
+   * Ground has changed hands. Say so, and mark the supply trace stale — every
+   * banner that moves can cut a region off or join one back up, and the board
+   * draws cut-off ground differently.
+   */
+  flew(cell, player) {
+    this.supplyDirty = true;
+    const region = this.regionAt(cell.x, cell.y);
+    this.game.emit('banner', {
+      player,
+      at: { x: cell.x, y: cell.y },
+      cells: region.map((c) => ({ x: c.x, y: c.y })),
+    });
+  }
+
   // --- area control ---------------------------------------------------------
 
   /** Contiguous runs of one banner. A run without your keep in it is cut off. */
@@ -260,6 +284,31 @@ export class Marches extends Mode {
     return this.game.board
       .regions((a, b) => a.banner != null && a.banner === b.banner)
       .filter((r) => r[0].banner != null);
+  }
+
+  regionAt(x, y) {
+    for (const r of this.bannerRegions()) {
+      if (r.some((c) => c.x === x && c.y === y)) return r;
+    }
+    return [];
+  }
+
+  /**
+   * Which banners can trace a path home. Recomputed only when something moved
+   * a banner, because the renderer asks per cell per frame and a flood fill
+   * per cell per frame is not a thing you do.
+   */
+  supplied() {
+    if (!this.supplyDirty && this.suppliedCells) return this.suppliedCells;
+    const out = new Set();
+    for (const region of this.bannerRegions()) {
+      const keep = this.keeps[region[0].banner];
+      if (!keep || !region.some((c) => c.x === keep.x && c.y === keep.y)) continue;
+      for (const c of region) out.add(keyOf(c.x, c.y));
+    }
+    this.suppliedCells = out;
+    this.supplyDirty = false;
+    return out;
   }
 
   /**
@@ -290,7 +339,11 @@ export class Marches extends Mode {
       const player = region[0].banner;
       const keep = this.keeps[player];
       const supplied = keep && region.some((c) => c.x === keep.x && c.y === keep.y);
-      if (!supplied) { tally[player].cut += region.length; continue; }
+      if (!supplied) {
+        tally[player].cut += region.length;
+        g.emit('levy', { player, supplied: false, cells: region.map((c) => ({ x: c.x, y: c.y })) });
+        continue;
+      }
       // Size, plus a bonus for the things worth holding ground for.
       let pts = region.length;
       for (const c of region) {
@@ -301,6 +354,11 @@ export class Marches extends Mode {
       }
       tally[player].held += region.length;
       tally[player].points += pts;
+      g.emit('levy', {
+        player, points: pts, supplied: true,
+        at: { x: keep.x + 0.5, y: keep.y + 0.5 },
+        cells: region.map((c) => ({ x: c.x, y: c.y })),
+      });
     }
 
     for (const p of g.players) {
@@ -380,7 +438,8 @@ export class Marches extends Mode {
   }
 
   cellOverlay(cell) {
-    return cell.banner == null ? null : { banner: cell.banner };
+    if (cell.banner == null) return null;
+    return { banner: cell.banner, cut: !this.supplied().has(keyOf(cell.x, cell.y)) };
   }
 
   status() {

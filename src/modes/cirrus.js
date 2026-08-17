@@ -136,6 +136,11 @@ export class Cirrus extends Mode {
     const doomed = [...board.cells.values()].filter((c) =>
       !c.anchored && board.degree(c.x, c.y) <= 1 && (c.round ?? 0) < this.game.round - 1);
 
+    if (doomed.length) {
+      this.game.emit('drift', {
+        cells: doomed.map((c) => ({ x: c.x, y: c.y, type: c.type, rot: c.rot })),
+      });
+    }
     for (const c of doomed) board.remove(c.x, c.y);
     if (doomed.length) {
       this.game.say(`The cloud thins — ${doomed.length} tile${doomed.length > 1 ? 's' : ''} drift away.`);

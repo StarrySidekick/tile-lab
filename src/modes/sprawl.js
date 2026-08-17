@@ -104,7 +104,7 @@ export class Sprawl extends Mode {
     }
     this.piece = null;
     g.tile = null;
-    g.emit('place');
+    g.emit('place', { cells: laid });
 
     // Every cell of the piece can close something, not just the anchor.
     for (const cell of laid) {

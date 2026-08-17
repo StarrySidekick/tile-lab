@@ -183,8 +183,12 @@ export class Adventure extends Mode {
       this.bag.supplies -= dest.cost;
       this.game.say(`Forced march off-road — 1 supply spent.`);
     }
+    const was = { x: p.x + 0.5, y: p.y + 0.62 };
     p.x = x; p.y = y;
-    this.game.emit(dest.byRoad && dest.steps === 2 ? 'warp' : 'step');
+    this.game.emit(dest.byRoad && dest.steps === 2 ? 'warp' : 'step', {
+      from: was, at: { x: x + 0.5, y: y + 0.62 }, key: `pawn:${p.id}`, player: p.player ?? 0,
+      style: { hero: !!p.hero, mounted: !!p.mounted },
+    });
     this.game.say(`${p.name} ${dest.steps === 2 ? 'travels' : 'moves'} to (${x}, ${y}).`);
     this.arrive(p);
     return true;
@@ -212,7 +216,7 @@ export class Adventure extends Mode {
       this.claimed.add(site.key);
       const info = MARKS[site.kind] || { label: site.kind };
       this.collect(info.loot);
-      if (info.loot) this.game.emit('treasure');
+      if (info.loot) this.game.emit('treasure', { at: { x: p.x + 0.5, y: p.y + 0.5 } });
       this.game.say(`${p.name} reaches the ${info.label}${lootText(info.loot)}`);
 
       if (site.kind === 'village') this.recruit(p);
@@ -299,7 +303,9 @@ export class Adventure extends Mode {
       inv.take(m);
       const info = MARKS[m.kind] || { label: m.kind };
       this.collect(info.loot);
-      if (info.loot) this.game.emit('treasure');
+      if (info.loot) {
+        this.game.emit('treasure', { space: 'interior', at: { x: inv.pos.x + 0.5, y: inv.pos.y + 0.5 } });
+      }
       this.game.say(`${p.name} finds the ${info.label}${lootText(info.loot)}`);
       if (m.kind === 'library') this.progress('relics');
       if (m.kind === 'shaft') this.leaveInside(p, 'climbs out through a shaft');

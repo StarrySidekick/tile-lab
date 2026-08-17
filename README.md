@@ -226,33 +226,53 @@ the point of it.
 
 ## Motion
 
-When something pays, the number floats off the tiles that paid it, in the
-colour of whoever was paid, and those tiles flash underneath it. That pairing
-is the point: a score you can see is worth less than a score you can *locate* —
-"+9" tells you how much, the flash tells you which city. Where a mode scores
-something with no place on the board (The Marches counting levies across the
-whole map) no number floats, because a "+14" over an unrelated tile is worse
-than no "+14" at all. The panel row bumps instead, and it bumps in every mode.
+Nothing on this board teleports any more.
 
-Three smaller ones came free from the same wiring: a gold square closing onto
-a tile as it lands, a ring where a follower is claimed, and a red one where you
-tried to play something illegal.
+**Scoring.** The number floats off the tiles that paid it, in the colour of
+whoever was paid, and those tiles flash underneath. That pairing is the point:
+a score you can see is worth less than a score you can *locate* — "+9" tells
+you how much, the flash tells you which city. Where a mode scores something
+with no place on the board, no number floats, because a "+14" over an
+unrelated tile is worse than none; the panel row bumps instead, and that works
+in every mode. **At the end**, where a dozen features settle in a single frame,
+they're paid out one at a time, a quarter-second apart, so the final score is
+a result rather than a number changing.
 
-`src/fx.js` holds them. It's a list of inert items — a kind, a position in
-world units, a birth time, a lifespan — spawned from the *same* event stream
-that drives the sound, so neither knows the other exists and either can be
-switched off with nothing else noticing. The drawing lives in `render.js` with
-the rest of the painting. **Score effects** in the panel turns them off, and
-they start off if your system asks for reduced motion.
+**Arriving and leaving.** A tile flies in from the preview — the thing you were
+just looking at — and lands slightly oversized, settling. In Strata it keeps
+going and rises onto the stack it covered. A follower hops in on an arc and
+hops back off when it's recalled; one that walks on (the wagon) crosses to its
+new feature rather than reappearing there. Pawns and companies walk their move.
+Tiles that leave do it visibly too: Cirrus's drift tumbles them off the edge,
+and the rising tide slides them under with the water going over them.
 
-Still scoped, roughly in order of what they'd buy: meeples walking to a feature
-rather than appearing on it, the tile flying in from the preview rather than
-materialising, a camera that eases to the computer's move instead of leaving
-you to find it, treasure effects inside caves (the interior has its own
-transform, so they need their own pass), the tide sliding rather than
-teleporting, drift blowing tiles off the board in Cirrus, and a proper endgame
-tally that walks the board feature by feature instead of settling the whole
-score in one frame.
+**Territory.** In The Marches a banner running out through a region shows you
+the shape of what you now hold, the levy count lights each region up before it
+says what it paid, and ground that can't trace a path home is drained of colour
+— it scores nothing, so it shouldn't look like ground that does.
+
+**The camera** eases to the computer's move when it lands off-screen, and stops
+the instant you touch the board. **The sea** lags the waterline and slides up to
+meet it. Small ones: a square closing onto a landed tile, a ring where a
+follower is claimed, a red one for an illegal move, and treasure rings inside
+caves — which need their own pass, because an interior draws through its own
+camera.
+
+`src/fx.js` holds all of it: inert items with a kind, a position in world
+units, a birth and a lifespan, spawned from the *same* event stream that drives
+the sound, so neither subscriber knows the other exists. Two things make
+animation possible in a renderer that otherwise paints only the current state —
+**veils** (a tile in flight must not also be sitting at its destination, so an
+effect can hide what it's animating, by key, until it lands) and **a birth in
+the future** (staggering is just an offset birth, which is how the endgame walks
+the board and how a banner sweeps a region). Drawing lives in `render.js` with
+the rest of the painting. **Score effects** in the panel turns the lot off, and
+it starts off if your system asks for reduced motion.
+
+Still scoped: the camera doesn't follow the endgame tally, so features light up
+off-screen; and the deliberate omissions are screen shake, particle bursts and
+confetti — wrong game, and they'd be the only loud thing in a palette that's
+restrained on purpose.
 
 ## Playing
 
@@ -399,6 +419,10 @@ computer player and a mode whose scoring it can't see. Both default to zero, so
 skipping them costs you a bot that plays the placement game and ignores your
 banners.
 
+`cellOverlay(cell)` is the other one worth knowing about: it's how a mode paints
+per-cell state without touching the renderer — a banner, a height, cloud, or
+whether that ground can still trace a path home.
+
 ### Testing
 
 Eleven modes is more than you can click through, and a change in `board.js`
@@ -424,11 +448,16 @@ something. A bot that can't beat random play is broken rather than gentle. The
 browser test has its own version of the question: that a bot takes its turns off
 the render loop unprompted, and that the action buttons go dead while it does.
 
-Two more things only exist in a browser and are checked there: that spreading
-two synthetic pointers zooms in, bringing them together zooms out, and neither
-gesture leaves a tile behind — a pinch read as a tap is the bug you'd ship —
-and that a closure puts a number and a flash on the board and bumps the panel
-row that changed.
+Input and motion only exist in a browser, so they're checked there too. The
+input block drives real pointer events rather than calling the game — a tap
+places, a drag pans, a spread zooms in and a pinch zooms out — and its
+load-bearing assertions are the negative ones: neither a drag nor a pinch may
+leave a tile behind, because a gesture read as a tap is the bug you'd ship.
+The motion block asks each effect to happen in the one mode where it can: a
+closure puts a number and a flash on the board and bumps the panel row, Cirrus
+blows a tile off the cloud, the tide takes one under, The Marches lights up a
+region as it counts it, and the endgame pays its features out over seconds
+rather than in a single frame.
 
 `package.json` exists only so Node treats `src/` as ES modules for those two
 scripts. The game itself still has no build step and no dependencies.

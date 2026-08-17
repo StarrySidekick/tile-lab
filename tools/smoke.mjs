@@ -229,8 +229,91 @@ for (const mode of modes) {
     if (!fx.kinds.includes('flash')) problems.push('no feature flash');
     if (!fx.bumped) problems.push('no panel bump');
   }
+  if (!fx.kinds.includes('tile')) problems.push('no tile flying in');
+  if (!fx.kinds.includes('figure')) problems.push('no follower in flight');
   if (problems.length) { failures++; console.log(`  ✗ score effects: ${problems.join(' · ')}`); }
   else console.log(`  ✓ score effects     ${fx.kinds.join(', ')} · ${fx.bumped} row bumped`);
+}
+
+// The rest of the motion, one mode each, because each one is the only place
+// its effect can happen: tiles blowing off the cloud, tiles going under the
+// water, a region lighting up as it's counted, and the endgame paying out one
+// feature at a time instead of all at once.
+for (const [what, mode, mech, kind] of [
+  ['drift', 'cirrus', null, 'fall'],
+  ['drown', 'classic', 'tide', 'fall'],
+  ['levy sweep', 'marches', null, 'sweep'],
+]) {
+  errors.length = 0;
+  await page.selectOption('#mode', mode);
+  if (mech) await page.check(`#mechanics input[data-mech="${mech}"]`);
+  await page.click('#newGame');
+  const got = await page.evaluate(async ([kind]) => {
+    const g = window.LAB.game;
+    const legal = () => {
+      const out = [];
+      const saved = g.rot;
+      for (const { x, y } of g.board.candidates(g.placeOpts())) {
+        for (let r = 0; r < 4; r++) { g.rot = r; if (g.canPlaceAt(x, y)) out.push({ x, y, rot: r }); }
+      }
+      g.rot = saved;
+      return out;
+    };
+    for (let i = 0; i < 120 && g.phase !== 'over'; i++) {
+      if (g.phase === 'market') g.takeFromMarket(0);
+      else if (g.phase === 'place') {
+        const s = legal()[0];
+        if (!s) break;
+        g.rot = s.rot;
+        g.cellClick(s.x, s.y);
+      } else if (g.phase === 'meeple') g.skipMeeple();
+      else if (g.phase === 'move') {
+        const w = g.walker;
+        const p = w.visiblePawns.find((q) => w.select(q));
+        const d = p ? [...w.reachable(p).values()] : [];
+        if (p && d.length) { g.selectPawn(p); g.movePawn(d[0].x, d[0].y); } else g.holdPosition();
+      } else break;
+      if (window.LAB.fx.items.some((e) => e.kind === kind)) return true;
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    return false;
+  }, [kind]);
+  if (mech) await page.uncheck(`#mechanics input[data-mech="${mech}"]`);
+  if (errors.length || !got) {
+    failures++;
+    console.log(`  ✗ ${what}: ${errors[0]?.split('\n')[0] || `no "${kind}" effect in ${mode}`}`);
+  } else console.log(`  ✓ ${what.padEnd(17)} ${mode}`);
+}
+
+// The endgame tally: many features settle in one frame, and they have to be
+// shown one at a time or the result is a number changing.
+{
+  errors.length = 0;
+  await page.selectOption('#mode', 'classic');
+  await page.click('#newGame');
+  const tally = await page.evaluate(() => {
+    const g = window.LAB.game;
+    for (let i = 0; i < 900 && g.phase !== 'over'; i++) {
+      if (g.phase === 'place') {
+        const s = g.board.legalPlacements(g.tile, g.placeOpts())[0];
+        if (!s) { g.finish(); break; }
+        g.rot = s.rot;
+        g.cellClick(s.x, s.y);
+      } else if (g.phase === 'meeple') {
+        const o = g.meepleOptions();
+        if (o.length) g.placeMeeple(o[0].i); else g.skipMeeple();
+      } else break;
+    }
+    const born = window.LAB.fx.items.filter((e) => e.kind === 'float').map((e) => e.born);
+    return { over: g.phase === 'over', n: born.length, spread: born.length ? Math.max(...born) - Math.min(...born) : 0 };
+  });
+  const problems = [];
+  if (errors.length) problems.push(errors[0].split('\n')[0]);
+  if (!tally.over) problems.push('the game never ended');
+  else if (tally.n < 2) problems.push(`only ${tally.n} endgame scores`);
+  else if (tally.spread < 200) problems.push(`${tally.n} scores landed within ${Math.round(tally.spread)}ms of each other`);
+  if (problems.length) { failures++; console.log(`  ✗ endgame tally: ${problems.join(' · ')}`); }
+  else console.log(`  ✓ endgame tally     ${tally.n} features over ${(tally.spread / 1000).toFixed(1)}s`);
 }
 
 // The computer player, which in the browser is a different claim from the one

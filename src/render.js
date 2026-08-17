@@ -37,6 +37,8 @@ export class Renderer {
     this.moveSpots = [];
     this.caveView = null;
     this.fx = null;         // an Effects list, if anyone has given us one
+    this.glide = null;      // a camera easing somewhere
+    this.shownWater = null; // where the sea has got to, chasing the waterline
     this.resize();
   }
 
@@ -73,7 +75,40 @@ export class Renderer {
     this.cam.y += wy - ny;
   }
 
-  centerOn(x, y) { this.cam.x = x + 0.5; this.cam.y = y + 0.5; }
+  centerOn(x, y) {
+    this.cam.x = x + 0.5;
+    this.cam.y = y + 0.5;
+    this.glide = null;
+  }
+
+  /**
+   * Ease the camera to a square instead of jumping to it. Used when the
+   * computer plays somewhere you weren't looking — a cut leaves you hunting
+   * for what changed, a glide tells you where it is on the way.
+   *
+   * Skipped when the square is already comfortably on screen, because the most
+   * annoying camera is one that moves when it didn't need to.
+   */
+  glideTo(x, y, dur = 480) {
+    const [sx, sy] = this.toScreen(x + 0.5, y + 0.5);
+    const m = this.cam.zoom * 1.2;
+    if (sx > m && sy > m && sx < this.w - m && sy < this.h - m) return false;
+    this.glide = {
+      x0: this.cam.x, y0: this.cam.y, x1: x + 0.5, y1: y + 0.5,
+      t0: performance.now(), dur,
+    };
+    return true;
+  }
+
+  glideStep() {
+    const g = this.glide;
+    if (!g) return;
+    const t = Math.min(1, (performance.now() - g.t0) / g.dur);
+    const k = t * t * (3 - 2 * t);                 // smoothstep: no jerk at either end
+    this.cam.x = g.x0 + (g.x1 - g.x0) * k;
+    this.cam.y = g.y0 + (g.y1 - g.y0) * k;
+    if (t >= 1) this.glide = null;
+  }
 
   /**
    * Paint one tile at a grid position — the one call every tile goes through.
@@ -117,6 +152,7 @@ export class Renderer {
 
   draw(game) {
     const ctx = this.ctx;
+    this.glideStep();
     ctx.clearRect(0, 0, this.w, this.h);
     this.drawBackdrop();
     if (game.options?.tide) this.drawWater(game);
@@ -125,6 +161,7 @@ export class Renderer {
 
     for (const cell of game.board.cells.values()) {
       if (!this.onScreen(cell.x, cell.y)) continue;
+      if (this.fx?.veiled(`tile:${cell.x},${cell.y}`)) continue;   // still in the air
       const overlay = game.m.cellOverlay?.(cell) || null;
       const lift = (overlay?.lift || 0) * 0.08;
       if (lift) this.drawStackShadow(cell, lift);
@@ -215,9 +252,12 @@ export class Renderer {
     const z = this.cam.zoom;
 
     if (overlay.banner != null) {
-      const color = PLAYER_COLORS[overlay.banner];
+      // Ground that can't trace a path home scores nothing, so it shouldn't
+      // look like ground that can: the colour drains out of it and the pennant
+      // hangs grey.
+      const color = overlay.cut ? '#6f665b' : PLAYER_COLORS[overlay.banner];
       ctx.save();
-      ctx.globalAlpha = 0.16;
+      ctx.globalAlpha = overlay.cut ? 0.10 : 0.16;
       ctx.fillStyle = color;
       ctx.fillRect(sx, sy, z, z);
       ctx.restore();
@@ -274,11 +314,20 @@ export class Renderer {
     }
   }
 
-  /** The rising tide: everything at or below the waterline is sea. */
+  /**
+   * The rising tide: everything at or below the waterline is sea.
+   *
+   * The waterline itself is a game rule and moves in whole squares; the water
+   * you see slides up to meet it, because a sea that teleports doesn't read as
+   * a sea. Purely a rendering lag — the rules never see this number.
+   */
   drawWater(game) {
     if (game.waterline == null) return;
     const ctx = this.ctx;
-    const [, sy] = this.toScreen(0, game.waterline);
+    if (this.shownWater == null) this.shownWater = game.waterline;
+    this.shownWater += (game.waterline - this.shownWater) * 0.06;
+    if (Math.abs(game.waterline - this.shownWater) < 0.004) this.shownWater = game.waterline;
+    const [, sy] = this.toScreen(0, this.shownWater);
     if (sy > this.h) return;
     const top = Math.max(0, sy);
     const g = ctx.createLinearGradient(0, top, 0, this.h);
@@ -404,6 +453,7 @@ export class Renderer {
   drawMeeples(game) {
     for (const cell of game.board.cells.values()) {
       if (!cell.meeple || !this.onScreen(cell.x, cell.y)) continue;
+      if (this.fx?.veiled(`meeple:${cell.x},${cell.y}`)) continue;   // on its way
       const spot = rotPoint(cell.type.spots[cell.meeple.feat], cell.rot);
       const [sx, sy] = this.toScreen(cell.x + spot[0], cell.y + spot[1]);
       drawMeeple(this.ctx, sx, sy, this.cam.zoom * 0.42, PLAYER_COLORS[cell.meeple.player]);
@@ -501,6 +551,7 @@ export class Renderer {
       const [cx, cy] = k.split(',').map(Number);
       if (!this.onScreen(cx, cy)) continue;
       group.forEach((p, i) => {
+        if (this.fx?.veiled(`pawn:${p.id}`)) return;      // mid-stride
         const off = group.length === 1 ? [0, 0]
           : [Math.cos(i / group.length * Math.PI * 2) * 0.22, Math.sin(i / group.length * Math.PI * 2) * 0.22];
         const [sx, sy] = this.toScreen(cx + 0.5 + off[0], cy + 0.62 + off[1]);
@@ -661,6 +712,11 @@ export class Renderer {
     lamp.addColorStop(1, isCity ? 'rgba(10,8,14,0.42)' : 'rgba(6,5,9,0.60)');
     ctx.fillStyle = lamp;
     ctx.fillRect(g.x, g.y, g.size, g.size);
+
+    // An interior has its own camera, so effects down here need their own pass
+    // through the same list — inside the clip, above the lamp, so treasure
+    // isn't dimmed by the dark it was found in.
+    this.drawEffects('interior', origin, g.zoom);
     ctx.restore();
 
     ctx.lineWidth = 2;
@@ -687,23 +743,29 @@ export class Renderer {
    * rest of the painting, so adding one is a case in this switch rather than a
    * new canvas call in a module that isn't about canvases.
    */
-  drawEffects() {
+  drawEffects(space = 'board', origin = null, zoom = this.cam.zoom) {
     if (!this.fx) return;
     const now = performance.now();
     const items = this.fx.live(now);
     if (!items.length) return;
     const ctx = this.ctx;
-    const z = this.cam.zoom;
+    const z = zoom;
+    const at = origin
+      ? (wx, wy) => origin(wx, wy)
+      : (wx, wy) => this.toScreen(wx, wy);
+    const visible = origin ? () => true : (x, y) => this.onScreen(x, y);
 
     ctx.save();
     for (const e of items) {
+      if ((e.space || 'board') !== space) continue;
+      if (now < e.born) continue;                 // staggered — not yet
       const t = Math.min(1, Math.max(0, (now - e.born) / e.life));
       switch (e.kind) {
         case 'float': {
           // Rises, slowing, and fades out over the last third — the number has
           // to be readable for most of its life or there's no point drawing it.
           const rise = ease(t) * 0.85;
-          const [sx, sy] = this.toScreen(e.x, e.y - rise);
+          const [sx, sy] = at(e.x, e.y - rise);
           if (sx < -80 || sy < -80 || sx > this.w + 80 || sy > this.h + 80) break;
           const pop = t < 0.16 ? 0.55 + 0.45 * (t / 0.16) : 1;
           const size = Math.max(15, z * 0.34) * pop;
@@ -726,23 +788,23 @@ export class Renderer {
           ctx.globalAlpha = a * 0.36;
           ctx.fillStyle = e.color;
           for (const c of e.cells) {
-            if (!this.onScreen(c.x, c.y)) continue;
-            const [sx, sy] = this.toScreen(c.x, c.y);
+            if (!visible(c.x, c.y)) continue;
+            const [sx, sy] = at(c.x, c.y);
             ctx.fillRect(sx, sy, z, z);
           }
           ctx.globalAlpha = a * 0.85;
           ctx.strokeStyle = e.color;
           ctx.lineWidth = 2.5;
           for (const c of e.cells) {
-            if (!this.onScreen(c.x, c.y)) continue;
-            const [sx, sy] = this.toScreen(c.x, c.y);
+            if (!visible(c.x, c.y)) continue;
+            const [sx, sy] = at(c.x, c.y);
             ctx.strokeRect(sx + 1.5, sy + 1.5, z - 3, z - 3);
           }
           break;
         }
 
         case 'ring': {
-          const [sx, sy] = this.toScreen(e.x, e.y);
+          const [sx, sy] = at(e.x, e.y);
           ctx.globalAlpha = (1 - t) * 0.8;
           ctx.strokeStyle = e.color;
           ctx.lineWidth = Math.max(2, z * 0.05) * (1 - t * 0.6);
@@ -754,12 +816,73 @@ export class Renderer {
 
         case 'land': {
           // A tile arriving: a square that closes onto the cell it landed in.
-          const [sx, sy] = this.toScreen(e.x, e.y);
+          const [sx, sy] = at(e.x, e.y);
           const grow = (1 + (1 - ease(t)) * 0.5) * z * 0.5;
           ctx.globalAlpha = (1 - t) * 0.7;
           ctx.strokeStyle = THEME.gold;
           ctx.lineWidth = Math.max(2, z * 0.04);
           ctx.strokeRect(sx - grow, sy - grow, grow * 2, grow * 2);
+          break;
+        }
+
+        case 'tile': {
+          // In from the preview, landing on the square you chose. The cell
+          // itself is veiled for exactly this long, so there's one tile on
+          // screen throughout rather than two or none.
+          const k = ease(t);
+          const wx = e.from.x + (e.to.x - e.from.x) * k;
+          const wy = e.from.y + (e.to.y - e.from.y) * k - (e.lift0 + (e.lift1 - e.lift0) * k);
+          const scale = 1 + (1 - k) * 0.22;                 // a shade oversized, settling
+          const s = z * scale;
+          const [sx, sy] = at(wx - 0.5, wy - 0.5);
+          ctx.globalAlpha = Math.min(1, 0.35 + t * 3);
+          this.paintTile(0, 0, e.rot, e.type, 'surface', s, () => [sx - (s - z) / 2, sy - (s - z) / 2]);
+          break;
+        }
+
+        case 'figure': {
+          // A follower crossing the board: a hop, because a straight slide
+          // reads as a bug and an arc reads as a decision.
+          const k = ease(t);
+          const wx = e.from.x + (e.to.x - e.from.x) * k;
+          const wy = e.from.y + (e.to.y - e.from.y) * k - Math.sin(t * Math.PI) * 0.5;
+          const [sx, sy] = at(wx, wy);
+          drawMeeple(ctx, sx, sy, z * 0.46, e.color, e.style || {});
+          break;
+        }
+
+        case 'fall': {
+          // Blown off the cloud, or taken by the water. Same effect, opposite
+          // moods: one tumbles sideways, the other slides straight down.
+          const k = ease(t);
+          const sink = e.how === 'sink';
+          const [sx, sy] = at(e.x + e.drift * k, e.y + (sink ? k * 0.55 : k * 0.9));
+          ctx.globalAlpha = (1 - t) * (sink ? 0.85 : 0.7);
+          const shrink = z * (1 - k * (sink ? 0.12 : 0.45));
+          ctx.save();
+          ctx.translate(sx + z / 2, sy + z / 2);
+          ctx.rotate(e.spin * k);
+          this.paintTile(0, 0, e.rot, e.type, 'surface', shrink, () => [-shrink / 2, -shrink / 2]);
+          if (sink) {
+            ctx.fillStyle = `rgba(48,84,110,${0.25 + k * 0.55})`;
+            ctx.fillRect(-shrink / 2, -shrink / 2, shrink, shrink);
+          }
+          ctx.restore();
+          break;
+        }
+
+        case 'sweep': {
+          // A colour running out through a region, one cell at a time.
+          if (!visible(e.x, e.y)) break;
+          const [sx, sy] = at(e.x, e.y);
+          const a = Math.sin(Math.min(1, t * 1.6) * Math.PI);
+          ctx.globalAlpha = a * 0.5;
+          ctx.fillStyle = e.color;
+          ctx.fillRect(sx, sy, z, z);
+          ctx.globalAlpha = a;
+          ctx.strokeStyle = e.color;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(sx + 1, sy + 1, z - 2, z - 2);
           break;
         }
 
