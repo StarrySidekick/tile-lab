@@ -1,0 +1,42 @@
+<!--
+  Tile Lab's mark: one tile, in the game's own palette (see src/theme.js).
+
+  It's the most recognisable face in the base set — a walled city corner with a
+  cart track bending past it — and it is drawn for SIXTEEN PIXELS rather than
+  for this file. Everything here is one of three big blocks in three different
+  hues (warm stone, olive field, pale road) so that when the detail dissolves
+  there is still a shape left: gold ring, warm mass in one corner, bright stroke
+  across the other. The first version of this had masonry courses and a roof and
+  it read as horizontal stripes in the tab.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <clipPath id="tile">
+      <rect x="3" y="3" width="58" height="58" rx="10" />
+    </clipPath>
+  </defs>
+
+  <!-- the night the board sits on, so the mark holds on a light tab bar too -->
+  <rect width="64" height="64" rx="14" fill="#17141d" />
+
+  <g clip-path="url(#tile)">
+    <!-- field -->
+    <rect x="3" y="3" width="58" height="58" fill="#7e8b52" />
+
+    <!-- the road, bending from the south edge out to the east: dark casing
+         first, pale surface on top, exactly the way the board draws one -->
+    <path d="M32 64 L32 40 Q32 32 40 32 L64 32" fill="none" stroke="#463b29" stroke-width="18" />
+    <path d="M32 64 L32 40 Q32 32 40 32 L64 32" fill="none" stroke="#dccaa4" stroke-width="11" />
+
+    <!-- the city corner: one solid quarter of stone, walled along its curve -->
+    <path d="M3 3 H36 A33 33 0 0 1 3 36 Z" fill="#8b7e63" />
+    <path d="M3 3 H36 A33 33 0 0 1 3 36 Z" fill="none" stroke="#4f4433" stroke-width="7" />
+    <path d="M36 3 A33 33 0 0 1 3 36" fill="none" stroke="#c6b593" stroke-width="2.5" />
+    <!-- one roof, so the stone reads as a town rather than as a blob -->
+    <path d="M11 22 L19 13 L27 22 Z" fill="#a05c3c" />
+    <rect x="14" y="20" width="10" height="6" fill="#ded2bb" />
+  </g>
+
+  <!-- the gold rim: the last thing still legible at 16 pixels -->
+  <rect x="3" y="3" width="58" height="58" rx="10" fill="none" stroke="#d4af5f" stroke-width="6" />
+</svg>

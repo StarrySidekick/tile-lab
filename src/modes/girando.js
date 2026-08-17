@@ -7,15 +7,28 @@
 // to the sky: you place tiles and claim features like Carcassonne, and then
 // the wind rearranges the country underneath you.
 //
-// THE ZEPHYR is the engine — sixteen of them in a seventy-two tile deck. Play
+// THE ZEPHYR is the engine — twenty of them in a seventy-two tile deck. Play
 // one and it blows down its lane: everything in that row or column, downwind,
-// slides along. Gusts STACK — a wind that runs over a zephyr pointing the same
-// way absorbs it and blows a square harder, up to three squares — and a zephyr
-// pointing anywhere else isn't absorbed but fires in its own turn, so a good
-// line of them is a chain reaction. Crystallised ground doesn't move and a tile
-// jammed against it has nowhere to go, but the wind carries on past and shoves
-// everything loose beyond. Tiles that end up touching nothing fall out of the
-// sky and go back in the deck.
+// slides along. Gusts STACK, and only one thing stacks them — a wind that runs
+// over a zephyr blowing the SAME way absorbs it and blows a square harder, up
+// to three. A zephyr blowing across the wind isn't absorbed but fires in its
+// own turn down its own lane, so a good line of them is a chain reaction; a
+// zephyr blowing straight back at the wind does nothing at all, because two
+// winds shoving the same lane in opposite directions is not weather, it's a
+// machine for throwing the board away. And no zephyr blows twice in one storm.
+//
+// FOUR OF THEM BLOW MORE THAN ONE WAY: two crosswinds, a trident and a compass
+// rose, one of each, opening two, three and four lanes at once out of the same
+// square. Tiles that end up touching nothing fall out of the sky and go back in
+// the deck.
+//
+// NOTHING CRYSTALLISES. Finishing a feature used to turn it to permanent land,
+// which meant every closure grew the board a skeleton the wind couldn't touch
+// and a long game slowly stopped being weather. Now only two things are rooted:
+// a temple, and a pair of sfera that have found each other. Everything else
+// stays loose for the whole game — including the city you just scored, which
+// the wind is free to pull apart again. When it does, the feature is simply
+// open country once more, and finishing it a second time pays a second time.
 //
 // FOLLOWERS ARE WEATHER TOO. Once a figure is on the board it never comes off
 // by choice: a gust blows it the same distance as everything else in its lane,
@@ -51,7 +64,10 @@
 // THE SKYWALL is the only thing that stops a gust — and only face on. A wall
 // stands across one axis: wind running into it stops dead and everything in
 // its lee is untouched, wind running along it goes straight past. Turning one
-// is deciding which way the country is allowed to be shoved.
+// is deciding which way the country is allowed to be shoved. It is not itself
+// rooted, though: a wall is shoved along like anything else, so the shelter it
+// casts is a thing that moves, and the safe ground behind it is only safe
+// until the next gust comes down the other axis.
 //
 // THE ABBAZIA takes any edge and CAPS everything it touches: a road running
 // into one ends there, a city walls itself off against it, and both can finish
@@ -77,11 +93,12 @@
 // base set has, because a country that keeps being rearranged needs more ways
 // to stop.
 //
-// The thesis is in one line: SCORING IS NOT GUARANTEED. Nothing pays until it
-// closes, nothing that hasn't closed pays at the end, an Abbazia blowing away
-// can un-finish what you already banked, and the wind is under no obligation
-// to leave your city where you built it. The temple and the island are the two
-// exceptions, and both of them are the sky's terms, not yours.
+// The thesis is in one line: SCORING IS NOT GUARANTEED, AND NOTHING IS BANKED.
+// Nothing pays until it closes, nothing that hasn't closed pays at the end,
+// and anything the wind pulls apart is unfinished again — which cuts both
+// ways, because unfinished country can be finished, and paid for, once more.
+// The temple and the island are the two exceptions, and both of them are the
+// sky's terms, not yours.
 // ---------------------------------------------------------------------------
 
 import { Mode } from './mode.js';
@@ -89,7 +106,7 @@ import { TILE_TYPES, MARKS, CENTRE_FEATURES, SIDE_STEP, opposite, buildDeck } fr
 import { PLAYER_COLORS } from '../theme.js';
 import { partOfScored, claimableFeatures } from '../mechanics.js';
 import {
-  storm, zephyrOn, worldDir, isRaft, isWall, isTemple, shelters, MAX_STRENGTH,
+  storm, zephyrDirs, worldDir, isRaft, isWall, isTemple, shelters, MAX_STRENGTH,
 } from '../wind.js';
 
 const DECK_SIZE = 72;        // a full Carcassonne set's worth of country
@@ -148,7 +165,6 @@ export class Girando extends Mode {
   setup() {
     this.flight = null;
     this.laid = 0;
-    this.crystals = 0;
     this.gusts = 0;
     this.fallen = 0;
     this.blowing = false;
@@ -156,8 +172,6 @@ export class Girando extends Mode {
     this.spheres = 0;          // half-spheres joined so far — six of them exist
     this.counting = false;     // a sphere closed this turn: count islands at the end
     this.paidRing = new Set(); // "temple|tile" pairs already paid this turn
-    const seed = this.game.board.get(0, 0);
-    if (seed) seed.anchored = true;          // the founding stone stays put
   }
 
   // --- placing --------------------------------------------------------------
@@ -166,10 +180,13 @@ export class Girando extends Mode {
     cell.round = this.game.round;
     this.laid++;
     this.payTemples([{ cell, from: null }], TEMPLE_LAID);
-    const z = zephyrOn(cell);
-    if (z) {
-      this.game.say(`${this.game.player.name} lets the zephyr out.`);
-      this.weather({ dir: worldDir(cell, z), from: { x: cell.x, y: cell.y } }, this.game.current);
+    const dirs = zephyrDirs(cell);
+    if (dirs.length) {
+      this.game.say(dirs.length > 1
+        ? `${this.game.player.name} lets the wind out ${dirs.length} ways at once.`
+        : `${this.game.player.name} lets the zephyr out.`);
+      const from = { x: cell.x, y: cell.y };
+      this.weather(dirs.map((dir) => ({ dir, from })), this.game.current);
     }
     this.joinSferas();
     // The flight is worked out after the weather, because the weather may have
@@ -344,8 +361,15 @@ export class Girando extends Mode {
       const over = board.get(x, y);
       if (!over) break;                          // open sky: nowhere to land
       path.push(over);
-      const z = zephyrOn(over);
-      if (z) dir = worldDir(over, z);            // you don't choose to ride it
+      // You don't choose to ride it. A wind already going your way changes
+      // nothing; one going across turns you; and one blowing straight back at
+      // you is the end of the flight — you can reach that square and no
+      // further, which is what makes a facing zephyr a wall for fliers.
+      const winds = zephyrDirs(over);
+      if (!winds.length || winds.includes(dir)) continue;
+      const turn = winds.find((d) => d !== opposite(dir));
+      if (turn == null) break;
+      dir = turn;
     }
     return path.length ? path : null;
   }
@@ -506,21 +530,17 @@ export class Girando extends Mode {
 
     const winners = this.game.board.majority(d);
     this.game.award(d, false, closer);
-    const bonus = this.crystallise(d);
+    const bonus = this.skyholds(d);
     if (bonus && winners.length) {
       for (const p of winners) this.game.players[p].score += bonus;
       this.game.say(`Skyholds in the ${d.type} → ${winners.map((p) => this.game.players[p].name).join(' & ')} +${bonus}`);
     }
   }
 
-  /** Everything in a finished feature turns to permanent land. */
-  crystallise(d) {
-    const board = this.game.board;
+  /** What the landmarks inside a finished feature are worth on top of it. */
+  skyholds(d) {
     let bonus = 0;
-    for (const cell of board.cellsOf(d)) {
-      if (cell.anchored) continue;
-      cell.anchored = true;
-      this.crystals++;
+    for (const cell of this.game.board.cellsOf(d)) {
       for (const m of cell.type.marks) bonus += MARKS[m.kind]?.score || 0;
     }
     return bonus;
@@ -529,12 +549,11 @@ export class Girando extends Mode {
   /**
    * A temple's income stops when the parish is full: eight tiles have arrived,
    * eight offerings have been paid, and there is nowhere left for a ninth to
-   * come from. It crystallises, and the keeper walks home.
+   * come from. The keeper walks home, and the building stands where it always
+   * stood — a temple was never movable, finished or not.
    */
   templeCloses(d) {
     const g = this.game;
-    const cell = g.board.get(d.at.x, d.at.y);
-    if (cell && !cell.anchored) { cell.anchored = true; this.crystals++; }
     const home = g.board.reclaim(d);
     for (const m of home) {
       g.players[m.player].meeples++;
@@ -556,7 +575,7 @@ export class Girando extends Mode {
    */
   liftable(x, y) {
     const cell = this.game.board.get(x, y);
-    if (!cell || !isRaft(cell) || cell.anchored || cell.fixed || cell.meeple) return false;
+    if (!cell || !isRaft(cell) || cell.fixed || cell.meeple) return false;
     return !partOfScored(this.game.board, cell);
   }
 
@@ -618,8 +637,7 @@ export class Girando extends Mode {
         if (!isWall(other)) continue;
         if (other.x === cell.x || other.y === cell.y) { value += 0.6; break; }
       }
-      const z = zephyrOn(cell);
-      if (z) value += this.gustValue(cell, worldDir(cell, z), player);
+      for (const d of zephyrDirs(cell)) value += this.gustValue(cell, d, player);
     }
     // Standing on an island only ever pays when a sphere closes — all of it on
     // the turn you close one yourself, and a fraction of it the rest of the
@@ -671,8 +689,7 @@ export class Girando extends Mode {
     for (let step = 1; step <= 24; step++) {
       const other = board.get(cell.x + dx * step, cell.y + dy * step);
       if (!other) continue;
-      const z = zephyrOn(other);
-      if (z && worldDir(other, z) === dir) strength = Math.min(MAX_STRENGTH, strength + 1);
+      if (zephyrDirs(other).includes(dir)) strength = Math.min(MAX_STRENGTH, strength + 1);
       // A follower about to be moved: ours is a risk, theirs is an opportunity,
       // and either way the further it travels the less likely it lands well.
       if (other.meeple && !isTemple(other)) {
@@ -681,7 +698,7 @@ export class Girando extends Mode {
         value += other.meeple.player === player ? -worse : worse * 0.7;
       }
       // Tiles the gust is about to park in one of our parishes.
-      if (!other.anchored && !other.fixed && !isTemple(other)) {
+      if (!other.fixed && !isTemple(other)) {
         value += this.templeValue(
           { x: other.x + dx * strength, y: other.y + dy * strength }, player, TEMPLE_BLOWN * 0.6);
       }
@@ -712,7 +729,7 @@ export class Girando extends Mode {
 
   /** Solid land reads hard-edged; everything else reads as weather. */
   cellOverlay(cell) {
-    const out = cell.anchored || cell.fixed ? { crystal: true } : { cloud: true };
+    const out = cell.fixed || isTemple(cell) ? { crystal: true } : { cloud: true };
     if (isRaft(cell)) out.raft = true;
     return out;
   }
@@ -733,9 +750,9 @@ export class Girando extends Mode {
   }
 
   status() {
-    const solid = [...this.game.board.cells.values()].filter((c) => c.anchored || c.fixed).length;
+    const rooted = [...this.game.board.cells.values()].filter((c) => c.fixed || isTemple(c)).length;
     const isles = Math.max(0, this.game.board.groups().length - 1);
-    return `${this.laid} tiles laid · ${solid} solid · ${this.game.board.size - solid} still cloud`
+    return `${this.laid} tiles laid · ${rooted} rooted · ${this.game.board.size - rooted} loose`
       + ` · ${isles} island${isles === 1 ? '' : 's'} adrift`;
   }
 

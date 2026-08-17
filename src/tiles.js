@@ -60,6 +60,14 @@ const sfera = (side = N) => ({ type: 'sfera', sides: [side] });
  */
 const mark = (kind, on = null, dir = null) => ({ kind, on, dir });
 
+/**
+ * A zephyr blows one way, usually. The special ones blow two, three or all
+ * four at once — one gust down each lane, out of the same tile — so the mark
+ * carries a LIST of directions and `dir` is just the first of them, kept so
+ * that everything which only knows about single-facing marks still works.
+ */
+const zephyr = (dirs = [N]) => ({ kind: 'zephyr', on: null, dir: dirs[0], dirs });
+
 // --- World features ---------------------------------------------------------
 // Each spans tiles and merges like a city does, but scores its own way.
 //
@@ -214,13 +222,22 @@ export const TILE_TYPES = [
   { id: 'Ka', n: 2, group: 'cloud', name: 'Skyhold',    feats: [city([N, W])],  marks: [mark('skyhold', 0)] },
 
   // Gusts, pointing north on the tile and wherever you turn it in the world.
-  // Twelve of them, on every kind of ground there is: wind that only ever
-  // arrived on empty fields would be wind you could plan around.
-  { id: 'Kz',  n: 5, group: 'cloud', name: 'Zephyr',        feats: [],                        marks: [mark('zephyr', null, N)] },
-  { id: 'Kzr', n: 4, group: 'cloud', name: 'Zephyr road',   feats: [road([E, W])],            marks: [mark('zephyr', null, N)] },
-  { id: 'Kzb', n: 3, group: 'cloud', name: 'Zephyr bend',   feats: [road([S, E])],            marks: [mark('zephyr', null, N)] },
-  { id: 'Kzc', n: 3, group: 'cloud', name: 'Zephyr wall',   feats: [city([W])],               marks: [mark('zephyr', null, N)] },
-  { id: 'Kzt', n: 1, group: 'cloud', name: 'Zephyr gate',   feats: [city([S]), road([E, W])], marks: [mark('zephyr', null, N)] },
+  // Sixteen single-facing ones, on every kind of ground there is: wind that
+  // only ever arrived on empty fields would be wind you could plan around.
+  { id: 'Kz',  n: 5, group: 'cloud', name: 'Zephyr',        feats: [],                        marks: [zephyr([N])] },
+  { id: 'Kzr', n: 4, group: 'cloud', name: 'Zephyr road',   feats: [road([E, W])],            marks: [zephyr([N])] },
+  { id: 'Kzb', n: 3, group: 'cloud', name: 'Zephyr bend',   feats: [road([S, E])],            marks: [zephyr([N])] },
+  { id: 'Kzc', n: 3, group: 'cloud', name: 'Zephyr wall',   feats: [city([W])],               marks: [zephyr([N])] },
+  { id: 'Kzt', n: 1, group: 'cloud', name: 'Zephyr gate',   feats: [city([S]), road([E, W])], marks: [zephyr([N])] },
+
+  // The four winds that blow more than one way at once — one gust per lane,
+  // out of the same square, all in the turn it's played. One of each, because
+  // a compass rose in a seventy-two tile deck should be a thing that happens
+  // once and gets talked about afterwards.
+  { id: 'Kzx', n: 1, group: 'cloud', name: 'Crosswind',     feats: [], marks: [zephyr([N, E])] },
+  { id: 'Kzy', n: 1, group: 'cloud', name: 'Split wind',    feats: [], marks: [zephyr([N, S])] },
+  { id: 'Kzw', n: 1, group: 'cloud', name: 'Trident wind',  feats: [], marks: [zephyr([N, E, W])] },
+  { id: 'Kzq', n: 1, group: 'cloud', name: 'Compass rose',  feats: [], marks: [zephyr([N, E, S, W])] },
 
   // The sfera: one edge is half a sphere and meets nothing but its other half.
   // Join two and the sky starts counting islands, for the rest of the game.
@@ -453,9 +470,9 @@ export const MARKS = {
   mouth:     { label: 'The lake',  score: 0, note: 'Where the river ends.' },
 
   // cloud
-  skyhold: { label: 'Skyhold', score: 3, note: 'Crystallises the moment its city closes.' },
+  skyhold: { label: 'Skyhold', score: 3, note: 'Pays a bonus to whoever holds its city when it closes.' },
   zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane when played, and again whenever the wind reaches it. Gusts stack up to three squares.' },
-  wall:    { label: 'Skywall', score: 0, note: 'Immovable, and it stops a wind that runs into its face. Wind along it passes by.' },
+  wall:    { label: 'Skywall', score: 0, note: 'Stops a wind that runs into its face; wind along it passes by. It is shoved along like anything else, so the shelter moves with it.' },
   abbazia: { label: 'Abbazia', score: 0, note: 'Caps every feature it touches — and un-caps them if the wind takes it away.' },
   flier:   { label: 'Flying machine', score: 0, note: 'Place it and a follower may fly out along it, riding any zephyr it crosses.' },
   raft:    { label: 'Flutitante', score: 0, note: 'Move it instead of playing a tile. It floats — the wind can strand it in open sky.' },

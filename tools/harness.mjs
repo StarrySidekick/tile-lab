@@ -314,15 +314,17 @@ function checkWind() {
     if (at(c, 0, -4) || r.fell.length !== 1) return fail('a tile touching nothing falls', JSON.stringify(r.fell));
   }
 
-  // A skywall shelters its lee, and doesn't move itself.
+  // A skywall shelters its lee — and is shoved along like everything else, so
+  // the shelter it casts is a thing that moves.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
     lay(b, 0, -1, 'Kl');                    // the wall
-    lay(b, 0, -2, 'U');                     // behind it, from the wind's side
+    lay(b, 0, -3, 'U');                     // behind it, with a square to spare
+    lay(b, 1, -3, 'U');                     // and a neighbour, so nothing falls
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (!at(b, 0, -1)) return fail('a skywall does not move', 'it blew away');
-    if (!at(b, 0, -2)) return fail('a skywall shelters its lee', 'the sheltered tile moved');
+    if (!at(b, 0, -3)) return fail('a skywall shelters its lee', 'the sheltered tile moved');
+    if (at(b, 0, -1) || !at(b, 0, -2)) return fail('a skywall is shoved along', 'it stood still');
   }
 
   // Solid ground is a windbreak: nothing shifts into an occupied square.
@@ -348,7 +350,7 @@ function checkWind() {
     if (!after || (after.rot & 1) !== 1) return fail('a vane swings onto the wind axis', `rot ${before} -> ${after && after.rot}`);
   }
 
-  // A zephyr caught by the wind fires in its turn.
+  // A zephyr caught ACROSS the wind fires in its turn.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');                     // the one we set off, pointing north
@@ -356,6 +358,42 @@ function checkWind() {
     lay(b, 1, -2, 'U');
     const reports = storm(b, { dir: 0, from: { x: 0, y: 0 } });
     if (reports.length < 2) return fail('a blown zephyr fires in its turn', `${reports.length} gust(s)`);
+  }
+
+  // …but a zephyr caught HEAD ON does nothing: the two brace against each
+  // other. Left to retrigger, a facing pair takes turns shoving the same lane
+  // apart until both ends of it have fallen out of the sky.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // north
+    lay(b, 0, -1, 'Kz', 2);                 // straight back at it, south
+    lay(b, 1, -1, 'U');                     // a neighbour so nothing falls
+    const reports = storm(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (reports.length !== 1) return fail('a facing zephyr does not retrigger', `${reports.length} gust(s)`);
+  }
+
+  // And no zephyr blows twice in one storm, however the chain comes back round.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // north
+    lay(b, 0, -1, 'Kz', 1);                 // east
+    lay(b, 1, -1, 'Kz', 3);                 // west — pointed straight back at it
+    lay(b, 1, -2, 'U');
+    const reports = storm(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (reports.length > 3) return fail('each zephyr blows once per storm', `${reports.length} gust(s)`);
+  }
+
+  // A compass rose opens all four lanes out of one square.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kzq');
+    for (const [x, y] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) lay(b, x, y, 'U');
+    for (const [x, y] of [[1, -2], [2, 1], [-1, 2], [-2, -1]]) lay(b, x, y, 'U');
+    const dirs = [0, 1, 2, 3].map((dir) => ({ dir, from: { x: 0, y: 0 } }));
+    storm(b, dirs);
+    const out = [[0, -2], [2, 0], [0, 2], [-2, 0]].filter(([x, y]) => at(b, x, y)).length;
+    if (out !== 4) return fail('a compass rose blows all four lanes', `${out}/4 moved`);
+    if (!at(b, 0, 0)) return fail('the rose stays where it is', 'it blew itself away');
   }
 
   // Followers ride their own tile: it moves, they move, and neither notices.
@@ -497,7 +535,7 @@ function checkWind() {
     if (road.tiles.size !== 1) return fail('a mismatched seam joins nothing', `road spans ${road.tiles.size}`);
   }
 
-  console.log('  ✓ lanes, corners, walls, windbreaks, crystals, vanes, chains, stacking, followers, temples, locks, Abbazias, bad seams');
+  console.log('  ✓ lanes, corners, walls, windbreaks, crystals, vanes, chains, head-on, once-per-storm, the rose, stacking, followers, temples, locks, Abbazias, bad seams');
 }
 
 // --- runs -------------------------------------------------------------------

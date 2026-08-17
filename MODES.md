@@ -149,7 +149,15 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 >
 > **Scarcity is what lets the count pay full price, and that took a wrong turn to find.** Built first as a standing rule — once any sphere closed, islands paid at the end of *every* round thereafter — it measured at 0 to 492 island points a game across twenty games. Whoever's follower happened to be standing on the big piece when it broke off collected its size thirty times over and nothing else in the game mattered; the brake it needed (a tile pays a given player once) worked, but it was a brake bolted onto an annuity. Tying the count to the sphere instead is the better shape of the same idea and needs no brake at all: twelve sfera makes six spheres, so six counts, and a thing that happens six times in a game can afford to be worth a lot. Around 3.7 spheres actually close in a bot game, and each count pays about 6 points to somebody.
 >
-> **Where it landed.** Twenty bot games, per game: temple 28.1, island 20.6, cities 11.8, roads 0.6, skyholds 0.5 — 62 points across two players, scores 0–105, three streams that can't all be chased at once. Closures are up from 0.65 to 2.25 a game. A sharp bot beats random play 37–3 in forty games, which says the economies are readable rather than noise: it prices parishes, half-spheres, island majorities and gust lanes through `botPlaceBonus`.
+> **Where the third pass landed.** Twenty bot games, per game: temple 28.1, island 20.6, cities 11.8, roads 0.6, skyholds 0.5 — 62 points across two players, scores 0–105, three streams that can't all be chased at once. Closures up from 0.65 to 2.25 a game, and a sharp bot beating random play 37–3 in forty.
+>
+> **Fourth pass: the skeleton comes out.** Three changes, and the third is the one that matters.
+>
+> - **A chain reaction was throwing the board away, and it wasn't emergent, it was a missing rule.** Two zephyrs facing each other took turns firing: A shoved the lane north, which reached B, which fired south, which reached A, which fired north, ten times over until everything at both ends of the lane had sailed off into open sky. The fix says out loud what the stacking rule already implied — a gust is amplified by a zephyr blowing *its* way and by nothing else. One blowing across still fires, down its own lane, which is the chain reaction worth having. One blowing straight back does nothing; the two brace. And no zephyr blows twice in one storm, tracked against the cell rather than the square, because the wind moves zephyrs while the storm is still going. A cascade is now finite rather than merely capped.
+> - **Four winds that blow more than one way.** A crosswind, a split wind, a trident and a compass rose — one of each — opening two, three and four lanes at once out of the same square. The mark carries a list of directions instead of one, so `storm()` takes a list of openers and the whole fan is a single weather event rather than four in a row.
+> - **Nothing crystallises.** Closing a feature used to turn its tiles to permanent land, and that was load-bearing in the wrong direction: every closure grew the board a skeleton the wind couldn't touch, so a long game quietly stopped being weather. Now the rooted list is a temple and a joined pair of sfera, and that's all — the skywall moves too, so the shelter it casts is a thing that slides around. A city you scored can be pulled apart, and when it is, it's open country again worth finishing a second time.
+>
+> **What taking the skeleton out actually did.** The board shatters. Islands at the end of a game went from 3.3 to 7.7, and island income from 20.6 to 50.1 a game — over half the total, because a sphere closing now finds a sky in eight pieces rather than three. Tiles genuinely lost stayed flat at 5 a game, which is the interesting part: the wind isn't destroying more, it's *fragmenting* more. Per game now: island 50.1, temple 31.1, cities 12.1, skyholds 1.9, roads 0.6 — 96 across two players, scores 11–118, and a sharp bot beating random 36–4. Whether a permanently shattered sky is the mode or a step too far is a table question, not a harness one; the knob if it's too much is putting crystallisation back on skyholds alone, so finished *landmarks* root and finished ordinary country doesn't.
 
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
@@ -677,9 +685,10 @@ A few things the harness noticed that are worth watching for at the table:
   games, where Classic runs 28 and 45. That's the thesis working (nothing pays
   until it closes, and the wind keeps things from closing) but it's close to
   the edge: if a game can end with everyone on 4, the wind is winning too
-  often. The knobs, in the order I'd turn them: how many zephyrs are in the
-  deck, whether a gust moves one square or shoves until it hits something, and
-  whether crystallising should pay a tile bonus at the end after all.
+  often. *Four passes later it scores 48 a player and the question has
+  inverted* — see the Girando entry above for where the points now come from,
+  and note that the new risk is the opposite one: a sky that shatters into
+  eight islands and pays mostly for standing on them.
 - **Marches** is capped at twelve rounds because uncapped income compounds into
   meaningless numbers. If the campaign feels short, raise the cap before you
   touch the scoring — the round count is the tuning knob, not the points.

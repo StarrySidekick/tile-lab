@@ -14,17 +14,28 @@
 //
 // The rules that make a gust a game rather than a shuffle:
 //
-//   IT PICKS UP STRENGTH. A gust that runs over a zephyr pointing the same way
-//     absorbs it and blows a square harder — one, two, three squares, and no
-//     further. A zephyr pointing some other way isn't absorbed; it fires in
-//     its own turn, which is how a line of them becomes a chain reaction.
-//   SOLID THINGS DON'T MOVE, BUT THEY DON'T STOP THE WIND EITHER. Crystallised
-//     tiles, skywalls, temples and joined sfera stay where they are, and a
-//     tile with nowhere to go stays too — but the gust carries on past them
+//   IT PICKS UP STRENGTH — AND ONLY FROM ITS OWN KIND. A gust that runs over
+//     a zephyr blowing the same way absorbs it and blows a square harder: one,
+//     two, three squares, and no further. That is the only thing that makes a
+//     gust travel further. A zephyr blowing ACROSS the wind isn't absorbed; it
+//     fires in its own turn, down its own lane, which is how a line of them
+//     becomes a chain reaction. And a zephyr blowing straight INTO the wind
+//     does nothing at all — the two brace against each other. Head-on used to
+//     retrigger, and two facing zephyrs then took turns shoving the same lane
+//     apart until everything at both ends of it had fallen out of the sky.
+//   NO ZEPHYR BLOWS TWICE IN ONE STORM. Not per direction, not per gust: the
+//     whole cascade is one weather event, and a zephyr contributes each of its
+//     directions to it once. It's the other half of what stops a chain from
+//     running away, and it's what makes a chain finite rather than merely
+//     capped.
+//   SOLID THINGS DON'T MOVE, BUT THEY DON'T STOP THE WIND EITHER. A temple, a
+//     joined sfera and ground a mode has anchored all stay where they are, and
+//     a tile with nowhere to go stays too — but the gust carries on past them
 //     and shoves everything loose further down the lane.
 //   A SKYWALL SHELTERS ITS LEE — if it's standing across the wind. A wall
 //     faces one way; wind into its face stops there, wind along it goes by. It
-//     is the only thing that stops a gust.
+//     is the only thing that stops a gust — and it is not itself rooted: the
+//     wall is shoved along with everything else, so the shelter moves with it.
 //   CORNERS COUNT. A tile that lands touching anything, even diagonally, stays
 //     up. A tile that lands touching nothing falls out of the sky. Diagonal
 //     contact is a state placement can never produce, which is exactly why the
@@ -41,10 +52,14 @@
 //     along behind whatever's in front of it instead of piling up.
 // ---------------------------------------------------------------------------
 
-import { SIDE_STEP, NO_MEEPLE } from './tiles.js';
+import { SIDE_STEP, NO_MEEPLE, opposite } from './tiles.js';
 
-/** A cascade has to stop somewhere: zephyrs blowing zephyrs blowing zephyrs. */
-export const MAX_GUSTS = 10;
+/**
+ * A backstop, not the rule. What ends a cascade is that no zephyr blows twice
+ * in one storm (see `storm`); this is only here so that a bug in that
+ * bookkeeping is a short storm rather than a hung tab.
+ */
+export const MAX_GUSTS = 16;
 
 /** Three squares is as hard as the sky blows, however many zephyrs agree. */
 export const MAX_STRENGTH = 3;
@@ -58,16 +73,30 @@ const wallOn = (cell) => markOf(cell, 'wall');
 export const isWall = (cell) => !!wallOn(cell);
 export const isRaft = (cell) => !!markOf(cell, 'raft');
 export const zephyrOn = (cell) => markOf(cell, 'zephyr');
+
+/**
+ * Every way a zephyr blows, in world directions. Most blow one way; the four
+ * special ones blow two, three or all four at once, and each of those is a
+ * separate gust down a separate lane out of the same square.
+ */
+export function zephyrDirs(cell) {
+  const z = zephyrOn(cell);
+  if (!z) return [];
+  return (z.dirs || [z.dir ?? 0]).map((d) => (d + cell.rot) % 4);
+}
 export const isTemple = (cell) => cell.type.feats.some((f) => f.type === 'temple');
 
 /** Weathervanes and vestibules: four ways in, and the wind picks the two. */
 export const swings = (cell) => !!cell.type.swing;
 
 /**
- * Everything the wind can't move: ground that has crystallised, a wall, a
- * temple, and a sfera the mode has locked because it found its other half.
+ * Everything the wind can't move, and it's a short list on purpose: a temple,
+ * a sfera the mode has locked because it found its other half, and ground a
+ * mode has anchored for reasons of its own. Everything else in the sky is
+ * loose, skywalls included — a wall stops the wind without standing still in
+ * it.
  */
-export const immovable = (cell) => !!cell.anchored || !!cell.fixed || isWall(cell) || isTemple(cell);
+export const immovable = (cell) => !!cell.anchored || !!cell.fixed || isTemple(cell);
 
 /**
  * A wall only stops what runs into its face. Its mark points the way it looks,
@@ -129,10 +158,12 @@ export function gust(board, { dir, from = null, everywhere = false }) {
     let blocked = false;
     for (const c of row) {
       if (blocked) { sheltered.add(c); continue; }
-      const z = zephyrOn(c);
-      if (z) {
-        if (worldDir(c, z) === dir) strength = Math.min(MAX_STRENGTH, strength + 1);
-        else report.zephyrs.push(c);              // points elsewhere: it fires next
+      for (const d of zephyrDirs(c)) {
+        // Blowing our way: absorbed, and the gust hardens.
+        if (d === dir) { strength = Math.min(MAX_STRENGTH, strength + 1); continue; }
+        // Blowing straight back at us: the two brace, and nothing comes of it.
+        if (d === opposite(dir)) continue;
+        report.zephyrs.push({ cell: c, dir: d });  // across the wind: it fires next
       }
       force.set(c, strength);
       report.strength = Math.max(report.strength, strength);
@@ -228,23 +259,48 @@ function landingFeature(cell, wasType) {
 }
 
 /**
- * A gust, plus every gust it sets off — a zephyr the wind reached that points
- * somewhere else fires in its turn, from wherever it ended up. Capped, because
- * two zephyrs pointed at each other are a perpetual motion machine.
+ * A gust, plus every gust it sets off — a zephyr the wind reached that blows
+ * across it fires in its turn, from wherever it ended up.
+ *
+ * `first` is one spec or a list of them: a zephyr that blows more than one way
+ * opens the storm with a gust down each of its lanes, and they belong to the
+ * same weather event rather than to several in a row.
+ *
+ * The bookkeeping that matters is `fired`. Each zephyr contributes each of its
+ * directions to a storm ONCE — tracked against the cell itself, not its
+ * square, because the wind moves zephyrs around while the storm is still
+ * going. Without it a chain is only bounded by `cap`, and "bounded by the cap"
+ * is what a tile sailing ten squares off the edge of the world looks like from
+ * the inside.
  *
  * Reports come back in the order they happened, so the caller can pay for them
  * and narrate them in the order a player watched them.
  */
 export function storm(board, first, cap = MAX_GUSTS) {
   const out = [];
-  const queue = [first];
+  const queue = Array.isArray(first) ? first.slice() : [first];
+  const fired = new Map();                               // cell -> Set of directions
+
+  const once = (cell, dir) => {
+    let seen = fired.get(cell);
+    if (!seen) fired.set(cell, seen = new Set());
+    if (seen.has(dir)) return false;
+    seen.add(dir);
+    return true;
+  };
+
+  for (const spec of queue) {
+    const src = spec.from && board.get(spec.from.x, spec.from.y);
+    if (src) once(src, spec.dir);
+  }
+
   while (queue.length && out.length < cap) {
     const g = gust(board, queue.shift());
     out.push(g);
-    for (const cell of g.zephyrs) {
-      if (board.get(cell.x, cell.y) !== cell) continue;    // it fell, or was buried
-      const z = zephyrOn(cell);
-      if (z) queue.push({ dir: worldDir(cell, z), from: { x: cell.x, y: cell.y } });
+    for (const { cell, dir } of g.zephyrs) {
+      if (board.get(cell.x, cell.y) !== cell) continue;   // it fell, or was buried
+      if (!once(cell, dir)) continue;
+      queue.push({ dir, from: { x: cell.x, y: cell.y } });
     }
   }
   return out;

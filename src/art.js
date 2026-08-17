@@ -1511,7 +1511,19 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     ctx.stroke();
   }
 
-  type.marks.forEach((m, i) => drawMark(ctx, m.kind, type.markSpots[i], 0.46, L, m.dir));
+  type.marks.forEach((m, i) => {
+    // A zephyr that blows more than one way is drawn as one gust per quarter,
+    // pushed out toward its own edge and shrunk so four of them fit without
+    // running into each other. One drawing, four facings, same as always.
+    if (m.dirs && m.dirs.length > 1) {
+      for (const d of m.dirs) {
+        const [vx, vy] = SIDE_VEC[d];
+        drawMark(ctx, m.kind, [0.5 + vx * 0.24, 0.5 + vy * 0.24], 0.32, L, d);
+      }
+      return;
+    }
+    drawMark(ctx, m.kind, type.markSpots[i], 0.46, L, m.dir);
+  });
 
   ctx.lineWidth = 0.02;
   // Deliberately no tile outline. Now that features merge across seams, a box

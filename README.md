@@ -65,21 +65,25 @@ hold still, and neither will the people standing on it.
 
 | | |
 |---|---|
-| **Zephyr** | Sixteen of them in a seventy-two tile deck. Played, one blows its lane downwind — the whole length of it. Gusts **stack**: a wind that runs over a zephyr pointing the same way absorbs it and blows a square harder, up to three; one pointing anywhere else isn't absorbed and fires in its own turn, so a line of them is a chain. Crystallised ground doesn't move and what's jammed against it can't either, but the gust carries on past and shoves everything loose beyond. Tiles that land touching nothing (corners count) fall out of the sky and go back in the deck |
+| **Zephyr** | Twenty of them in a seventy-two tile deck. Played, one blows its lane downwind — the whole length of it. Gusts **stack**, and only one thing stacks them: a wind that runs over a zephyr blowing the *same* way absorbs it and blows a square harder, up to three. One blowing *across* isn't absorbed and fires in its own turn, so a line of them is a chain; one blowing straight *back* does nothing, because the two brace against each other. And no zephyr blows twice in one storm. Rooted things don't move and what's jammed against them can't either, but the gust carries on past and shoves everything loose beyond. Tiles that land touching nothing (corners count) fall out of the sky and go back in the deck |
+| **The four winds** | One crosswind, one split wind, one trident and one compass rose — each opens two, three or four lanes at once out of the same square, in the turn it's played. One of each in the deck |
 | **Followers** | Weather too. Once a figure is on the board it never comes off by choice: a gust blows it as far as everything else in its lane and it takes up whatever it lands in — its own kind of feature if there is one, anything claimable if not, and simply lying on the tile holding nothing if there's nothing there. Blown over open sky it goes back to its owner's hand, and that is the only way home. A figure inside a temple is indoors and the wind can't reach it |
-| **Temple** | A monastery with no cloisters left in the sky — every one is a temple. Claim it and it pays by the tile: **1** every time somebody *lays* a tile in the eight squares around it, **2** every time the wind *blows* one in. It cannot be moved. When the parish fills, it crystallises and the keeper walks home |
+| **Temple** | A monastery with no cloisters left in the sky — every one is a temple. Claim it and it pays by the tile: **1** every time somebody *lays* a tile in the eight squares around it, **2** every time the wind *blows* one in. It cannot be moved, and the figure inside it is the only one the weather can't take. When the parish fills, the income stops and the keeper walks home |
 | **Sfera** | Twelve of them, each half a sphere on one edge, and that edge meets nothing but another sfera's. Join two and they **lock forever** — nothing moves them again — and the sky looks down and **counts the islands**: whoever has the most figures on a broken-off piece of country scores a point for each of its tiles, ties paying both. Once, then and there. Twelve sfera makes six spheres, so **six counts in a whole game**, which is what lets each one pay full price — it's a moment you play toward and can be beaten to, not an income. Resolved at the end of the turn the sphere closed on, after everything else that turn did, so a follower blown off an island a moment before wasn't there and one flown out to it was |
 | **Abbazia** | Takes any edge, and **caps** everything it touches — a road ends there, a city walls itself against it, and both can finish without meeting anything. It's an ordinary tile, so the wind can take it away again, and then everything it was holding shut is unfinished and can be **scored a second time** |
 | **Flying machine** | Place one and a follower flies out along the lane it points down, landing on any feature out there *including one somebody already holds* — but not on a tile with a figure standing on it. A zephyr crossed on the way is a wind you're in: the flight turns and follows it, so a zephyr pointed the wrong way is a wall for fliers |
 | **Windvane / vestibule** | Four ways in, two of them joined, and the wind decides which two. A road that ran through one is a dead end after the next gust |
-| **Skywall** | The only thing that stops a gust, and only face-on: wind into its face stops dead, wind along it goes past |
+| **Skywall** | The only thing that stops a gust, and only face-on: wind into its face stops dead, wind along it goes past. It isn't rooted, though — a wall is shoved along like anything else, so the shelter it casts moves with it, and safe ground is only safe until the next gust comes down the other axis |
 | **Flutitante** | Terrain on a hull. The only tiles you may pick up and move yourself, and the only ones that survive being stranded in open sky |
 
-Closing a feature *crystallises* it into permanent land, which is also how you
-build a windbreak. Cities pay the ordinary 2 a tile, and the deck carries more
-end caps than the base set and no four-sided city, because a country that keeps
-being rearranged needs more ways to stop. Nothing pays until it closes, and
-nothing unfinished pays at the end — the temple and the island are the two
+**Nothing crystallises.** Only two things in the sky are rooted — a temple, and
+a pair of sfera that have found each other. Everything else stays loose for the
+whole game, the city you just scored included, and when the wind pulls one apart
+it is simply open country again: unfinished, and worth finishing a second time.
+Cities pay the ordinary 2 a tile, and the deck carries more end caps than the
+base set and no four-sided city, because a country that keeps being rearranged
+needs more ways to stop. Nothing pays until it closes, nothing unfinished pays
+at the end, and nothing is ever banked — the temple and the island are the two
 exceptions, and both of them are the sky's terms rather than yours.
 
 **World** — the countryside gets the rest of its geography, in four families
@@ -343,9 +347,9 @@ Tiles are grouped, and each group toggles on and off independently:
 - **Adventure sites** — wayshrines, ruins, campsites, merchants
 - **War terrain** — keeps, forts, hills, fords, beacons, muster fields
 - **Dangers** — stairs down, bandit camps, wolf dens, barrows
-- **Cloud kingdom** — zephyrs, sferas, temples, Abbazias, flying machines,
-  windvanes, vestibules, skywalls, flutitantes, city end caps and skyholds
-  (Girando's pool)
+- **Cloud kingdom** — zephyrs (including four that blow more than one way at
+  once), sferas, temples, Abbazias, flying machines, windvanes, vestibules,
+  skywalls, flutitantes, city end caps and skyholds (Girando's pool)
 - **Mountains** — spurs, ridges, bends, massifs, passes, and one peak
 - **Forests** — edges, corners, deep forest and old growth, some with logs
 - **Lakes** — shores, corners, narrows, headlands
