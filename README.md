@@ -234,6 +234,27 @@ time, which is the only evidence that the three settings are a ladder rather
 than three flavours. Against a person who is thinking, it is beatable — that's
 the point of it.
 
+## Which version am I looking at?
+
+The panel header carries a build stamp — `v0.9.0 · b12` — and it is the first
+thing to check when a change doesn't seem to have arrived.
+
+It's stamped into two files by `node tools/stamp.mjs`: `src/version.js`, which
+is compiled into the page, and `version.json`, which the page fetches at boot
+with the cache switched off. On load it compares them. If they agree, the badge
+is quiet gold and you're running what the server has. If they disagree the
+badge goes solid amber and reads `v0.9.0 · b11 → v0.9.0 · b12` — your browser
+handed you an old copy, click it to reload, and hard-refresh if it comes back
+saying the same thing.
+
+That pair is the point. A version number baked into a page can only tell you
+what the page thinks it is; it cannot tell you the page itself is stale, which
+is the one thing you actually want to know after a deploy.
+
+`node tools/stamp.mjs 0.10.0 -m "what changed"` sets a version and a label; with
+no arguments it just bumps the build number. The browser test fails if the two
+files ever fall out of step.
+
 ## Motion
 
 Nothing on this board teleports any more.
@@ -445,6 +466,7 @@ node tools/harness.mjs              # every mode + modifier, headless
 node tools/harness.mjs marches 200  # one mode, 200 seeded games
 node tools/smoke.mjs                # each mode booted in a real browser
 node tools/smoke.mjs --shots        # …and screenshotted to tools/shots/
+node tools/stamp.mjs -m "what's new"  # bump the build stamp before pushing
 ```
 
 The harness plays random legal moves to completion and fails on anything that

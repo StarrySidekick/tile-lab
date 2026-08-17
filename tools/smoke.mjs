@@ -137,6 +137,31 @@ for (const mode of modes) {
   }
 }
 
+// The build stamp, which exists to answer "is this the version I just pushed"
+// — so the thing worth checking is that it says something, and that it agrees
+// with the copy the server hands out uncached.
+{
+  errors.length = 0;
+  const v = await page.evaluate(async () => {
+    const live = await (await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' })).json();
+    return {
+      badge: document.getElementById('version').textContent.trim(),
+      stale: document.getElementById('version').classList.contains('stale'),
+      built: window.LAB.VERSION,
+      live,
+    };
+  });
+  const problems = [];
+  if (errors.length) problems.push(errors[0].split('\n')[0]);
+  if (!/^v\d+\.\d+\.\d+ · b\d+$/.test(v.badge)) problems.push(`badge reads "${v.badge}"`);
+  if (v.stale) problems.push('the page thinks it is stale against its own server');
+  if (v.built.build !== v.live.build || v.built.version !== v.live.version) {
+    problems.push(`src/version.js (b${v.built.build}) and version.json (b${v.live.build}) disagree — re-run tools/stamp.mjs`);
+  }
+  if (problems.length) { failures++; console.log(`  ✗ build stamp: ${problems.join(' · ')}`); }
+  else console.log(`  ✓ build stamp       ${v.badge}`);
+}
+
 // The input layer itself, through real pointer events rather than by calling
 // the game — everything else in this file drives the rules directly, so a tap
 // that stopped placing tiles would sail straight past it. Three gestures, and

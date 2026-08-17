@@ -20,6 +20,7 @@ import { THEME } from './theme.js';
 import { TILE_TYPES, TILES, GROUPS } from './tiles.js';
 import { Sfx, SOUND_NAMES } from './audio.js';
 import { Effects } from './fx.js';
+import { VERSION } from './version.js';
 
 const canvas = document.getElementById('board');
 const renderer = new Renderer(canvas);
@@ -69,6 +70,36 @@ fx.entryAt = () => {
 };
 
 const spec = (id) => MODES.find((m) => m.id === id);
+
+// --- the build stamp ---------------------------------------------------------
+
+/**
+ * What this page was built from, and whether it's the current one.
+ *
+ * The badge alone can only ever report what the running code thinks it is —
+ * which is no help at all when the browser has quietly served you last week's
+ * copy. So the same stamp is fetched from version.json past the cache and the
+ * two are compared: if they disagree, what you're looking at is stale, and the
+ * badge says so instead of confidently showing the wrong number.
+ */
+function showVersion() {
+  const el = $('version');
+  const stamp = `v${VERSION.version} · b${VERSION.build}`;
+  el.textContent = stamp;
+  el.title = `Built ${VERSION.date}${VERSION.label ? ` — ${VERSION.label}` : ''}`;
+
+  fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((live) => {
+      if (!live || (live.build === VERSION.build && live.version === VERSION.version)) return;
+      el.classList.add('stale');
+      el.textContent = `${stamp} → v${live.version} · b${live.build}`;
+      el.title = 'Your browser is running an older copy than the server has. '
+        + 'Click to reload; if it comes back the same, hard-refresh (shift+reload).';
+      el.onclick = () => window.location.reload();
+    })
+    .catch(() => { /* offline, or opened without a server: nothing to compare to */ });
+}
 
 // --- computer players --------------------------------------------------------
 //
@@ -720,6 +751,7 @@ function frame(now = 0) {
   requestAnimationFrame(frame);
 }
 
+showVersion();
 renderGroups();
 onModeChange();
 game = bind(new Game({ players: 2, groups: [...enabledGroups] }));
@@ -731,5 +763,5 @@ frame();
 window.LAB = {
   get game() { return game; },
   get bots() { return bots; },
-  renderer, newGame, THEME, sfx, fx, MODES, MECHANICS,
+  renderer, newGame, THEME, sfx, fx, MODES, MECHANICS, VERSION,
 };

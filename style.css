@@ -67,6 +67,27 @@ h2 {
   padding-bottom: 4px;
 }
 
+/* The build stamp. Loud enough to read from across the desk without hunting,
+   because the question it answers — "is this the version I just pushed?" — is
+   one you ask in a hurry. It goes amber when the server has a newer one. */
+.ver {
+  font: 600 11px/1.5 ui-monospace, monospace;
+  letter-spacing: 0.04em;
+  text-transform: none;          /* the h1 uppercases everything in it */
+  color: var(--accent);
+  border: 1px solid var(--accent-dim);
+  border-radius: 4px;
+  padding: 1px 6px;
+  vertical-align: 2px;
+  white-space: nowrap;
+}
+.ver.stale {
+  color: #241d0c;
+  background: var(--accent);
+  border-color: var(--accent);
+  cursor: pointer;
+}
+
 #phase { margin: 5px 0 0; font-size: 13px; color: var(--dim); }
 .dim { color: var(--dim); }
 .hint { margin: 2px 0 0; font-size: 10.5px; color: var(--dim); line-height: 1.4; }
