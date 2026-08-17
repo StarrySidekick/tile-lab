@@ -18,7 +18,7 @@
 // `scoredParts` as a set of cell-feature keys.
 // ---------------------------------------------------------------------------
 
-import { SIDE_STEP, opposite } from './tiles.js';
+import { SIDE_STEP, opposite, CENTRE_FEATURES } from './tiles.js';
 
 export const keyOf = (x, y) => `${x},${y}`;
 
@@ -181,6 +181,11 @@ export class Board {
       const mine = this.featAt(cell, s);
       const theirs = this.featAt(nb, opposite(s));
       if (mine == null || theirs == null) continue; // field-to-field seam
+      // Placement guarantees matching edges, but the wind doesn't: it can
+      // shove a road up against a city wall. A mismatched seam joins nothing
+      // and closes nothing — both features stay open, facing a wall they can
+      // never finish against, until something moves again.
+      if (this.edgeAt(cell, s) !== this.edgeAt(nb, opposite(s))) continue;
       const id = `${keyOf(nb.x, nb.y)}#${theirs}`;
       // During a rebuild the neighbours are replayed in placement order, so a
       // later one isn't wired up yet — it'll make this same join from its side.
@@ -229,6 +234,35 @@ export class Board {
     if (under) this.rebuild(); else this.link(cell);
     return cell;
   }
+
+  /**
+   * Slide a tile one cell over, keeping everything about it — who laid it,
+   * who's standing on it, whether it's anchored, and its place in the
+   * placement order, so a rebuild still replays the board in the order it was
+   * built. The target must be empty; resolving collisions is the caller's job,
+   * and so is calling `rebuild()` once the dust settles.
+   *
+   * This is the one operation that can produce a board no sequence of
+   * placements could: tiles touching only at the corners, and seams whose
+   * edges disagree.
+   */
+  shift(from, to) {
+    const fromKey = keyOf(from.x, from.y);
+    const toKey = keyOf(to.x, to.y);
+    const cell = this.cells.get(fromKey);
+    if (!cell || this.cells.has(toKey)) return null;
+    this.cells.delete(fromKey);
+    for (const f of cell.type.feats.keys()) {
+      if (this.scoredParts.delete(`${fromKey}#${f}`)) this.scoredParts.add(`${toKey}#${f}`);
+    }
+    cell.x = to.x;
+    cell.y = to.y;
+    this.cells.set(toKey, cell);
+    return cell;
+  }
+
+  /** Is anything at all in the eight cells around this one? Corners count. */
+  touching(x, y) { return this.surroundCount(x, y) > 0; }
 
   /**
    * Lift the top tile off a cell. Returns the removed cell, or null.
@@ -415,7 +449,7 @@ export class Board {
     if (!cell) return done;
     const roots = new Set();
     cell.type.feats.forEach((f, i) => {
-      if (f.type !== 'monastery') roots.add(this.find(`${keyOf(x, y)}#${i}`));
+      if (!CENTRE_FEATURES.has(f.type)) roots.add(this.find(`${keyOf(x, y)}#${i}`));
     });
     for (const r of roots) {
       const d = this.data.get(r);
@@ -427,7 +461,7 @@ export class Board {
         const c = this.get(x + dx, y + dy);
         if (!c) continue;
         c.type.feats.forEach((f, i) => {
-          if (f.type !== 'monastery') return;
+          if (!CENTRE_FEATURES.has(f.type)) return;
           const d = this.data.get(this.find(`${keyOf(c.x, c.y)}#${i}`));
           if (d && !d.scored && this.surroundCount(c.x, c.y) === 8) { this.markScored(d); done.push(d); }
         });

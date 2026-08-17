@@ -236,6 +236,13 @@ const VOICES = {
     s.noise({ dur: 0.45, gain: 0.05, type: 'highpass', freq: 4000 });
   },
 
+  // A gust crossing the board: air, not a note. Long enough to cover the
+  // tiles sliding, quiet enough to sit under everything else that fires.
+  gust: (s) => {
+    s.noise({ dur: 0.55, gain: 0.13, type: 'bandpass', freq: 420, sweepTo: 1700, q: 0.8 });
+    s.tone({ freq: 190, slideTo: 96, dur: 0.5, type: 'sine', gain: 0.07, cutoff: 600 });
+  },
+
   // Illegal move — dull, non-punishing.
   deny: (s) => {
     s.tone({ freq: 120, slideTo: 84, dur: 0.13, type: 'square', gain: 0.11, cutoff: 420 });

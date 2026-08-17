@@ -224,7 +224,7 @@ export class Game {
       this.tilesLeft = this.tilesPerTurn;
       this.builderUsed = false;
     }
-    if (!this.riverActive && this.deck.length === 0 && !this.market?.length) {
+    if (!this.riverActive && !this.m.anythingLeft()) {
       const other = this.m.someoneStillInside(this.current);
       if (other != null) { this.current = other; return this.startTurn(); }
       return this.finish();

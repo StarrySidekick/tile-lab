@@ -6,7 +6,7 @@
 // Colours all come from theme.js — edit that file to re-vibe the game.
 // ---------------------------------------------------------------------------
 
-import { SIDE_MID } from './tiles.js';
+import { SIDE_MID, SIDE_VEC } from './tiles.js';
 import { THEME, PLAYER_COLORS, PLAYER_NAMES } from './theme.js';
 import { LIGHT, spin, shadow, noShadow } from './light.js';
 import { featureShape } from './shape.js';
@@ -271,17 +271,30 @@ function drawCity(ctx, f, L) {
 
 // --- roads ------------------------------------------------------------------
 
-function roadPath(ctx, f) {
+function roadPath(ctx, f, short = false) {
   ctx.beginPath();
   if (f.sides.length === 1) {
     const [mx, my] = SIDE_MID[f.sides[0]];
     ctx.moveTo(mx, my);
-    ctx.lineTo(0.5, 0.5);
-  } else {
+    // A stub that stops short of the middle is a road that DOESN'T connect —
+    // which is the entire question a windvane asks, and it has to be visible
+    // at a glance or the tile is a shrug.
+    const k = short ? 0.52 : 1;
+    ctx.lineTo(mx + (0.5 - mx) * k, my + (0.5 - my) * k);
+  } else if (f.sides.length === 2) {
     const [ax, ay] = SIDE_MID[f.sides[0]];
     const [bx, by] = SIDE_MID[f.sides[1]];
     ctx.moveTo(ax, ay);
     ctx.quadraticCurveTo(0.5, 0.5, bx, by);
+  } else {
+    // Three or four arms of ONE road, which is a junction you drive through
+    // rather than a junction that ends anything. Spokes, and the centre dot
+    // that the two-stub case draws is deliberately absent — nothing stops.
+    for (const s of f.sides) {
+      const [mx, my] = SIDE_MID[s];
+      ctx.moveTo(mx, my);
+      ctx.lineTo(0.5, 0.5);
+    }
   }
 }
 
@@ -293,17 +306,69 @@ const ROAD_STYLE = {
 
 // A road is a road. It lies flat on the ground and gets no lighting of its own
 // — the only thing on the board with height is something you could walk into.
-function drawRoad(ctx, f, terrain) {
+function drawRoad(ctx, f, terrain, short = false) {
   const s = ROAD_STYLE[terrain] || ROAD_STYLE.surface;
   ctx.lineCap = 'round';
-  roadPath(ctx, f);
+  roadPath(ctx, f, short);
   ctx.lineWidth = s.outer;
   ctx.strokeStyle = s.edge;
   ctx.stroke();
-  roadPath(ctx, f);
+  roadPath(ctx, f, short);
   ctx.lineWidth = s.inner;
   ctx.strokeStyle = s.core;
   ctx.stroke();
+}
+
+/**
+ * A temple: a monastery with the ownership taken out and a direction put in.
+ * The ring is open on the side it faces, and the pennant on the roof points
+ * the way it will breathe when the country closes around it.
+ */
+function drawTemple(ctx, f, L) {
+  const cx = 0.5, cy = 0.52, r = 0.29;
+  const face = (f.face ?? 0) & 3;
+  const a = -Math.PI / 2 + face * Math.PI / 2;         // 0=N, clockwise
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx - L.x * 0.045, cy - L.y * 0.045, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(13,11,17,0.34)';
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#6a7350';
+  ctx.fill();
+
+  // The precinct ring, left open to the quarter it faces.
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = THEME.cityWall;
+  ctx.lineWidth = 0.075;
+  ctx.beginPath(); ctx.arc(cx, cy, r, a + 0.5, a - 0.5 + Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = THEME.wallLit;
+  ctx.lineWidth = 0.035;
+  ctx.beginPath(); ctx.arc(cx, cy - 0.018, r, a + 0.5, a - 0.5 + Math.PI * 2); ctx.stroke();
+
+  // A squat shrine, and the pennant that gives the mode its weather.
+  ctx.fillStyle = THEME.plaster;
+  ctx.strokeStyle = THEME.timber;
+  ctx.lineWidth = 0.022;
+  ctx.beginPath(); ctx.rect(cx - 0.11, cy - 0.10, 0.22, 0.22); ctx.fill(); ctx.stroke();
+  roofTri(ctx, cx, cy - 0.10, 0.30, 0.16, THEME.roof);
+
+  ctx.save();
+  ctx.translate(cx, cy - 0.20);
+  ctx.rotate(a + Math.PI / 2);
+  ctx.strokeStyle = THEME.timber;
+  ctx.lineWidth = 0.03;
+  ctx.beginPath(); ctx.moveTo(0, 0.06); ctx.lineTo(0, -0.20); ctx.stroke();
+  ctx.fillStyle = THEME.teal;
+  ctx.beginPath();
+  ctx.moveTo(0.01, -0.20); ctx.lineTo(0.22, -0.10); ctx.lineTo(0.01, -0.01);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+
+  ctx.restore();
 }
 
 // --- monastery --------------------------------------------------------------
@@ -644,27 +709,67 @@ const MARK_ART = {
     ctx.ellipse(0.20, 0.36, 0.26, 0.13, 0, 0, Math.PI * 2);
     ctx.fill();
   },
-  vane(ctx) {
-    ctx.strokeStyle = THEME.timber;
-    ctx.lineWidth = 0.08;
-    ctx.beginPath(); ctx.moveTo(0, 0.44); ctx.lineTo(0, -0.44); ctx.stroke();
-    ctx.fillStyle = THEME.teal;
+  /**
+   * A zephyr: three curls of moving air and the arrowhead they're headed for.
+   * Drawn pointing north and turned by `drawMark`, so one drawing serves all
+   * four facings and the tile can be rotated on top of that.
+   */
+  zephyr(ctx) {
+    ctx.strokeStyle = 'rgba(228,240,248,0.85)';
+    ctx.lineWidth = 0.09;
+    ctx.lineCap = 'round';
+    for (const [x, len] of [[-0.22, 0.30], [0, 0.46], [0.22, 0.30]]) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0.44);
+      ctx.quadraticCurveTo(x + 0.10, 0.44 - len * 0.6, x, 0.44 - len);
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(228,240,248,0.9)';
     ctx.beginPath();
-    ctx.moveTo(0.02, -0.44); ctx.lineTo(0.46, -0.24); ctx.lineTo(0.02, -0.06);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.moveTo(0, -0.48); ctx.lineTo(0.22, -0.10); ctx.lineTo(-0.22, -0.10);
+    ctx.closePath(); ctx.fill();
+    ctx.lineWidth = 0.055;
+    ctx.lineCap = 'butt';
+  },
+
+  /** A skywall: too tall to blow over, and too tall to see past. */
+  wall(ctx) {
+    ctx.fillStyle = THEME.city;
+    ctx.beginPath(); ctx.rect(-0.52, -0.16, 1.04, 0.46); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.wallLit;
+    ctx.beginPath(); ctx.rect(-0.52, -0.16, 1.04, 0.10); ctx.fill(); ctx.stroke();
+    for (let x = -0.52; x < 0.5; x += 0.26) {          // crenellations
+      ctx.fillStyle = THEME.city;
+      ctx.beginPath(); ctx.rect(x, -0.32, 0.13, 0.17); ctx.fill(); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(30,24,18,0.35)';           // courses
+    ctx.lineWidth = 0.03;
+    for (const y of [0.00, 0.14]) {
+      ctx.beginPath(); ctx.moveTo(-0.50, y); ctx.lineTo(0.50, y); ctx.stroke();
+    }
+    ctx.strokeStyle = THEME.timber;
     ctx.lineWidth = 0.055;
   },
-  raincatch(ctx) {
-    ctx.fillStyle = THEME.shield;               // a basin of caught water
+
+  /** A flutitante: the terrain above is ordinary, the hull under it isn't. */
+  raft(ctx) {
+    // Small and low: it's the hull the terrain is built on, not the subject of
+    // the tile. In play the dashed rim does the work of saying "you can move
+    // this"; this is what tells you why.
+    ctx.save();
+    ctx.translate(0, 0.62);
+    ctx.scale(0.62, 0.62);
+    ctx.fillStyle = THEME.timber;
     ctx.beginPath();
-    ctx.moveTo(-0.40, -0.06); ctx.lineTo(0.40, -0.06);
-    ctx.lineTo(0.26, 0.34); ctx.lineTo(-0.26, 0.34);
+    ctx.moveTo(-0.62, -0.10);
+    ctx.lineTo(0.62, -0.10);
+    ctx.quadraticCurveTo(0.40, 0.34, 0, 0.34);
+    ctx.quadraticCurveTo(-0.40, 0.34, -0.62, -0.10);
     ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.20)';
     ctx.lineWidth = 0.06;
-    for (const x of [-0.20, 0.04, 0.24]) {
-      ctx.beginPath(); ctx.moveTo(x, -0.50); ctx.lineTo(x - 0.05, -0.16); ctx.stroke();
-    }
+    ctx.beginPath(); ctx.moveTo(-0.46, 0.04); ctx.lineTo(0.46, 0.04); ctx.stroke();
+    ctx.restore();
     ctx.strokeStyle = THEME.timber;
     ctx.lineWidth = 0.055;
   },
@@ -1146,7 +1251,7 @@ function drawRiver(ctx, f) {
  * a shaft of daylight has nothing to cast a shadow with, and giving them one
  * turns a spring into a coin sitting on the grass.
  */
-const FLAT_MARKS = new Set(['mouth', 'spring', 'ford', 'shaft', 'hill']);
+const FLAT_MARKS = new Set(['mouth', 'spring', 'ford', 'shaft', 'hill', 'zephyr', 'raft']);
 
 /**
  * Draw a landmark centred at (x, y) in unit tile space.
@@ -1157,12 +1262,15 @@ const FLAT_MARKS = new Set(['mouth', 'spring', 'ford', 'shaft', 'hill']);
  * the same direction as everything else on the board, for three lines and no
  * edits to the drawings themselves.
  */
-export function drawMark(ctx, kind, [x, y], s = 0.46, L = LIGHT) {
+export function drawMark(ctx, kind, [x, y], s = 0.46, L = LIGHT, dir = null) {
   const art = MARK_ART[kind];
   if (!art) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(s, s);
+  // A mark that carries a direction is drawn pointing north and turned here,
+  // so its art never has to know which way its tile ended up facing.
+  if (dir) ctx.rotate((dir & 3) * Math.PI / 2);
   ctx.lineWidth = 0.055;
   ctx.strokeStyle = THEME.timber;
   ctx.lineJoin = 'round';
@@ -1238,10 +1346,15 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
   type.feats.forEach((f) => { if (f.type === 'mountain') drawMountain(ctx, f, L); });
   type.feats.forEach((f) => { if (f.type === 'river') drawRiver(ctx, f); });
 
-  type.feats.forEach((f) => { if (f.type === 'road') drawRoad(ctx, f, terrain); });
+  // A swinging tile's stubs stop short of the middle: they are the ways in
+  // that this tile is currently refusing.
+  type.feats.forEach((f) => {
+    if (f.type === 'road') drawRoad(ctx, f, terrain, !!type.swing && f.sides.length === 1);
+  });
 
   // Two or more dead-end road stubs meeting = a junction, not a through road.
-  if (type.feats.filter((f) => f.type === 'road' && f.sides.length === 1).length >= 2) {
+  // Not on a vane: nothing meets there, that's the point of it.
+  if (!type.swing && type.feats.filter((f) => f.type === 'road' && f.sides.length === 1).length >= 2) {
     const js = ROAD_STYLE[terrain] || ROAD_STYLE.surface;
     ctx.beginPath();
     ctx.arc(0.5, 0.5, js.inner * 0.8 + 0.03, 0, Math.PI * 2);
@@ -1264,8 +1377,39 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     if (f.type === 'forest' && f.shield) drawLog(ctx, type.spots[i], L);
   });
   for (const f of type.feats) if (f.type === 'monastery') drawAbbey(ctx, L);
+  for (const f of type.feats) if (f.type === 'temple') drawTemple(ctx, f, L);
 
-  type.marks.forEach((m, i) => drawMark(ctx, m.kind, type.markSpots[i], 0.46, L));
+  // A vestibule can't show a gap the way a vane can — city art merges into one
+  // silhouette — so the sides it ISN'T joined to get a shut gate across the
+  // throat. Same message, drawn the way a city can carry it.
+  if (type.swing) {
+    for (const f of type.feats) {
+      if (f.type !== 'city' || f.sides.length !== 1) continue;
+      const [vx, vy] = SIDE_VEC[f.sides[0]];
+      ctx.save();
+      ctx.translate(0.5 + vx * 0.26, 0.5 + vy * 0.26);
+      ctx.rotate(Math.atan2(vy, vx));
+      ctx.fillStyle = THEME.cityWall;
+      ctx.beginPath(); ctx.rect(-0.035, -0.20, 0.07, 0.40); ctx.fill();
+      ctx.fillStyle = THEME.wallLit;
+      ctx.beginPath(); ctx.rect(-0.035, -0.20, 0.07, 0.06); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // The pivot a vane or a vestibule turns on, so a tile that will re-point
+  // itself in the next gust says so while it's still in your hand.
+  if (type.swing) {
+    ctx.beginPath();
+    ctx.arc(0.5, 0.5, 0.085, 0, Math.PI * 2);
+    ctx.fillStyle = THEME.teal;
+    ctx.fill();
+    ctx.lineWidth = 0.03;
+    ctx.strokeStyle = 'rgba(20,16,26,0.55)';
+    ctx.stroke();
+  }
+
+  type.marks.forEach((m, i) => drawMark(ctx, m.kind, type.markSpots[i], 0.46, L, m.dir));
 
   ctx.lineWidth = 0.02;
   // Deliberately no tile outline. Now that features merge across seams, a box

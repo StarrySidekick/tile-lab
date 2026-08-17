@@ -32,7 +32,7 @@ export const MECHANICS = [
   },
   {
     id: 'lift', group: 'play', name: 'Lift placed tiles',
-    note: "Cirrus's main verb, anywhere. Instead of placing, pick up an unclaimed tile that isn't holding the board together, and play it somewhere better.",
+    note: 'Instead of placing, pick up an unclaimed tile that isn\'t holding the board together, and play it somewhere better. Girando narrows this to flutitantes; this is the unrestricted version, for any mode.',
   },
   {
     id: 'stack', group: 'play', name: 'Build on top of tiles',

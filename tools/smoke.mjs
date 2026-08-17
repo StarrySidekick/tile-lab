@@ -71,9 +71,17 @@ for (const mode of modes) {
     for (let i = 0; i < 25 && g.phase !== 'over'; i++) {
       if (g.phase === 'market') { g.takeFromMarket(rnd(g.market.length)); continue; }
       if (g.phase === 'place') {
-        const spots = g.m.piece
-          ? g.board.legalPiecePlacements(g.m.piece)
-          : g.board.legalPlacements(g.tile, g.placeOpts());
+        // Through canPlaceAt, not board.legalPlacements: the river only accepts
+        // one square and one rotation, and a mode may veto anything it likes.
+        const spots = [];
+        if (g.m.piece) spots.push(...g.board.legalPiecePlacements(g.m.piece));
+        else {
+          const saved = g.rot;
+          for (const { x, y } of g.board.candidates(g.placeOpts())) {
+            for (let r = 0; r < 4; r++) { g.rot = r; if (g.canPlaceAt(x, y)) spots.push({ x, y, rot: r }); }
+          }
+          g.rot = saved;
+        }
         if (!spots.length) break;
         const s = spots[rnd(spots.length)];
         if (s.rot != null) for (let r = 0; r < s.rot; r++) g.rotate(1);
@@ -240,7 +248,6 @@ for (const mode of modes) {
 // water, a region lighting up as it's counted, and the endgame paying out one
 // feature at a time instead of all at once.
 for (const [what, mode, mech, kind] of [
-  ['drift', 'cirrus', null, 'fall'],
   ['drown', 'classic', 'tide', 'fall'],
   ['levy sweep', 'marches', null, 'sweep'],
 ]) {
@@ -283,6 +290,62 @@ for (const [what, mode, mech, kind] of [
     failures++;
     console.log(`  ✗ ${what}: ${errors[0]?.split('\n')[0] || `no "${kind}" effect in ${mode}`}`);
   } else console.log(`  ✓ ${what.padEnd(17)} ${mode}`);
+}
+
+// Girando's wind, which is the one effect driven by the rules rather than by
+// a score: a zephyr has to actually shove the board, and the tiles it shoved
+// have to be drawn sliding rather than teleporting.
+{
+  errors.length = 0;
+  await page.selectOption('#mode', 'girando');
+  await page.click('#newGame');
+  const wind = await page.evaluate(async () => {
+    const g = window.LAB.game;
+    let gusts = 0, moved = 0;
+    g.on((kind, data) => { if (kind === 'gust') { gusts++; moved += data.moves.length; } });
+    const legal = () => {
+      const out = [];
+      const saved = g.rot;
+      for (const { x, y } of g.board.candidates(g.placeOpts())) {
+        for (let r = 0; r < 4; r++) { g.rot = r; if (g.canPlaceAt(x, y)) out.push({ x, y, rot: r }); }
+      }
+      g.rot = saved;
+      return out;
+    };
+    const seen = {};
+    let steps = 0;
+    for (; steps < 400 && g.phase !== 'over'; steps++) {
+      seen[g.phase] = (seen[g.phase] || 0) + 1;
+      if (g.phase === 'market') {
+        // Take a zephyr the moment one is in hand, so this doesn't rely on luck.
+        const z = g.market.findIndex((id) => id.startsWith('Kz'));
+        g.takeFromMarket(z >= 0 ? z : 0);
+      } else if (g.phase === 'place') {
+        const s = legal()[0];
+        if (!s) break;
+        g.rot = s.rot;
+        g.cellClick(s.x, s.y);
+      } else if (g.phase === 'meeple') {
+        const o = g.meepleOptions();
+        if (o.length) g.placeMeeple(o[0].i); else g.skipMeeple();
+      } else if (g.phase === 'lift') {
+        g.m.cancelLift();
+      } else break;
+      if (gusts && moved) break;
+      // Let the render loop breathe now and then — the effects are made
+      // synchronously, so this is for the picture, not for the test.
+      if (steps % 16 === 15) await new Promise((r) => requestAnimationFrame(r));
+    }
+    return { mode: g.mode, gusts, moved, steps, seen, phase: g.phase };
+  });
+  const problems = [];
+  if (errors.length) problems.push(errors[0].split('\n')[0]);
+  if (wind.mode !== 'girando') problems.push(`the mode was ${wind.mode}`);
+  else if (!wind.gusts) {
+    problems.push(`no zephyr in ${wind.steps} steps (${JSON.stringify(wind.seen)}, ended in "${wind.phase}")`);
+  } else if (!wind.moved) problems.push('the wind moved nothing');
+  if (problems.length) { failures++; console.log(`  ✗ girando wind: ${problems.join(' · ')}`); }
+  else console.log(`  ✓ girando wind      ${wind.gusts} gust(s), ${wind.moved} tiles shoved`);
 }
 
 // The endgame tally: many features settle in one frame, and they have to be

@@ -35,7 +35,20 @@ export const SIDE_STEP = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 const city = (sides, shield = false) => ({ type: 'city', sides, shield });
 const road = (sides) => ({ type: 'road', sides });
 const abbey = () => ({ type: 'monastery', sides: [] });
-const mark = (kind, on = null) => ({ kind, on });
+
+/**
+ * A temple is a monastery that nobody owns. It has no sides, it completes the
+ * same way — surrounded on all eight — and it scores nothing at all. What it
+ * has instead is a FACING: when the country closes around it, it exhales, and
+ * everything on the board moves one square that way. Girando's engine.
+ */
+const temple = (face = N) => ({ type: 'temple', sides: [], face });
+
+/**
+ * `dir` is a cardinal direction carried by a mark, rotated with its tile the
+ * same way a feature's sides are. Only the wind uses it.
+ */
+const mark = (kind, on = null, dir = null) => ({ kind, on, dir });
 
 // --- World features ---------------------------------------------------------
 // Each spans tiles and merges like a city does, but scores its own way.
@@ -56,12 +69,18 @@ const river = (sides) => ({ type: 'river', sides });
 
 /** Edge letter per feature type. Two edges match only if their letters do. */
 export const EDGE_LETTER = {
-  city: 'c', road: 'r', monastery: 'f',
+  city: 'c', road: 'r', monastery: 'f', temple: 'f',
   forest: 'w', mountain: 'm', lake: 'l', river: 'v',
 };
 
 /** Features you can't put a follower on. */
-export const NO_MEEPLE = new Set(['mountain', 'lake', 'river']);
+export const NO_MEEPLE = new Set(['mountain', 'lake', 'river', 'temple']);
+
+/**
+ * Features that reach no edge and are completed by being surrounded, rather
+ * than by running out of open sides. The board checks the 3x3 around them.
+ */
+export const CENTRE_FEATURES = new Set(['monastery', 'temple']);
 
 // ---------------------------------------------------------------------------
 // Tile groups. Toggle these on and off to change what's in the draw pile.
@@ -76,7 +95,7 @@ export const GROUPS = [
   { id: 'adventure', name: 'Adventure sites', note: 'Wayshrines, ruins, campsites, merchants.', classic: false, expedition: false, adventure: true },
   { id: 'marches', name: 'War terrain', note: 'Keeps, forts, hills, fords, beacons.', classic: false, expedition: false, adventure: false },
   { id: 'descent', name: 'Dangers', note: 'Stairs down, bandits, wolves, barrows.', classic: false, expedition: false, adventure: false },
-  { id: 'cloud', name: 'Cloud kingdom', note: 'Skyholds, windvanes, raincatches.', classic: false, expedition: false, adventure: false },
+  { id: 'cloud', name: 'Cloud kingdom', note: 'Zephyrs, temples, windvanes, vestibules, skywalls and flutitantes.', classic: false, expedition: false, adventure: false },
   { id: 'mountains', name: 'Mountains', note: 'Pay the moment the chain grows, scaling with its size. Nothing can be claimed on them.', classic: false, expedition: false, adventure: false },
   { id: 'forests', name: 'Forests', note: '1 per tile, +1 per log. No complete/incomplete distinction — a forest is just as big as it is.', classic: false, expedition: false, adventure: false },
   { id: 'lakes', name: 'Lakes', note: 'Shores and corners, never all four sides. A city beside water is worth more.', classic: false, expedition: false, adventure: false },
@@ -165,10 +184,38 @@ export const TILE_TYPES = [
   { id: 'De', n: 3, group: 'descent', name: "Healer's hut", feats: [road([S])],  marks: [mark('healer')] },
   { id: 'Df', n: 3, group: 'descent', name: 'Wayside cache', feats: [road([W, S])], marks: [mark('chest')] },
 
-  // --- cloud: the sky kingdom ----------------------------------------------
+  // --- cloud: the sky kingdom, and the weather that runs it -----------------
+  //
+  // Girando's pool. Five of these exist to make the board MOVE rather than to
+  // score: the zephyr blows a lane, the temple blows everything, the windvane
+  // and the vestibule re-point themselves in the wind and re-cut what's
+  // finished, and the skywall is the only thing that stops any of it.
   { id: 'Ka', n: 3, group: 'cloud', name: 'Skyhold',    feats: [city([N, W])],  marks: [mark('skyhold', 0)] },
-  { id: 'Kb', n: 4, group: 'cloud', name: 'Windvane',   feats: [road([N, S])],  marks: [mark('vane')] },
-  { id: 'Kc', n: 4, group: 'cloud', name: 'Raincatch',  feats: [],              marks: [mark('raincatch')] },
+
+  // A gust, pointing north on the tile and wherever you turn it in the world.
+  { id: 'Kz', n: 4, group: 'cloud', name: 'Zephyr',       feats: [],                marks: [mark('zephyr', null, N)] },
+  { id: 'Kzr', n: 2, group: 'cloud', name: 'Zephyr road', feats: [road([E, W])],    marks: [mark('zephyr', null, N)] },
+
+  // The vane and the vestibule are the same idea twice: four ways in, only two
+  // of them joined, and the wind decides which two. Every edge matches, so
+  // they always fit — what changes is what runs THROUGH them.
+  { id: 'Kw', n: 3, group: 'cloud', name: 'Windvane',   swing: true, feats: [road([N, S]), road([E]), road([W])] },
+  { id: 'Kv', n: 2, group: 'cloud', name: 'Vestibule',  swing: true, feats: [city([N, S]), city([E]), city([W])] },
+
+  { id: 'Kt', n: 3, group: 'cloud', name: 'Temple',     feats: [temple(N)] },
+  { id: 'Kl', n: 2, group: 'cloud', name: 'Skywall',    feats: [],              marks: [mark('wall')] },
+
+  // Flutitantes: terrain built on a hull. You may move one instead of playing
+  // a tile, and the wind can strand one in open sky without sinking it.
+  { id: 'Kf', n: 2, group: 'cloud', name: 'Flutitante road',  feats: [road([N, S])], marks: [mark('raft')] },
+  { id: 'Kg', n: 2, group: 'cloud', name: 'Flutitante hold',  feats: [city([N, W])], marks: [mark('raft')] },
+  { id: 'Kh', n: 2, group: 'cloud', name: 'Flutitante field', feats: [],             marks: [mark('raft')] },
+
+  // Not dealt: Girando swaps these in for the base 3-way junctions, so a road
+  // running into one carries on instead of ending. Fewer things close, which
+  // is the point — a kingdom that keeps finishing stops being weather.
+  { id: 'Gw', n: 0, group: 'cloud', name: 'Road 3-way (open)',    feats: [road([E, S, W])] },
+  { id: 'Gl', n: 0, group: 'cloud', name: 'City + 3-way (open)',  feats: [city([N]), road([E, S, W])] },
 
   // --- mountains ------------------------------------------------------------
   // Mountain edges only meet mountain edges, so a range grows as one mass and
@@ -354,9 +401,10 @@ export const MARKS = {
   mouth:     { label: 'The lake',  score: 0, note: 'Where the river ends.' },
 
   // cloud
-  skyhold:   { label: 'Skyhold',   score: 3, note: 'Crystallises the moment its city closes.' },
-  vane:      { label: 'Windvane',  score: 1, note: 'Anchors its tile against the drift.' },
-  raincatch: { label: 'Raincatch', score: 2, note: 'Worth points while it survives the round.' },
+  skyhold: { label: 'Skyhold', score: 3, note: 'Crystallises the moment its city closes.' },
+  zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane one square when played, and again whenever the wind reaches it.' },
+  wall:    { label: 'Skywall', score: 0, note: 'Immovable. Nothing downwind of it in a lane is touched by the wind.' },
+  raft:    { label: 'Flutitante', score: 0, note: 'Move it instead of playing a tile. It floats — the wind can strand it in open sky.' },
 };
 
 /**

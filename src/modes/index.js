@@ -15,7 +15,7 @@ import { Classic } from './classic.js';
 import { Expedition } from './expedition.js';
 import { Adventure } from './adventure.js';
 import { Duel } from './duel.js';
-import { Cirrus } from './cirrus.js';
+import { Girando } from './girando.js';
 import { Sprawl } from './sprawl.js';
 import { Strata } from './strata.js';
 import { Marches } from './marches.js';
@@ -25,7 +25,7 @@ import { Tesserae } from './tesserae.js';
 import { World } from './world.js';
 
 export const MODES = [
-  Classic, World, Duel, Sprawl, Strata, Cirrus,
+  Classic, World, Duel, Sprawl, Strata, Girando,
   Marches, Expedition, Adventure, Descent, Chronicle, Tesserae,
 ].map((M) => M.spec);
 

@@ -292,6 +292,16 @@ export class Effects {
         return;
       }
 
+      case 'gust': {
+        // Everything the wind shoved, sliding one square at once, and whatever
+        // it pushed off the edge tumbling after it.
+        for (const m of data.moves || []) {
+          this.flyTile({ from: m.from, to: m.at, type: m.type, rot: m.rot });
+        }
+        if (data.fell?.length) this.fall(data.fell, 'blow');
+        return;
+      }
+
       case 'drift':
         this.fall(data.cells, 'blow');
         return;

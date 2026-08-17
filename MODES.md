@@ -16,7 +16,7 @@ interesting part.
 | | Shipped as | Question it answers |
 |---|---|---|
 | 1. The Marches | mode | Is the board better as a contested surface than a scoring one? |
-| 2. Cirrus | mode | Is a small board you keep *editing* better than a big one you keep *growing*? |
+| 2. Cirrus → **Girando** | mode | Is a small board you keep *editing* better than a big one you keep *growing*? — and then: is it better still if the board edits *itself*? |
 | 3. Sprawl | mode | Does the board get more interesting when the *holes* matter? |
 | 4. Descent | mode | Does exploration hold up with a real fail state? |
 | 5. The Chronicle | mode | Are the tiles good *prompts*? |
@@ -116,7 +116,22 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 
 ## 2. Cirrus — the cloud kingdom, where tiles can be lifted
 
-> **Built** — `src/modes/cirrus.js`. It needed one rule the design didn't have: a newly placed tile gets a round's grace before it can drift, or you can never build outward at all. Cloud and crystallised land are drawn differently, which turned out to be load-bearing — the lift rules read as arbitrary until you can see at a glance which is which.
+> **Built, played, and rebuilt as GIRANDO** — `src/modes/girando.js`, with the weather engine in `src/wind.js`. The original is below, unchanged, because the reason it was replaced is the interesting part.
+>
+> Cirrus worked and it answered its question: a board you keep editing *is* better than one you only grow. But the editing was all yours. Every change to the board was a player deciding to make it, which made the mode a puzzle with a fidget attached rather than a place with weather in it. The drift was the only thing the board did on its own, and once you learned to keep everything at degree 2 it stopped happening.
+>
+> **Girando moves the verb from the player to the sky.** You place and claim as in Carcassonne — meeples are back, majority scoring is back — and the churn comes from the tiles themselves:
+>
+> - **Zephyrs** blow their whole lane one square downwind when played. Tiles that land touching nothing (corners count) fall out of the sky and go back in the deck. A zephyr caught by the wind fires in its turn, so a line of them is a chain.
+> - **Temples** replace monasteries: nobody claims them, they score nothing, and when the country closes around one it exhales — *every* lane on the board moves the way it faces. Shoving one with a gust pays 2.
+> - **Windvanes** and **vestibules** have four ways in and only two of them joined, and the wind picks which two. Every edge matches so they always fit; what changes is what runs through them, which means what's finished can become unfinished.
+> - **Skywalls** are the only thing that stops any of it. Crystallised tiles don't move either, so everything you finish becomes a windbreak and the board grows a skeleton it can't lose.
+> - **Flutitantes** are what's left of lifting: terrain on a hull, the only tiles you may move yourself, and the only ones that survive being stranded in open sky.
+> - The base set's **3-way junctions are swapped for open ones** that carry a road through instead of ending it. Fewer closures, fewer crystals, more weather.
+>
+> Three things the rebuild forced on the engine, all of which are improvements everywhere. `Board.link` now refuses to join a seam whose edges disagree — placement can't produce one, but wind can shove a road into a city wall, and without the guard the union-find merged them. `Board.shift` moves a tile keeping its follower, its owner and its place in the replay order. And the host now asks the mode `anythingLeft()` instead of reading `market`, which was pointing at the *previous* player's hand and could end a hand-dealt game while you were holding three playable tiles.
+>
+> **What it still needs:** temples almost never complete. Eight neighbours is a lot to assemble on a board that keeps moving, and across twelve bot games not one temple exhaled. The mass-wind event — the mode's biggest moment — is currently theoretical. Either the trigger loosens or the temple needs a second way to fire.
 
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
@@ -333,7 +348,7 @@ genuinely different game from everything else on this list, and it's the one
 stacking is uniquely good at.
 
 **Engine work.** `cell.under` as a stack; edges read from the top; connectivity
-via rebuild (same primitive as Cirrus). Rendering is the real risk — solve it
+via rebuild (same primitive as the cloud kingdom). Rendering is the real risk — solve it
 with a small vertical offset per level plus a drop shadow and a lit top edge.
 Pseudo-isometric, cheap, and it reads instantly.
 
@@ -363,7 +378,7 @@ difficulty setting.
 
 ## 8. Market — a drafting layer (best ratio on the list)
 
-> **Built as a modifier** — `Drafting market`, and it works everywhere. Duel's open pool and Cirrus's hand reuse the same row and the same picker, with the discard rule switched off.
+> **Built as a modifier** — `Drafting market`, and it works everywhere. Duel's open pool and Girando's hand reuse the same row and the same picker, with the discard rule switched off.
 
 **Question:** how much of the game is the randomness of the draw?
 
@@ -431,7 +446,7 @@ becomes a river; a monastery becomes a barrow.
 
 Small engine change (`type.back`, and a flip that goes through the same
 rebuild path as removal), large combinatorial payoff, and it composes with
-almost everything: Strata's cover rule, Cirrus's drift, Tideline's flood front,
+almost everything: Strata's cover rule, the cloud kingdom's drift, Tideline's flood front,
 Descent's escalation. Worth prototyping *after* removal exists, because it's
 nearly free at that point.
 
@@ -487,13 +502,13 @@ the fix is the number, not the rule.
 Cheap, orthogonal, and each changes several modes at once. This is where the
 leverage turned out to be: four of the twelve designs above are here rather
 than in the mode list, and they're worth more for it — and two rules that
-started life as whole modes (Cirrus's lifting, Strata's stacking) turned out to
+started life as whole modes (the cloud kingdom's lifting, Strata's stacking) turned out to
 be better as switches than as places.
 
 | Mechanic | What it does | Built |
 |---|---|---|
 | **Drafting market** (#8) | Removes draw luck, adds a cost model with no currency | ✔ |
-| **Lift placed tiles** | Cirrus's verb, anywhere | ✔ |
+| **Lift placed tiles** | The cloud kingdom's verb, anywhere | ✔ |
 | **Build on top** | Strata's rule, anywhere | ✔ |
 | **Recall a follower** | Take one back instead of claiming | ✔ |
 | **Followers walk on** | The wagon, from Abbey & Mayor | ✔ |
@@ -509,7 +524,7 @@ be better as switches than as places.
 | **Builder** | Extend what you hold, get another tile | ✔ (simplified) |
 | **Trade goods** | Wine / grain / cloth, 10 for each majority | ✔ |
 | **Oracle dice** | Uncertainty the table resolves narratively | ✔, inside The Chronicle |
-| **Hand of tiles** | Choice instead of fate | ✔, inside Cirrus |
+| **Hand of tiles** | Choice instead of fate | ✔, inside Girando |
 | **Asymmetric powers** | Each player breaks one rule | not built |
 | **Turn timer** | Kills analysis paralysis, changes the whole feel | not built |
 | **Co-op vs the deck** | The deck plays events against the table | not built |
@@ -546,7 +561,7 @@ rebuild() {
 ```
 
 O(n) per removal with n ≈ 100. Free at this scale, and the same call now
-supports **lifting** (Cirrus), **covering** (Strata), **flipping** (two-faced)
+supports **lifting** (Girando), **covering** (Strata), **flipping** (two-faced)
 and **flooding** (rising tide) — one primitive, four features, which is the
 best ratio anything in this document achieved.
 
@@ -640,9 +655,13 @@ A few things the harness noticed that are worth watching for at the table:
   is healthy — it means the draft and the bounded board are doing work. If it's
   *not* fun, that's the single most useful negative result in the whole
   document, because everything else assumes it is.
-- **Cirrus** ends with roughly half the tiles it dealt still on the board. The
-  drift is doing a lot; if it feels punishing rather than tense, raise the
-  grace period before lowering the drift.
+- **Girando** scores *low* — a mean of 3 across random play, 10 across bot
+  games, where Classic runs 28 and 45. That's the thesis working (nothing pays
+  until it closes, and the wind keeps things from closing) but it's close to
+  the edge: if a game can end with everyone on 4, the wind is winning too
+  often. The knobs, in the order I'd turn them: how many zephyrs are in the
+  deck, whether a gust moves one square or shoves until it hits something, and
+  whether crystallising should pay a tile bonus at the end after all.
 - **Marches** is capped at twelve rounds because uncapped income compounds into
   meaningless numbers. If the campaign feels short, raise the cap before you
   touch the scoring — the round count is the tuning knob, not the points.

@@ -13,6 +13,7 @@
 //   endTurn/endRound  upkeep
 //   actions()         the contextual buttons in the panel
 //   panel()           HTML replacing the score table, or null to keep it
+//   anythingLeft()    whether there's anything left to deal you
 //   botPlaceBonus()   what a computer player can't see in your scoring
 //   botMoveValue()    …and what it can't see in your movement
 //
@@ -42,6 +43,15 @@ export class Mode {
   // --- turn hooks -----------------------------------------------------------
 
   startTurn() { return true; }
+
+  /**
+   * Is there anything left to deal THIS player? The host ends the game when
+   * there isn't. The default is the shared deck plus whatever's face up; a
+   * mode that deals private hands has to answer for its own, because the
+   * host's `market` still points at the last player who took a turn.
+   */
+  anythingLeft() { return this.game.deck.length > 0 || !!this.game.market?.length; }
+
   afterPlace() { return null; }
   onClosed() {}
   endTurn() {}

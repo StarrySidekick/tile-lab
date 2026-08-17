@@ -59,13 +59,21 @@ earn stone, covering spends it, and you can't cover something that already
 scored. Buried tiles still pay 1 to whoever laid them at the end — **covering
 an opponent freezes them rather than erasing them**.
 
-**Cirrus** — the cloud kingdom. Forty tiles, a hand of three, and the main verb
-is *lifting*: each turn, play from hand or pick up a placed tile and put it
-somewhere better. Two rules make that a game rather than a fidget — you can't
-lift anything anchored, and a lift **must leave the board connected**. Closing a
-feature *crystallises* its tiles into permanent land. Everything still cloud is
-subject to the **drift**: at the end of each round, any unanchored tile holding
-on by a single edge blows away.
+**Girando** — the cloud kingdom, where the board itself is weather. You place
+and claim as in Carcassonne; the difference is that the country won't hold
+still. A **zephyr** blows its whole lane one square downwind — tiles that end up
+touching nothing fall out of the sky and go back in the deck, followers standing
+on a road get blown off it, and a zephyr caught by another zephyr fires in its
+turn. A **temple** is a monastery nobody owns and nothing scores: close the
+country around it and it exhales, moving *every* lane the way it faces. Shove
+one with a gust and it pays you 2. **Windvanes** and **vestibules** have four
+ways in and only two of them joined, and the wind decides which two, so a road
+that ran through one is a dead end after the next gust. A **skywall** is the
+only thing that stops any of it. Closing a feature *crystallises* it into
+permanent land — which is also how you build a windbreak. **Flutitantes** are
+terrain on a hull: the only tiles you may pick up and move yourself, and the
+only ones that survive being stranded in open sky. Nothing pays until it closes,
+and nothing unfinished pays at the end.
 
 **World** — the countryside gets the rest of its geography, in four families
 you can also switch on inside any other mode:
@@ -133,16 +141,16 @@ meeples.
 
 Rules you switch on à la carte, in any mode and any combination. Anything a
 single mode invented that turns out to be interesting on its own lives here
-rather than locked inside that mode — lifting came out of Cirrus, building on
-top came out of Strata, and both are more useful bolted onto Classic, or onto
-each other.
+rather than locked inside that mode — lifting came out of the cloud kingdom,
+building on top came out of Strata, and both are more useful bolted onto
+Classic, or onto each other.
 
 **Play**
 
 | | |
 |---|---|
 | **Drafting market** | A face-up row instead of a blind draw. The first is free; reaching past a tile discards it, so cost needs no currency |
-| **Lift placed tiles** | Cirrus's main verb, anywhere. Instead of placing, pick up an unclaimed tile that isn't holding the board together, and play it somewhere better |
+| **Lift placed tiles** | Instead of placing, pick up an unclaimed tile that isn't holding the board together, and play it somewhere better. Girando narrows this to flutitantes; this is the unrestricted version |
 | **Build on top of tiles** | Strata's rule, anywhere. Cover a tile that hasn't scored and has nobody on it. Three levels maximum |
 | **Recall a follower** | Instead of claiming, take one of your followers back off the board |
 | **Followers walk on** | Abbey & Mayor's wagon. When a feature scores, your follower steps along the road to the next unclaimed, unfinished thing instead of going home |
@@ -243,7 +251,7 @@ just looking at — and lands slightly oversized, settling. In Strata it keeps
 going and rises onto the stack it covered. A follower hops in on an arc and
 hops back off when it's recalled; one that walks on (the wagon) crosses to its
 new feature rather than reappearing there. Pawns and companies walk their move.
-Tiles that leave do it visibly too: Cirrus's drift tumbles them off the edge,
+Tiles that leave do it visibly too: a gust in Girando tumbles them off the edge,
 and the rising tide slides them under with the water going over them.
 
 **Territory.** In The Marches a banner running out through a region shows you
@@ -307,7 +315,8 @@ Tiles are grouped, and each group toggles on and off independently:
 - **Adventure sites** — wayshrines, ruins, campsites, merchants
 - **War terrain** — keeps, forts, hills, fords, beacons, muster fields
 - **Dangers** — stairs down, bandit camps, wolf dens, barrows
-- **Cloud kingdom** — skyholds, windvanes, raincatches
+- **Cloud kingdom** — zephyrs, temples, windvanes, vestibules, skywalls,
+  flutitantes and skyholds (Girando's pool)
 - **Mountains** — spurs, ridges, bends, massifs, passes, and one peak
 - **Forests** — edges, corners, deep forest and old growth, some with logs
 - **Lakes** — shores, corners, narrows, headlands
@@ -329,6 +338,7 @@ src/art.js         procedural tile + landmark drawing (no assets)
 src/light.js       where the light comes from — one sun for the whole board
 src/shape.js       area silhouettes — the corner-to-corner rule that makes tiles match
 src/sprites.js     tile sprite cache, so the art is drawn once and then blitted
+src/wind.js        Girando's weather: one gust, and everything it moved
 src/game.js        the host: turn flow, deck, players, modifiers
 src/modes/         one file per mode, behind a small set of hooks
 src/ai.js          the computer player — one class, one action at a time
@@ -370,7 +380,7 @@ to be: `cells` is the source of truth and connectivity is **recomputable**.
 `Board.rebuild()` throws the components away and replays every visible cell in
 placement order — O(n) with n in the low hundreds, which is free at this scale.
 
-That one primitive is what lets tiles be **lifted** (Cirrus), **covered**
+That one primitive is what lets tiles be **lifted** (Girando), **covered**
 (Strata), **flipped** (two-faced) and **drowned** (rising tide). Two pieces of
 state have to survive a rebuild, so neither lives on the component: meeples live
 on their cell, and "already scored" lives in `scoredParts` as a set of
@@ -454,10 +464,10 @@ places, a drag pans, a spread zooms in and a pinch zooms out — and its
 load-bearing assertions are the negative ones: neither a drag nor a pinch may
 leave a tile behind, because a gesture read as a tap is the bug you'd ship.
 The motion block asks each effect to happen in the one mode where it can: a
-closure puts a number and a flash on the board and bumps the panel row, Cirrus
-blows a tile off the cloud, the tide takes one under, The Marches lights up a
-region as it counts it, and the endgame pays its features out over seconds
-rather than in a single frame.
+closure puts a number and a flash on the board and bumps the panel row, the
+tide takes a tile under, The Marches lights up a region as it counts it,
+Girando's wind actually shoves the board, and the endgame pays its features out
+over seconds rather than in a single frame.
 
 `package.json` exists only so Node treats `src/` as ES modules for those two
 scripts. The game itself still has no build step and no dependencies.

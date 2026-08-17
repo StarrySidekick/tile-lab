@@ -20,6 +20,7 @@ import { makePiece, rotatePiece, validatePiece } from '../src/pieces.js';
 import { Board } from '../src/board.js';
 import { TILES } from '../src/tiles.js';
 import { liftableCells } from '../src/mechanics.js';
+import { gust, storm } from '../src/wind.js';
 import { GROUPS } from '../src/tiles.js';
 
 const ALL_GROUPS = GROUPS.map((g) => g.id);
@@ -271,6 +272,135 @@ function checkPieces(n = 300) {
   console.log(`  ✓ ${n} pieces valid through all four rotations (${spread})`);
 }
 
+// --- the wind ----------------------------------------------------------------
+
+/**
+ * Girando's engine, on boards built by hand. Every one of these is a rule you
+ * can state in a sentence, and every one of them is a rule that a game of
+ * Girando is unplayable without — which is exactly the set worth asserting
+ * rather than hoping a random playthrough happens to cover.
+ */
+function checkWind() {
+  console.log('the wind');
+
+  const at = (b, x, y) => b.get(x, y);
+  const lay = (b, x, y, id, rot = 0) => b.place(x, y, TILES[id], rot, { free: true });
+
+  // A lane slides one square, downwind of the zephyr and nowhere else.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // the gust, pointing north
+    lay(b, 0, -1, 'U'); lay(b, 0, -2, 'U'); lay(b, 1, -1, 'U');
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (!at(b, 0, -2) || !at(b, 0, -3)) return fail('a lane shifts one square', 'it did not');
+    if (!at(b, 1, -1)) return fail('the wind stays in its lane', 'the next column moved');
+    if (!at(b, 0, 0)) return fail('the zephyr stays put', 'it blew itself away');
+  }
+
+  // Corners count: a tile that lands touching only a diagonal survives, and a
+  // tile that lands touching nothing at all does not.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    lay(b, 0, -2, 'U');                     // alone in the lane, two clear
+    lay(b, 1, -3, 'U');                     // …but there's a corner to catch it
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (!at(b, 0, -3)) return fail('a diagonal contact keeps a tile up', 'it fell');
+
+    const c = new Board();
+    lay(c, 0, 0, 'Kz');
+    lay(c, 0, -3, 'U');
+    const r = gust(c, { dir: 0, from: { x: 0, y: 0 } });
+    if (at(c, 0, -4) || r.fell.length !== 1) return fail('a tile touching nothing falls', JSON.stringify(r.fell));
+  }
+
+  // A skywall shelters its lee, and doesn't move itself.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    lay(b, 0, -1, 'Kl');                    // the wall
+    lay(b, 0, -2, 'U');                     // behind it, from the wind's side
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (!at(b, 0, -1)) return fail('a skywall does not move', 'it blew away');
+    if (!at(b, 0, -2)) return fail('a skywall shelters its lee', 'the sheltered tile moved');
+  }
+
+  // Solid ground is a windbreak: nothing shifts into an occupied square.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    lay(b, 0, -1, 'U');
+    const crystal = lay(b, 0, -2, 'U');
+    crystal.anchored = true;
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (!at(b, 0, -1) || !at(b, 0, -2)) return fail('a tile pressed against solid ground stays put', 'something moved');
+  }
+
+  // A weathervane turns to the wind, which re-cuts what runs through it.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz', 1);                  // pointing east
+    lay(b, 1, 0, 'Kw');                     // through-road N-S at rot 0
+    lay(b, 2, 1, 'U');                      // something for it to land against
+    const before = at(b, 1, 0).rot;
+    gust(b, { dir: 1, from: { x: 0, y: 0 } });
+    const after = b.get(2, 0) || b.get(1, 0);
+    if (!after || (after.rot & 1) !== 1) return fail('a vane swings onto the wind axis', `rot ${before} -> ${after && after.rot}`);
+  }
+
+  // A zephyr caught by the wind fires in its turn.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // the one we set off, pointing north
+    lay(b, 0, -1, 'Kz', 1);                 // caught by it, pointing east
+    lay(b, 1, -2, 'U');
+    const reports = storm(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (reports.length < 2) return fail('a blown zephyr fires in its turn', `${reports.length} gust(s)`);
+  }
+
+  // Followers: blown off a road, safe behind city walls.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    const road = lay(b, 0, -1, 'U');
+    b.addMeeple(0, -1, 0, 0);
+    const town = lay(b, 0, -2, 'E');        // a city edge, facing north
+    b.addMeeple(0, -2, 0, 1);
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (r.unseated.length !== 1 || r.unseated[0].player !== 0) {
+      return fail('a follower on a road is blown off it', JSON.stringify(r.unseated));
+    }
+    if (!town.meeple) return fail('a follower inside a city rides it out', 'it was blown off');
+    if (road.meeple) return fail('the unseated follower leaves the tile', 'it is still standing there');
+  }
+
+  // A temple exhaling moves every lane, not just its own.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kt').anchored = true;     // a temple has crystallised by now
+    lay(b, 3, 3, 'U'); lay(b, 4, 3, 'U');           // one lane, far from the temple
+    lay(b, -3, -3, 'U'); lay(b, -4, -3, 'U');       // another, the other way
+    gust(b, { dir: 2, everywhere: true });
+    if (!b.get(3, 4) || !b.get(-3, -2)) return fail('a temple blows every lane', 'some lane sat still');
+    if (!b.get(0, 0)) return fail('a crystallised temple stays where it is', 'it blew itself away');
+  }
+
+  // Mismatched seams join nothing — the wind can shove a road into a city.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    lay(b, 0, -1, 'U');                     // road N-S
+    lay(b, 0, -3, 'E', 2);                  // city facing south, two clear
+    lay(b, 1, -3, 'U');                     // a corner so nothing falls
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    const road = b.featureOf(0, -2, 0);
+    if (!road || road.type !== 'road') return fail('the shoved road survives as a road', road && road.type);
+    if (road.tiles.size !== 1) return fail('a mismatched seam joins nothing', `road spans ${road.tiles.size}`);
+  }
+
+  console.log('  ✓ lanes, corners, walls, windbreaks, vanes, chains, followers, temples, bad seams');
+}
+
 // --- runs -------------------------------------------------------------------
 
 function runMode(spec, games, extraOpts = {}, label = '') {
@@ -352,6 +482,7 @@ function main() {
 
   checkBoard();
   checkPieces();
+  checkWind();
 
   console.log('\nmodes');
   for (const spec of MODES) {
@@ -365,13 +496,13 @@ function main() {
   } else {
     checkBots(Math.max(4, games / 2));
     botVsRandom(Math.max(10, games * 2));
-    // Classic is the plain case, Cirrus removes tiles, and Sprawl places
-    // several at once — between them they cover the ways a modifier can go
-    // wrong.
+    // Classic is the plain case, Girando moves tiles around under you, and
+    // Sprawl places several at once — between them they cover the ways a
+    // modifier can go wrong.
     console.log('\nmechanics, against a plain mode, a removing one and a piece one');
     for (const mech of MECHANICS) {
       if (mech.id === 'fog') continue;                // purely a render flag
-      for (const host of ['classic', 'cirrus', 'sprawl']) {
+      for (const host of ['classic', 'girando', 'sprawl']) {
         runMode(MODE_OF(host), Math.max(4, games / 2), { options: { [mech.id]: true } }, `+${mech.id}`);
       }
     }

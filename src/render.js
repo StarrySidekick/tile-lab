@@ -288,6 +288,17 @@ export class Renderer {
       ctx.lineWidth = 2;
       ctx.strokeRect(sx + 1, sy + 1, z - 2, z - 2);
     }
+    // A flutitante wears its hull, because "which of these can I move" is a
+    // question you ask every turn and shouldn't have to answer from memory.
+    if (overlay.raft) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(155,120,78,0.95)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([z * 0.16, z * 0.09]);
+      ctx.strokeRect(sx + 2.5, sy + 2.5, z - 5, z - 5);
+      ctx.restore();
+    }
+
     if (overlay.cloud) {
       const haze = ctx.createLinearGradient(sx, sy, sx, sy + z);
       haze.addColorStop(0, 'rgba(206,222,240,0.20)');
