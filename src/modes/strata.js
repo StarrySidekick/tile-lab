@@ -92,7 +92,7 @@ export class Strata extends Mode {
     this.game.players[closer].score += pts;
     this.game.say(
       `${this.game.players[closer].name} closes a ${d.type} of ${d.tiles.size} at mean height ${mult.toFixed(1)} → +${pts}`);
-    this.game.emit('score', { points: pts });
+    this.game.emit('score', { points: pts, player: closer, ...this.game.spotOf(d) });
   }
 
   /**

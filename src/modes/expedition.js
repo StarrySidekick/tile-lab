@@ -294,7 +294,10 @@ export class Expedition extends Mode {
       if (info.score) {
         player.score += info.score;
         this.game.say(`${player.name} claims the ${info.label} +${info.score}`);
-        this.game.emit('landmark', { kind: m.kind });
+        this.game.emit('landmark', {
+          kind: m.kind, points: info.score, player: pawn.player,
+          at: { x: cell.x + 0.5, y: cell.y + 0.5 },
+        });
       }
 
       if (CITY_LANDMARKS.includes(m.kind)) {

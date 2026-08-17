@@ -19,19 +19,32 @@ import { drawTile, PLAYER_COLORS } from './art.js';
 import { THEME } from './theme.js';
 import { TILE_TYPES, TILES, GROUPS } from './tiles.js';
 import { Sfx, SOUND_NAMES } from './audio.js';
+import { Effects } from './fx.js';
 
 const canvas = document.getElementById('board');
 const renderer = new Renderer(canvas);
 const $ = (id) => document.getElementById(id);
 const sfx = new Sfx();
 
+// Someone who has asked their system not to animate things has asked us too.
+const stillness = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const fx = new Effects({ enabled: !stillness });
+renderer.fx = fx;
+
 let enabledGroups = new Set(DEFAULT_GROUPS.classic);
 let mechanics = {};
 let game;
 
-/** Every Game is fresh, so sound has to be re-subscribed each time. */
+/**
+ * Every Game is fresh, so its listeners have to be re-subscribed each time.
+ * Sound and effects are two subscribers to the same stream — neither knows the
+ * other exists, and either can be switched off without the game noticing.
+ */
 function bind(g) {
-  g.on((kind) => sfx.play(kind));
+  g.on((kind, data) => {
+    sfx.play(kind);
+    fx.on(kind, data, g);
+  });
   return g;
 }
 
@@ -108,6 +121,9 @@ function newGame() {
   }));
   game.free = $('freePlace').checked;
   buildBots();
+  fx.clear();
+  shownScores = [];
+  bumping.clear();
   renderer.centerOn(0, 0);
   renderer.cam.zoom = spec(mode)?.bounds ? 78 : 96;
   syncPanel();
@@ -148,8 +164,32 @@ function onModeChange() {
 }
 
 // --- pointer ----------------------------------------------------------------
+//
+// One finger pans, two fingers pinch, and a mouse behaves exactly as it did.
+// Every live pointer is tracked, because that's the only way to tell a pinch
+// from a drag — and the moment a second finger lands, whatever the first one
+// was doing stops being a drag and stops being a tap.
+//
+// Positions come off clientX/clientY rather than offsetX/offsetY: with two
+// pointers on one element the two are the same thing anyway, and this way a
+// synthetic event from a test carries the coordinates it was given.
 
-let drag = null;
+const pointers = new Map();   // pointerId -> {x, y}
+let drag = null;              // one-pointer pan
+let pinch = null;             // two-pointer zoom: last {dist, x, y}
+let gestured = false;         // a pinch happened — the release isn't a tap
+
+function local(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+/** Distance between the two live pointers, and the point between them. */
+function spread() {
+  const [a, b] = [...pointers.values()];
+  if (!a || !b) return null;
+  return { dist: Math.hypot(b.x - a.x, b.y - a.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
 
 /** Is this cell touching the played area? Used to decide whether to buzz. */
 function nearBoard(c) {
@@ -160,31 +200,85 @@ function nearBoard(c) {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
-  canvas.setPointerCapture(e.pointerId);
-  drag = { x: e.offsetX, y: e.offsetY, moved: 0, camX: renderer.cam.x, camY: renderer.cam.y };
+  const p = local(e);
+  pointers.set(e.pointerId, p);
+  // A synthetic pointer (a test, mostly) has nothing to capture.
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* not a real pointer */ }
+  if (pointers.size >= 2) {
+    drag = null;
+    pinch = spread();
+    gestured = true;
+    renderer.hover = null;
+  } else {
+    drag = { x: p.x, y: p.y, moved: 0, camX: renderer.cam.x, camY: renderer.cam.y };
+    gestured = false;
+  }
 });
 
 canvas.addEventListener('pointermove', (e) => {
+  const p = local(e);
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, p);
+
+  // Pinch: scale about the midpoint, then follow the midpoint. Doing both is
+  // what keeps the board stuck to your fingers instead of sliding under them.
+  if (pinch && pointers.size >= 2) {
+    const now = spread();
+    if (now && pinch.dist > 0 && !game.interior) {
+      renderer.zoomAt(now.x, now.y, now.dist / pinch.dist);
+      renderer.cam.x -= (now.x - pinch.x) / renderer.cam.zoom;
+      renderer.cam.y -= (now.y - pinch.y) / renderer.cam.zoom;
+    }
+    pinch = now;
+    renderer.hover = null;
+    return;
+  }
+
   if (drag) {
-    const dx = e.offsetX - drag.x, dy = e.offsetY - drag.y;
+    const dx = p.x - drag.x, dy = p.y - drag.y;
     drag.moved = Math.max(drag.moved, Math.hypot(dx, dy));
     if (drag.moved > 4 && !game.interior) {
       renderer.cam.x = drag.camX - dx / renderer.cam.zoom;
       renderer.cam.y = drag.camY - dy / renderer.cam.zoom;
     }
   }
-  renderer.pointer = { sx: e.offsetX, sy: e.offsetY };
-  renderer.hover = renderer.cellAt(e.offsetX, e.offsetY);
+  renderer.pointer = { sx: p.x, sy: p.y };
+  renderer.hover = renderer.cellAt(p.x, p.y);
 });
 
 canvas.addEventListener('pointerleave', () => { renderer.hover = null; renderer.pointer = null; });
 
-canvas.addEventListener('pointerup', (e) => {
-  const wasDrag = drag && drag.moved > 4;
+function liftPointer(e) {
+  pointers.delete(e.pointerId);
+  try { canvas.releasePointerCapture(e.pointerId); } catch { /* never captured */ }
+  if (pointers.size < 2) pinch = null;
+  // One finger left after a pinch: it becomes the pan anchor from where it is,
+  // or the board leaps the moment it moves.
+  if (pointers.size === 1) {
+    const [p] = pointers.values();
+    drag = { x: p.x, y: p.y, moved: 99, camX: renderer.cam.x, camY: renderer.cam.y };
+  }
+}
+
+canvas.addEventListener('pointercancel', liftPointer);
+
+// A pointer whose release we never see would leave the map thinking a finger
+// is still down, and taps would stop working entirely. Losing focus is the way
+// that actually happens, so that's where it gets cleaned up.
+window.addEventListener('blur', () => {
+  pointers.clear();
+  pinch = null;
   drag = null;
-  if (wasDrag) return;
+  gestured = false;
+});
+
+canvas.addEventListener('pointerup', (e) => {
+  const wasDrag = (drag && drag.moved > 4) || gestured;
+  liftPointer(e);
+  if (pointers.size) return;          // still touching — not a tap yet
+  const { x: sx, y: sy } = local(e);
+  drag = null;
+  if (wasDrag) { gestured = false; return; }
   if (botTurn()) return;              // hands off while the computer is playing
-  const { offsetX: sx, offsetY: sy } = e;
 
   // An interior takes over the whole interaction while it's open.
   if (game.interior) {
@@ -207,7 +301,10 @@ canvas.addEventListener('pointerup', (e) => {
 
   const c = renderer.cellAt(sx, sy);
   const acted = game.cellClick(c.x, c.y);
-  if (!acted && game.phase === 'place' && !game.board.get(c.x, c.y) && nearBoard(c)) sfx.play('deny');
+  if (!acted && game.phase === 'place' && !game.board.get(c.x, c.y) && nearBoard(c)) {
+    sfx.play('deny');
+    fx.on('deny', { at: { x: c.x + 0.5, y: c.y + 0.5 } }, game);
+  }
 });
 
 canvas.addEventListener('contextmenu', (e) => {
@@ -300,6 +397,11 @@ for (const el of $('mechanics').querySelectorAll('input[data-mech]')) {
 }
 
 $('hints').onchange = (e) => { renderer.showHints = e.target.checked; };
+$('effects').checked = !stillness;
+$('effects').onchange = (e) => {
+  fx.enabled = e.target.checked;
+  if (!fx.enabled) fx.clear();
+};
 
 // --- sound controls ---------------------------------------------------------
 
@@ -519,6 +621,42 @@ function syncPanel() {
   renderMarket();
   renderActions();
   drawPreview();
+  bumpScores();
+}
+
+/**
+ * Make the number that changed jump. Every mode's panel — the default one and
+ * the six that build their own — lays a row out as `.player` with a `.pscore`
+ * in it, so this works everywhere without any of them being asked to help.
+ *
+ * It's the half of "you scored" that the board can't do: The Marches counts
+ * levies across the whole map, and there's nowhere on the board to put that
+ * number, but there is always a row in the panel.
+ */
+const BUMP_LIFE = { bump: 640, 'bump-down': 420 };
+let shownScores = [];
+const bumping = new Map();          // seat -> {kind, at}
+
+function bumpScores() {
+  const now = performance.now();
+  $('scores').querySelectorAll('.pscore').forEach((el, i) => {
+    const score = game.players[i]?.score;
+    if (score == null) return;
+    const was = shownScores[i];
+    if (fx.enabled && was != null && score !== was) {
+      bumping.set(i, { kind: score > was ? 'bump' : 'bump-down', at: now });
+    }
+    const b = bumping.get(i);
+    if (!b) return;
+    const elapsed = now - b.at;
+    if (elapsed >= BUMP_LIFE[b.kind]) { bumping.delete(i); return; }
+    // This panel is rebuilt from scratch whenever anything changes, so an
+    // animation that began two refreshes ago is *resumed* with a negative
+    // delay rather than restarted — otherwise a busy turn stutters it.
+    el.style.animationDelay = `-${Math.round(elapsed)}ms`;
+    el.classList.add(b.kind);
+  });
+  shownScores = game.players.map((p) => p.score);
 }
 
 $('export').onclick = () => {
@@ -571,5 +709,5 @@ frame();
 window.LAB = {
   get game() { return game; },
   get bots() { return bots; },
-  renderer, newGame, THEME, sfx, MODES, MECHANICS,
+  renderer, newGame, THEME, sfx, fx, MODES, MECHANICS,
 };

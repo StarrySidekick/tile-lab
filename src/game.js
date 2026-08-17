@@ -832,6 +832,24 @@ export class Game {
   }
 
   /**
+   * Where a component sits, for anything that wants to point at it — the score
+   * numbers that float off the board, and the flash that says which tiles the
+   * points came from. Returns null for a component with nothing left on the
+   * board, which a drowned or lifted one can be.
+   */
+  spotOf(d) {
+    const cells = this.board.cellsOf(d);
+    if (!cells.length) return null;
+    return {
+      at: {
+        x: cells.reduce((s, c) => s + c.x, 0) / cells.length + 0.5,
+        y: cells.reduce((s, c) => s + c.y, 0) / cells.length + 0.5,
+      },
+      cells: cells.map((c) => ({ x: c.x, y: c.y })),
+    };
+  }
+
+  /**
    * What a component pays, with every scoring mechanic folded in: the water a
    * city sits beside, and the inn or cathedral on it.
    */
@@ -861,7 +879,7 @@ export class Game {
       const who = winners.map((p) => this.players[p].name).join(' & ');
       const n = d.tiles.size;
       this.say(`${final ? 'Endgame: ' : ''}${d.type} of ${n} tile${n > 1 ? 's' : ''} → ${who} +${pts}`);
-      this.emit('score', { points: pts });
+      this.emit('score', { points: pts, players: winners, ...this.spotOf(d) });
     } else if (!final && !winners.length) {
       this.say(`A ${d.type} closed with nobody on it.`);
     }

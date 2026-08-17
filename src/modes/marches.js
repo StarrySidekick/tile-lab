@@ -224,7 +224,7 @@ export class Marches extends Mode {
       } else {
         g.say(`${names[1]} loses a company but holds.`);
       }
-      g.emit('score', { points: 1 });
+      g.emit('score', { points: 1, player: attacker, at: { x: x + 0.5, y: y + 0.5 } });
     } else {
       this.units = this.units.filter((u) => u !== unit);
       if (this.selected === unit) this.selected = null;

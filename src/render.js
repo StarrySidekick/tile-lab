@@ -20,6 +20,9 @@ const MOVE_OK = { rgb: '124,196,108', line: '#7cc46c' };
 const MOVE_SPECIAL = { rgb: '95,191,174', line: THEME.teal };
 const MOVE_COSTLY = { rgb: '196,104,80', line: '#c46850' };
 
+/** Fast then slow — the shape almost everything transient here moves on. */
+const ease = (t) => 1 - (1 - t) ** 3;
+
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -33,6 +36,7 @@ export class Renderer {
     this.pawnSpots = [];
     this.moveSpots = [];
     this.caveView = null;
+    this.fx = null;         // an Effects list, if anyone has given us one
     this.resize();
   }
 
@@ -147,7 +151,11 @@ export class Renderer {
 
     applyDusk(ctx, this.w, this.h);
 
-    // Interiors sit above the dusk pass — you're indoors, not outdoors.
+    // Effects sit above the dusk wash. A score you can't read is not a score
+    // you can read dimly — it's one you miss.
+    this.drawEffects();
+
+    // Interiors sit above that — you're indoors, not outdoors.
     if (game.interior) this.drawInterior(game); else this.caveView = null;
   }
 
@@ -669,6 +677,96 @@ export class Renderer {
     ctx.fillText(`${inv.label} — ${verb}`, g.x + 10, g.y + 20);
     ctx.fillStyle = THEME.dim;
     ctx.fillText(`${inv.deck.length} tiles left · ${inv.visited} discovered`, g.x + 10, g.y + g.size - 12);
+  }
+
+  // --- effects --------------------------------------------------------------
+
+  /**
+   * Whatever src/fx.js is currently holding. The effects themselves are inert
+   * data with a birth time and a lifespan; all the drawing is here, with the
+   * rest of the painting, so adding one is a case in this switch rather than a
+   * new canvas call in a module that isn't about canvases.
+   */
+  drawEffects() {
+    if (!this.fx) return;
+    const now = performance.now();
+    const items = this.fx.live(now);
+    if (!items.length) return;
+    const ctx = this.ctx;
+    const z = this.cam.zoom;
+
+    ctx.save();
+    for (const e of items) {
+      const t = Math.min(1, Math.max(0, (now - e.born) / e.life));
+      switch (e.kind) {
+        case 'float': {
+          // Rises, slowing, and fades out over the last third — the number has
+          // to be readable for most of its life or there's no point drawing it.
+          const rise = ease(t) * 0.85;
+          const [sx, sy] = this.toScreen(e.x, e.y - rise);
+          if (sx < -80 || sy < -80 || sx > this.w + 80 || sy > this.h + 80) break;
+          const pop = t < 0.16 ? 0.55 + 0.45 * (t / 0.16) : 1;
+          const size = Math.max(15, z * 0.34) * pop;
+          ctx.globalAlpha = t < 0.1 ? t / 0.1 : Math.min(1, (1 - t) / 0.34);
+          ctx.font = `700 ${size}px ui-sans-serif, system-ui, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.lineJoin = 'round';
+          ctx.lineWidth = Math.max(3, size * 0.24);
+          ctx.strokeStyle = 'rgba(13,11,17,0.9)';
+          ctx.strokeText(e.text, sx, sy);
+          ctx.fillStyle = e.color;
+          ctx.fillText(e.text, sx, sy);
+          break;
+        }
+
+        case 'flash': {
+          // Which tiles paid. One swell, in the colour of whoever was paid.
+          const a = Math.sin(t * Math.PI) ** 1.4;
+          ctx.globalAlpha = a * 0.36;
+          ctx.fillStyle = e.color;
+          for (const c of e.cells) {
+            if (!this.onScreen(c.x, c.y)) continue;
+            const [sx, sy] = this.toScreen(c.x, c.y);
+            ctx.fillRect(sx, sy, z, z);
+          }
+          ctx.globalAlpha = a * 0.85;
+          ctx.strokeStyle = e.color;
+          ctx.lineWidth = 2.5;
+          for (const c of e.cells) {
+            if (!this.onScreen(c.x, c.y)) continue;
+            const [sx, sy] = this.toScreen(c.x, c.y);
+            ctx.strokeRect(sx + 1.5, sy + 1.5, z - 3, z - 3);
+          }
+          break;
+        }
+
+        case 'ring': {
+          const [sx, sy] = this.toScreen(e.x, e.y);
+          ctx.globalAlpha = (1 - t) * 0.8;
+          ctx.strokeStyle = e.color;
+          ctx.lineWidth = Math.max(2, z * 0.05) * (1 - t * 0.6);
+          ctx.beginPath();
+          ctx.arc(sx, sy, (0.12 + ease(t) * e.r) * z, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+
+        case 'land': {
+          // A tile arriving: a square that closes onto the cell it landed in.
+          const [sx, sy] = this.toScreen(e.x, e.y);
+          const grow = (1 + (1 - ease(t)) * 0.5) * z * 0.5;
+          ctx.globalAlpha = (1 - t) * 0.7;
+          ctx.strokeStyle = THEME.gold;
+          ctx.lineWidth = Math.max(2, z * 0.04);
+          ctx.strokeRect(sx - grow, sy - grow, grow * 2, grow * 2);
+          break;
+        }
+
+        default: break;
+      }
+    }
+    ctx.restore();
   }
 
   drawDebug(game) {

@@ -121,7 +121,7 @@ export class Cirrus extends Mode {
     if (closer != null) {
       this.game.players[closer].score += pts + bonus;
       this.game.say(`${this.game.players[closer].name} crystallises a ${d.type} of ${d.tiles.size} → +${pts + bonus}`);
-      this.game.emit('score', { points: pts + bonus });
+      this.game.emit('score', { points: pts + bonus, player: closer, ...this.game.spotOf(d) });
     }
   }
 

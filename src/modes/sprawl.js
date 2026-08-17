@@ -155,7 +155,7 @@ export class Sprawl extends Mode {
       this.courtyards++;
       this.game.players[player].score += COURTYARD;
       this.game.say(`${this.game.players[player].name} seals a courtyard at (${h.x}, ${h.y}) +${COURTYARD}`);
-      this.game.emit('score', { points: COURTYARD });
+      this.game.emit('score', { points: COURTYARD, player, at: { x: h.x + 0.5, y: h.y + 0.5 }, cells: [h] });
     }
   }
 

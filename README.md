@@ -224,6 +224,36 @@ time, which is the only evidence that the three settings are a ladder rather
 than three flavours. Against a person who is thinking, it is beatable — that's
 the point of it.
 
+## Motion
+
+When something pays, the number floats off the tiles that paid it, in the
+colour of whoever was paid, and those tiles flash underneath it. That pairing
+is the point: a score you can see is worth less than a score you can *locate* —
+"+9" tells you how much, the flash tells you which city. Where a mode scores
+something with no place on the board (The Marches counting levies across the
+whole map) no number floats, because a "+14" over an unrelated tile is worse
+than no "+14" at all. The panel row bumps instead, and it bumps in every mode.
+
+Three smaller ones came free from the same wiring: a gold square closing onto
+a tile as it lands, a ring where a follower is claimed, and a red one where you
+tried to play something illegal.
+
+`src/fx.js` holds them. It's a list of inert items — a kind, a position in
+world units, a birth time, a lifespan — spawned from the *same* event stream
+that drives the sound, so neither knows the other exists and either can be
+switched off with nothing else noticing. The drawing lives in `render.js` with
+the rest of the painting. **Score effects** in the panel turns them off, and
+they start off if your system asks for reduced motion.
+
+Still scoped, roughly in order of what they'd buy: meeples walking to a feature
+rather than appearing on it, the tile flying in from the preview rather than
+materialising, a camera that eases to the computer's move instead of leaving
+you to find it, treasure effects inside caves (the interior has its own
+transform, so they need their own pass), the tide sliding rather than
+teleporting, drift blowing tiles off the board in Cirrus, and a proper endgame
+tally that walks the board feature by feature instead of settling the whole
+score in one frame.
+
 ## Playing
 
 | | |
@@ -238,7 +268,7 @@ the point of it.
 | Enter a city | stand on its gate, press `E` |
 | Skip / hold | `Space` |
 | Move a pawn | click your pawn, then a gold target |
-| Pan / zoom | drag / scroll |
+| Pan / zoom | drag / scroll, or one finger / two |
 | Recenter | `C` |
 | Feature overlay | `D` |
 
@@ -282,6 +312,7 @@ src/sprites.js     tile sprite cache, so the art is drawn once and then blitted
 src/game.js        the host: turn flow, deck, players, modifiers
 src/modes/         one file per mode, behind a small set of hooks
 src/ai.js          the computer player — one class, one action at a time
+src/fx.js          transient effects: floating scores, flashes, rings
 src/interior.js    caves and city streets — a sub-map on the same loop
 src/render.js      camera, canvas painting, overlays, hit-testing
 src/main.js        DOM wiring
@@ -392,6 +423,12 @@ any good" are different claims, and the second one only means anything against
 something. A bot that can't beat random play is broken rather than gentle. The
 browser test has its own version of the question: that a bot takes its turns off
 the render loop unprompted, and that the action buttons go dead while it does.
+
+Two more things only exist in a browser and are checked there: that spreading
+two synthetic pointers zooms in, bringing them together zooms out, and neither
+gesture leaves a tile behind — a pinch read as a tap is the bug you'd ship —
+and that a closure puts a number and a flash on the board and bumps the panel
+row that changed.
 
 `package.json` exists only so Node treats `src/` as ES modules for those two
 scripts. The game itself still has no build step and no dependencies.

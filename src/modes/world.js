@@ -66,7 +66,7 @@ export class World extends Mode {
       const pts = mountainValue(n);
       g.player.score += pts;
       g.say(`${g.player.name} extends a range to ${n} tiles → +${pts}`);
-      g.emit('score', { points: pts });
+      g.emit('score', { points: pts, player: g.current, ...g.spotOf(d) });
     });
   }
 
