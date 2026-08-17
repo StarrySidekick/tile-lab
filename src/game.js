@@ -372,9 +372,15 @@ export class Game {
 
   // --- the abbey (expansion 5) ---------------------------------------------
 
+  /**
+   * Not while the river is going down. The river owns placement completely —
+   * `canPlaceAt` routes through `riverLegal` before it looks at anything else —
+   * so an abbey taken out now is a tile with nowhere at all it may go, and the
+   * turn can never end.
+   */
   canPlayAbbey() {
     return this.has('abbey') && this.phase === 'place' && !this.usingAbbey
-      && this.player.abbeys > 0 && this.abbeyGaps().length > 0;
+      && !this.riverActive && this.player.abbeys > 0 && this.abbeyGaps().length > 0;
   }
 
   abbeyGaps() {

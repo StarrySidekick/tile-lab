@@ -320,9 +320,10 @@ function drawRoad(ctx, f, terrain, short = false) {
 }
 
 /**
- * A temple: a monastery with the ownership taken out and a direction put in.
- * The ring is open on the side it faces, and the pennant on the roof points
- * the way it will breathe when the country closes around it.
+ * A temple: a monastery that pays by the arrival rather than by the closure.
+ * The precinct ring is open on the side it faces — the way in — and the pennant
+ * on the roof points the same way, so a temple reads as facing somewhere even
+ * though nothing but the art cares which way that is.
  */
 function drawTemple(ctx, f, L) {
   const cx = 0.5, cy = 0.52, r = 0.29;
@@ -367,6 +368,50 @@ function drawTemple(ctx, f, L) {
   ctx.moveTo(0.01, -0.20); ctx.lineTo(0.22, -0.10); ctx.lineTo(0.01, -0.01);
   ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
+
+  ctx.restore();
+}
+
+/**
+ * A sfera: half a sphere, cut flush with one edge of the tile, so two of them
+ * meeting across a seam read as one whole ball. That's the entire visual rule —
+ * a player has to be able to see the join from across the table, because the
+ * join changes the game.
+ */
+function drawSfera(ctx, f, L) {
+  const side = f.sides[0] ?? 0;
+  const [vx, vy] = SIDE_VEC[side];
+  const cx = 0.5 + vx * 0.5, cy = 0.5 + vy * 0.5;      // centre sits ON the edge
+  const r = 0.30;
+
+  ctx.save();
+  // Clipped to the tile, so the half that belongs to the neighbour isn't drawn.
+  ctx.beginPath(); ctx.rect(0, 0, 1, 1); ctx.clip();
+
+  ctx.beginPath();
+  ctx.arc(cx - L.x * 0.03, cy - L.y * 0.03, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(13,11,17,0.30)';
+  ctx.fill();
+
+  const grad = ctx.createRadialGradient(
+    cx - L.x * 0.11, cy - L.y * 0.11, r * 0.12, cx, cy, r);
+  grad.addColorStop(0, '#cfe6df');
+  grad.addColorStop(0.55, '#7fb3a8');
+  grad.addColorStop(1, '#3c5f5c');
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.lineWidth = 0.028;
+  ctx.strokeStyle = '#2a4746';
+  ctx.stroke();
+
+  // A meridian, so a half looks like half of something rather than a blob.
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, r * 0.42, r, 0, 0, Math.PI * 2);
+  ctx.lineWidth = 0.016;
+  ctx.strokeStyle = 'rgba(232,222,208,0.30)';
+  ctx.stroke();
 
   ctx.restore();
 }
@@ -1432,6 +1477,7 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
   type.feats.forEach((f, i) => {
     if (f.type === 'forest' && f.shield) drawLog(ctx, type.spots[i], L);
   });
+  for (const f of type.feats) if (f.type === 'sfera') drawSfera(ctx, f, L);
   for (const f of type.feats) if (f.type === 'monastery') drawAbbey(ctx, L);
   for (const f of type.feats) if (f.type === 'temple') drawTemple(ctx, f, L);
 

@@ -226,6 +226,10 @@ export class Board {
     for (const cell of order) this.link(cell);
     for (const cell of order) {
       if (!cell.meeple) continue;
+      // A follower with no feature is lying on the tile rather than holding
+      // anything — the wind put it there. It stays where it is and counts for
+      // nobody until something it can stand in arrives underneath it.
+      if (cell.meeple.feat == null) continue;
       const d = this.featureOf(cell.x, cell.y, cell.meeple.feat);
       if (d) d.meeples.push({ ...cell.meeple, x: cell.x, y: cell.y });
       else cell.meeple = null;         // the feature it sat on no longer exists
@@ -350,6 +354,15 @@ export class Board {
       out.push(group);
     }
     return out;
+  }
+
+  /**
+   * The board as separate pieces of country, biggest first. Orthogonal only:
+   * two tiles touching at a corner are held up by each other but are not the
+   * same island, which is exactly the distinction Girando scores on.
+   */
+  groups() {
+    return this.regions(() => true).sort((a, b) => b.length - a.length);
   }
 
   /** Empty cells fully surrounded by tiles — courtyards, for Sprawl. */

@@ -37,12 +37,22 @@ const road = (sides) => ({ type: 'road', sides });
 const abbey = () => ({ type: 'monastery', sides: [] });
 
 /**
- * A temple is a monastery that nobody owns. It has no sides, it completes the
- * same way — surrounded on all eight — and it scores nothing at all. What it
- * has instead is a FACING: when the country closes around it, it exhales, and
- * everything on the board moves one square that way. Girando's engine.
+ * A temple is a monastery that pays as it goes rather than when it closes. It
+ * has no sides and completes the same way — surrounded on all eight — but the
+ * points come from the arrivals: its keeper takes an offering for every tile
+ * that lands in the parish, and double for one the wind put there. The wind
+ * can't move the building, and the figure inside it is indoors.
+ *
+ * The FACING is what the shrine looks toward. Nothing reads it but the art.
  */
 const temple = (face = N) => ({ type: 'temple', sides: [], face });
+
+/**
+ * Half of a sphere, on one edge. A sfera edge meets nothing but another sfera
+ * edge, so joining two of them is a deliberate act rather than an accident —
+ * and the moment two are joined, the sky starts counting islands.
+ */
+const sfera = (side = N) => ({ type: 'sfera', sides: [side] });
 
 /**
  * `dir` is a cardinal direction carried by a mark, rotated with its tile the
@@ -81,11 +91,11 @@ export const edgesMeet = (a, b) => a === b || a === CAP || b === CAP;
 /** Edge letter per feature type. Two edges match only if their letters do. */
 export const EDGE_LETTER = {
   city: 'c', road: 'r', monastery: 'f', temple: 'f',
-  forest: 'w', mountain: 'm', lake: 'l', river: 'v',
+  forest: 'w', mountain: 'm', lake: 'l', river: 'v', sfera: 'o',
 };
 
 /** Features you can't put a follower on. */
-export const NO_MEEPLE = new Set(['mountain', 'lake', 'river', 'temple']);
+export const NO_MEEPLE = new Set(['mountain', 'lake', 'river', 'sfera']);
 
 /**
  * Features that reach no edge and are completed by being surrounded, rather
@@ -106,7 +116,7 @@ export const GROUPS = [
   { id: 'adventure', name: 'Adventure sites', note: 'Wayshrines, ruins, campsites, merchants.', classic: false, expedition: false, adventure: true },
   { id: 'marches', name: 'War terrain', note: 'Keeps, forts, hills, fords, beacons.', classic: false, expedition: false, adventure: false },
   { id: 'descent', name: 'Dangers', note: 'Stairs down, bandits, wolves, barrows.', classic: false, expedition: false, adventure: false },
-  { id: 'cloud', name: 'Cloud kingdom', note: 'Zephyrs, temples, Abbazias, flying machines, windvanes, vestibules, skywalls and flutitantes.', classic: false, expedition: false, adventure: false },
+  { id: 'cloud', name: 'Cloud kingdom', note: 'Zephyrs, sferas, temples, Abbazias, flying machines, windvanes, vestibules, skywalls and flutitantes.', classic: false, expedition: false, adventure: false },
   { id: 'mountains', name: 'Mountains', note: 'Pay the moment the chain grows, scaling with its size. Nothing can be claimed on them.', classic: false, expedition: false, adventure: false },
   { id: 'forests', name: 'Forests', note: '1 per tile, +1 per log. No complete/incomplete distinction — a forest is just as big as it is.', classic: false, expedition: false, adventure: false },
   { id: 'lakes', name: 'Lakes', note: 'Shores and corners, never all four sides. A city beside water is worth more.', classic: false, expedition: false, adventure: false },
@@ -206,11 +216,24 @@ export const TILE_TYPES = [
   // Gusts, pointing north on the tile and wherever you turn it in the world.
   // Twelve of them, on every kind of ground there is: wind that only ever
   // arrived on empty fields would be wind you could plan around.
-  { id: 'Kz',  n: 4, group: 'cloud', name: 'Zephyr',        feats: [],                        marks: [mark('zephyr', null, N)] },
-  { id: 'Kzr', n: 3, group: 'cloud', name: 'Zephyr road',   feats: [road([E, W])],            marks: [mark('zephyr', null, N)] },
-  { id: 'Kzb', n: 2, group: 'cloud', name: 'Zephyr bend',   feats: [road([S, E])],            marks: [mark('zephyr', null, N)] },
-  { id: 'Kzc', n: 2, group: 'cloud', name: 'Zephyr wall',   feats: [city([W])],               marks: [mark('zephyr', null, N)] },
+  { id: 'Kz',  n: 5, group: 'cloud', name: 'Zephyr',        feats: [],                        marks: [mark('zephyr', null, N)] },
+  { id: 'Kzr', n: 4, group: 'cloud', name: 'Zephyr road',   feats: [road([E, W])],            marks: [mark('zephyr', null, N)] },
+  { id: 'Kzb', n: 3, group: 'cloud', name: 'Zephyr bend',   feats: [road([S, E])],            marks: [mark('zephyr', null, N)] },
+  { id: 'Kzc', n: 3, group: 'cloud', name: 'Zephyr wall',   feats: [city([W])],               marks: [mark('zephyr', null, N)] },
   { id: 'Kzt', n: 1, group: 'cloud', name: 'Zephyr gate',   feats: [city([S]), road([E, W])], marks: [mark('zephyr', null, N)] },
+
+  // The sfera: one edge is half a sphere and meets nothing but its other half.
+  // Join two and the sky starts counting islands, for the rest of the game.
+  { id: 'Kso', n: 3, group: 'cloud', name: 'Sfera',          feats: [sfera(N)] },
+  { id: 'Ksr', n: 3, group: 'cloud', name: 'Sfera road',     feats: [sfera(N), road([E, W])] },
+  { id: 'Ksc', n: 2, group: 'cloud', name: 'Sfera wall',     feats: [sfera(N), city([S])] },
+  { id: 'Ksb', n: 2, group: 'cloud', name: 'Sfera lane',     feats: [sfera(N), road([S])] },
+  { id: 'Ksx', n: 2, group: 'cloud', name: 'Sfera span',     feats: [sfera(N), city([E, W])] },
+
+  // End caps. A city has to be able to stop somewhere, and in a country that
+  // keeps being rearranged it needs to be able to stop more often than the
+  // base set allows.
+  { id: 'Kce', n: 5, group: 'cloud', name: 'Cloud city cap', feats: [city([N])] },
 
   // The vane and the vestibule are the same idea twice: four ways in, only two
   // of them joined, and the wind decides which two. Every edge matches, so
@@ -218,7 +241,7 @@ export const TILE_TYPES = [
   { id: 'Kw', n: 2, group: 'cloud', name: 'Windvane',   swing: true, feats: [road([N, S]), road([E]), road([W])] },
   { id: 'Kv', n: 2, group: 'cloud', name: 'Vestibule',  swing: true, feats: [city([N, S]), city([E]), city([W])] },
 
-  { id: 'Kt',  n: 2, group: 'cloud', name: 'Temple',        feats: [temple(N)] },
+  { id: 'Kt',  n: 3, group: 'cloud', name: 'Temple',        feats: [temple(N)] },
   { id: 'Kta', n: 0, group: 'cloud', name: 'Temple + road', feats: [temple(N), road([S])] },
 
   // A wall only stops what runs into its face. The mark's direction is the way
@@ -431,7 +454,7 @@ export const MARKS = {
 
   // cloud
   skyhold: { label: 'Skyhold', score: 3, note: 'Crystallises the moment its city closes.' },
-  zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane one square when played, and again whenever the wind reaches it.' },
+  zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane when played, and again whenever the wind reaches it. Gusts stack up to three squares.' },
   wall:    { label: 'Skywall', score: 0, note: 'Immovable, and it stops a wind that runs into its face. Wind along it passes by.' },
   abbazia: { label: 'Abbazia', score: 0, note: 'Caps every feature it touches — and un-caps them if the wind takes it away.' },
   flier:   { label: 'Flying machine', score: 0, note: 'Place it and a follower may fly out along it, riding any zephyr it crosses.' },

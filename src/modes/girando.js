@@ -7,20 +7,36 @@
 // to the sky: you place tiles and claim features like Carcassonne, and then
 // the wind rearranges the country underneath you.
 //
-// THE ZEPHYR is the engine — twelve of them in a seventy-two tile deck, which
-// is a full Carcassonne set's worth of country. Play one and
-// it blows down its lane — everything in that row or column, downwind, slides
-// one square. A gust runs the whole length of the lane: crystallised ground
-// doesn't move and a tile jammed against it has nowhere to go, but the wind
-// carries on past them and shoves everything loose beyond. Tiles that end up
-// touching nothing fall out of the sky and go back in the deck. Followers
-// standing on a road get blown off it; followers inside a city are behind
-// walls and ride it out. A zephyr caught by another zephyr fires in its turn,
-// so a good line of them is a chain reaction.
+// THE ZEPHYR is the engine — sixteen of them in a seventy-two tile deck. Play
+// one and it blows down its lane: everything in that row or column, downwind,
+// slides along. Gusts STACK — a wind that runs over a zephyr pointing the same
+// way absorbs it and blows a square harder, up to three squares — and a zephyr
+// pointing anywhere else isn't absorbed but fires in its own turn, so a good
+// line of them is a chain reaction. Crystallised ground doesn't move and a tile
+// jammed against it has nowhere to go, but the wind carries on past and shoves
+// everything loose beyond. Tiles that end up touching nothing fall out of the
+// sky and go back in the deck.
 //
-// A TEMPLE is a monastery nobody owns. It scores nothing. When the country
-// closes around it, it exhales: every lane on the board moves one square the
-// way it faces. Shove one with a zephyr and it pays you 2 — it likes the wind.
+// FOLLOWERS ARE WEATHER TOO. Once a figure is on the board it never comes off
+// by choice: a gust blows it the same distance as everything else in its lane,
+// and it takes up whatever it lands in — its own kind of feature if the new
+// tile has one, anything claimable if it doesn't, and simply lying on the tile
+// holding nothing if there's nothing there at all. Blown over open sky, it goes
+// back to its owner's hand. That is the only way home.
+//
+// A TEMPLE is claimable, immovable, and pays by the tile: 1 to its keeper every
+// time somebody LAYS a tile in the eight squares around it, and 2 every time
+// the wind BLOWS one in. It is the one reliable income in a mode where nothing
+// else is reliable, and it's reliable because the wind cannot touch it — a
+// figure inside a temple is indoors.
+//
+// THE SFERA is half a sphere on one edge, and that edge meets nothing but
+// another sfera's. Join two and they lock together forever — nothing moves them
+// again — and the sky starts COUNTING ISLANDS for the rest of the game: at the
+// end of every round, whoever has the most figures standing on a broken-off
+// piece of country scores a point for each of its tiles, ties paying both. It
+// resolves last, after everything else in the round, so a follower blown off an
+// island a moment before the count is a follower that wasn't there.
 //
 // THE WINDVANE AND THE VESTIBULE have four ways in and only two of them
 // joined, and the wind decides which two. A road that ran through one is a
@@ -51,21 +67,26 @@
 // sky. They're what's left of Cirrus's lifting, narrowed to the tiles that are
 // supposed to do it.
 //
-// There are no cloisters in the sky: every one of them is a temple. A city
-// pays 1 a tile, exactly like a road — two a tile made finishing one worth
-// chasing through the weather, and this is a mode where the weather decides.
+// There are no cloisters in the sky: every one of them is a temple. Cities pay
+// the ordinary 2 a tile, because in this mode finishing one is hard enough to
+// be worth the full price — and there are more end caps in the deck than the
+// base set has, because a country that keeps being rearranged needs more ways
+// to stop.
 //
 // The thesis is in one line: SCORING IS NOT GUARANTEED. Nothing pays until it
 // closes, nothing that hasn't closed pays at the end, an Abbazia blowing away
 // can un-finish what you already banked, and the wind is under no obligation
-// to leave your city where you built it.
+// to leave your city where you built it. The temple and the island are the two
+// exceptions, and both of them are the sky's terms, not yours.
 // ---------------------------------------------------------------------------
 
 import { Mode } from './mode.js';
-import { TILE_TYPES, MARKS, CENTRE_FEATURES, SIDE_STEP, buildDeck } from '../tiles.js';
+import { TILE_TYPES, MARKS, CENTRE_FEATURES, SIDE_STEP, opposite, buildDeck } from '../tiles.js';
 import { PLAYER_COLORS } from '../theme.js';
 import { partOfScored, claimableFeatures } from '../mechanics.js';
-import { storm, zephyrOn, worldDir, isRaft, isWall } from '../wind.js';
+import {
+  storm, zephyrOn, worldDir, isRaft, isWall, isTemple, shelters, MAX_STRENGTH,
+} from '../wind.js';
 
 const DECK_SIZE = 72;        // a full Carcassonne set's worth of country
 /**
@@ -78,16 +99,24 @@ const DECK_SIZE = 72;        // a full Carcassonne set's worth of country
  * sky to hand tiles back, tight enough that it can't blow forever.
  */
 const STORM_LIMIT = 96;
-const TEMPLE_SHOVE = 2;      // for blowing a temple with a zephyr
-const MAX_CHAIN = 6;         // temples setting off temples
+const TEMPLE_LAID = 1;       // to its keeper, per tile placed in the ring
+const TEMPLE_BLOWN = 2;      // …and per tile the wind puts there
+const MAX_CHAIN = 6;         // storms raised while a storm is still landing
 const FLIGHT_RANGE = 24;     // squares, before we assume the zephyrs are a loop
 
 /**
  * What Girando plays instead of parts of the base set. The 3-way junctions
  * carry a road THROUGH instead of ending it — fewer closures, more weather —
- * and there are no cloisters in the sky: every one of them is a temple.
+ * there are no cloisters in the sky (every one of them is a temple), and the
+ * four-sided city is out, because a city that can only ever be entered and
+ * never capped is a city the weather will never let you finish.
  */
-const SWAPS = { W: 'Gw', L: 'Gl', A: 'Kta', B: 'Kt' };
+const SWAPS = { W: 'Gw', L: 'Gl', A: 'Kta', B: 'Kt', C: 'E' };
+
+/** The eight squares around a tile — a temple's parish, and a monastery's. */
+const RING = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+const inRing = (a, b) => a && b && Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1
+  && !(a.x === b.x && a.y === b.y);
 
 export class Girando extends Mode {
   /**
@@ -113,13 +142,15 @@ export class Girando extends Mode {
 
   setup() {
     this.flight = null;
-    this.rattled = new Set();
     this.laid = 0;
     this.crystals = 0;
     this.gusts = 0;
     this.fallen = 0;
     this.blowing = false;
     this.queued = [];
+    this.islands = false;      // switched on for good by the first joined sfera
+    this.spheres = 0;
+    this.paidRing = new Set(); // "temple|tile" pairs already paid this turn
     const seed = this.game.board.get(0, 0);
     if (seed) seed.anchored = true;          // the founding stone stays put
   }
@@ -129,11 +160,13 @@ export class Girando extends Mode {
   afterPlace(cell) {
     cell.round = this.game.round;
     this.laid++;
+    this.payTemples([{ cell, from: null }], TEMPLE_LAID);
     const z = zephyrOn(cell);
     if (z) {
       this.game.say(`${this.game.player.name} lets the zephyr out.`);
       this.weather({ dir: worldDir(cell, z), from: { x: cell.x, y: cell.y } }, this.game.current);
     }
+    this.joinSferas();
     // The flight is worked out after the weather, because the weather may have
     // just rearranged everything the machine was going to fly over.
     this.flight = this.flightPath(cell);
@@ -142,23 +175,143 @@ export class Girando extends Mode {
 
   endTurn() {
     this.flight = null;
-    this.rattled.clear();
+    this.paidRing.clear();
     if (this.laid >= STORM_LIMIT) {
       this.game.say('The season turns, and the wind drops.');
       this.game.finish();
     }
   }
 
-  // --- scoring --------------------------------------------------------------
+  // --- temples --------------------------------------------------------------
 
   /**
-   * A city pays 1 a tile here, exactly like a road. Two a tile made finishing
-   * one worth chasing through the weather; one a tile makes a city just a
-   * bigger, slower road, which is the right price in a mode where the wind
-   * decides whether you finish anything at all.
+   * A temple is worth exactly what happens next to it. Every tile that arrives
+   * in its eight squares pays whoever is standing in it — one for a tile a
+   * player laid there, two for one the wind put there, which is the mode
+   * saying out loud that it would rather you built next to the weather than
+   * away from it.
+   *
+   * Paid at most once per temple per tile per turn. Without that, two zephyrs
+   * pointed at each other could walk the same tile in and out of the same
+   * parish all turn and print money doing it.
+   */
+  payTemples(arrivals, rate) {
+    const g = this.game;
+    for (const { cell, from } of arrivals) {
+      if (!cell || g.board.get(cell.x, cell.y) !== cell) continue;
+      for (const [dx, dy] of RING) {
+        const temple = g.board.get(cell.x + dx, cell.y + dy);
+        if (!temple || !isTemple(temple) || !temple.meeple) continue;
+        if (from && inRing(from, temple)) continue;     // it was already in the parish
+        const key = `${temple.x},${temple.y}|${cell.seq}`;
+        if (this.paidRing.has(key)) continue;
+        this.paidRing.add(key);
+        const who = temple.meeple.player;
+        g.players[who].score += rate;
+        g.say(`${g.players[who].name}'s temple at (${temple.x}, ${temple.y}) takes an offering +${rate}`);
+        g.emit('score', {
+          points: rate, player: who, players: [who],
+          at: { x: temple.x + 0.5, y: temple.y + 0.5 },
+          cells: [{ x: temple.x, y: temple.y }, { x: cell.x, y: cell.y }],
+        });
+      }
+    }
+  }
+
+  /**
+   * A temple pays nothing when it closes; it pays all the way there. Nothing
+   * in the engine scores one, so this exists purely to tell anyone pricing the
+   * board — the computer player, mostly — what standing in it is worth: one
+   * offering for every square of the parish still empty, and a bit more than
+   * one, because a good share of those tiles arrive on the wind at double.
    */
   valueOf(d) {
-    return d.type === 'city' ? d.tiles.size + d.shields : null;
+    if (d.type !== 'temple') return null;
+    const left = 8 - this.game.board.surroundCount(d.at.x, d.at.y);
+    return Math.round(left * (TEMPLE_LAID + TEMPLE_BLOWN) / 2);
+  }
+
+  // --- the sfera ------------------------------------------------------------
+
+  /**
+   * Two half-spheres meeting is the one event in the mode that changes the
+   * rules rather than the board. It can only happen deliberately — a sfera edge
+   * meets nothing else — and once it has happened it never un-happens, so the
+   * pair is nailed down where it stands and the sky counts islands from here to
+   * the end of the game.
+   */
+  joinSferas() {
+    const board = this.game.board;
+    let found = 0;
+    for (const d of board.allComponents()) {
+      if (d.type !== 'sfera' || d.tiles.size < 2) continue;
+      found++;
+      for (const cell of board.cellsOf(d)) {
+        if (cell.fixed) continue;
+        cell.fixed = true;
+        this.game.emit('landmark');
+      }
+    }
+    if (found <= this.spheres) return;
+    this.spheres = found;
+    if (!this.islands) {
+      this.islands = true;
+      this.game.say('The sphere closes. From here on, the sky counts islands.');
+    } else {
+      this.game.say('Another sphere closes, and locks where it stands.');
+    }
+  }
+
+  /**
+   * Islands, at the end of a round, after everything else — which is the whole
+   * of the timing rule: a follower blown off a rock a moment ago is a follower
+   * that isn't standing on it now.
+   *
+   * The biggest piece of country is the mainland and pays nobody; everything
+   * that has broken off it is an island, and the majority standing on one takes
+   * a point for each of its tiles. Ties pay in full, both ways.
+   *
+   * With one brake, and it is load-bearing. A tile pays a given player ONCE —
+   * the stone remembers who it has already paid. Without that the count is
+   * every round for the rest of the game, and twenty games of it read the same
+   * way every time: whoever's follower happened to be standing on the big piece
+   * when it broke off collects its size, thirty times over, and nothing else
+   * that happens in the game matters. Marking the stones keeps every incentive
+   * the rule was for — break country off, stand on it, take it off somebody —
+   * because a rival who seizes the majority collects the whole island fresh,
+   * and an island that grows pays its new stones to whoever holds it.
+   */
+  scoreIslands() {
+    if (!this.islands) return;
+    const g = this.game;
+    const groups = g.board.groups();
+    if (groups.length < 2) return;
+    for (const group of groups.slice(1)) {
+      const counts = new Map();
+      for (const cell of group) {
+        if (!cell.meeple) continue;
+        const n = cell.meeple.big ? 2 : 1;
+        counts.set(cell.meeple.player, (counts.get(cell.meeple.player) || 0) + n);
+      }
+      if (!counts.size) continue;
+      const best = Math.max(...counts.values());
+      const winners = [...counts.entries()].filter(([, n]) => n === best).map(([p]) => p);
+      for (const p of winners) {
+        const fresh = group.filter((c) => !(c.paid || (c.paid = new Set())).has(p));
+        if (!fresh.length) continue;
+        for (const c of fresh) c.paid.add(p);
+        g.players[p].score += fresh.length;
+        g.say(`Island of ${group.length} tile${group.length > 1 ? 's' : ''} → ${g.players[p].name} +${fresh.length}`);
+        g.emit('score', {
+          points: fresh.length, player: p, players: [p],
+          at: {
+            x: fresh.reduce((s, c) => s + c.x, 0) / fresh.length + 0.5,
+            y: fresh.reduce((s, c) => s + c.y, 0) / fresh.length + 0.5,
+          },
+          cells: fresh.map((c) => ({ x: c.x, y: c.y })),
+        });
+      }
+    }
   }
 
   // --- flying machines ------------------------------------------------------
@@ -216,11 +369,11 @@ export class Girando extends Mode {
   // --- the weather ----------------------------------------------------------
 
   /**
-   * Blow, then pay for whatever that finished, then blow again if a temple
-   * closed while the dust was settling.
+   * Blow, then pay for whatever that finished, then blow again if the settling
+   * raised another wind.
    *
-   * Re-entrant on purpose: a gust can complete a temple, and a temple exhaling
-   * is another gust. Rather than recursing through `onClosed` — which would
+   * Re-entrant on purpose: scoring a closure can move the board, and moving the
+   * board can score. Rather than recursing through `onClosed` — which would
    * interleave two storms and score them in an order nobody could follow —
    * anything raised mid-storm is queued and run after the current one lands.
    */
@@ -230,7 +383,7 @@ export class Girando extends Mode {
     try {
       let job = [spec, by];
       for (let n = 0; job && n < MAX_CHAIN; n++) {
-        for (const report of storm(this.game.board, job[0])) this.applyGust(report, job[1]);
+        for (const report of storm(this.game.board, job[0])) this.applyGust(report);
         this.reopen();
         this.settle(job[1]);
         job = this.queued.shift();
@@ -243,10 +396,10 @@ export class Girando extends Mode {
   }
 
   /** Turn one gust's report into points, losses, log lines and pictures. */
-  applyGust(r, by) {
+  applyGust(r) {
     const g = this.game;
     this.gusts++;
-    if (!r.moved.length && !r.swung.length) return;
+    if (!r.moved.length && !r.swung.length && !r.homed.length) return;
 
     g.emit('gust', {
       dir: r.dir,
@@ -257,44 +410,49 @@ export class Girando extends Mode {
       })),
       fell: r.fell.map((f) => ({ x: f.x, y: f.y, type: f.type, rot: f.rot })),
     });
+    if (r.strength > 1) {
+      g.say(`The gust picks up a second wind — ${r.strength} square${r.strength > 1 ? 's' : ''}.`);
+    }
 
     // Tiles that end up touching nothing go back in the deck — the sky keeps
     // what it takes, and hands it back later.
     for (const f of r.fell) {
       g.deck.push(f.id);
-      if (f.meeple) g.players[f.meeple.player].meeples++;
       this.fallen++;
     }
     if (r.fell.length) {
       g.say(`${r.fell.length} tile${r.fell.length > 1 ? 's' : ''} blow off the edge of the world.`);
     }
 
-    for (const m of r.unseated) {
+    // Followers travel with the weather. One the wind put down somewhere is
+    // still on the board and still counts for whoever owns it; one it carried
+    // out over open sky is the only figure that ever comes home.
+    for (const m of r.carried) {
+      g.emit('step', {
+        from: { x: m.from.x + 0.5, y: m.from.y + 0.5 },
+        at: { x: m.to.x + 0.5, y: m.to.y + 0.5 },
+        key: `meeple:${m.to.x},${m.to.y}`, player: m.player,
+      });
+    }
+    if (r.carried.length) {
+      g.say(`${r.carried.length} follower${r.carried.length > 1 ? 's are' : ' is'} carried down the lane.`);
+    }
+    for (const m of r.homed) {
       g.players[m.player].meeples++;
-      g.say(`${g.players[m.player].name}'s follower is blown off the road at (${m.x}, ${m.y}).`);
+      if (m.big) g.players[m.player].big++;
+      g.say(`${g.players[m.player].name}'s follower is blown into open sky and comes home.`);
+      g.emit('meeple', { recall: true, player: m.player, at: { x: m.x + 0.5, y: m.y + 0.5 } });
     }
 
     if (r.swung.length) {
       g.say(`${r.swung.length} vane${r.swung.length > 1 ? 's' : ''} swing${r.swung.length > 1 ? '' : 's'} into the wind.`);
     }
 
-    // A temple likes being shoved — once. A gust that sets off three more
-    // gusts can put a hand on the same temple four times in one turn, and
-    // paying for each of them turns rattling into an income stream that
-    // dwarfs anything you could earn by actually finishing something.
-    if (by != null) {
-      for (const cell of r.temples) {
-        const key = `${cell.x},${cell.y}`;
-        if (this.rattled.has(key)) continue;
-        this.rattled.add(key);
-        g.players[by].score += TEMPLE_SHOVE;
-        g.say(`${g.players[by].name} rattles the temple at (${cell.x}, ${cell.y}) +${TEMPLE_SHOVE}`);
-        g.emit('score', {
-          points: TEMPLE_SHOVE, player: by,
-          at: { x: cell.x + 0.5, y: cell.y + 0.5 }, cells: [{ x: cell.x, y: cell.y }],
-        });
-      }
-    }
+    // Tiles the wind has just parked next to a temple pay double. A tile that
+    // was already in the parish and only shuffled along inside it doesn't:
+    // arriving is the thing that's worth something.
+    this.payTemples(r.moved, TEMPLE_BLOWN);
+    this.joinSferas();
   }
 
   /**
@@ -339,7 +497,8 @@ export class Girando extends Mode {
   // --- closing --------------------------------------------------------------
 
   onClosed(d, closer) {
-    if (d.type === 'temple') return this.templeCloses(d, closer);
+    if (d.type === 'sfera') return;              // a sphere isn't scored, it's a rule
+    if (d.type === 'temple') return this.templeCloses(d);
 
     const winners = this.game.board.majority(d);
     this.game.award(d, false, closer);
@@ -364,20 +523,23 @@ export class Girando extends Mode {
   }
 
   /**
-   * A temple pays nobody. What it does instead is breathe out: every lane on
-   * the board moves one square the way it faces.
+   * A temple's income stops when the parish is full: eight tiles have arrived,
+   * eight offerings have been paid, and there is nowhere left for a ninth to
+   * come from. It crystallises, and the keeper walks home.
    */
-  templeCloses(d, by) {
-    const board = this.game.board;
-    const cell = board.get(d.at.x, d.at.y);
-    if (!cell) return;
-    cell.anchored = true;
-    this.crystals++;
-    const feat = cell.type.feats.find((f) => f.type === 'temple');
-    const dir = ((feat?.face ?? 0) + cell.rot) % 4;
-    this.game.say(`The temple at (${cell.x}, ${cell.y}) is enclosed, and exhales ${['north', 'east', 'south', 'west'][dir]}.`);
-    this.game.emit('landmark');
-    this.weather({ dir, everywhere: true }, by);
+  templeCloses(d) {
+    const g = this.game;
+    const cell = g.board.get(d.at.x, d.at.y);
+    if (cell && !cell.anchored) { cell.anchored = true; this.crystals++; }
+    const home = g.board.reclaim(d);
+    for (const m of home) {
+      g.players[m.player].meeples++;
+      if (m.big) g.players[m.player].big++;
+    }
+    g.say(home.length
+      ? `The temple at (${d.at.x}, ${d.at.y}) is enclosed, and its keeper comes home.`
+      : `The temple at (${d.at.x}, ${d.at.y}) is enclosed, with nobody in it.`);
+    g.emit('landmark');
   }
 
   // --- flutitantes ----------------------------------------------------------
@@ -390,7 +552,7 @@ export class Girando extends Mode {
    */
   liftable(x, y) {
     const cell = this.game.board.get(x, y);
-    if (!cell || !isRaft(cell) || cell.anchored || cell.meeple) return false;
+    if (!cell || !isRaft(cell) || cell.anchored || cell.fixed || cell.meeple) return false;
     return !partOfScored(this.game.board, cell);
   }
 
@@ -428,42 +590,122 @@ export class Girando extends Mode {
 
   // --- the season -----------------------------------------------------------
 
+  /** Islands last, after every other action in the round — that's the rule. */
   endRound() {
+    this.scoreIslands();
     if (this.game.board.size === 0) this.game.finish();
   }
 
   // --- what a computer player can't see -------------------------------------
   //
   // The bot reads the board: what closed, who holds it, what it pays. None of
-  // that includes the weather, and in this mode the weather is the game.
+  // that includes the weather, and in this mode the weather is the game. Four
+  // things are worth points it can't see — a temple's parish, a sphere about to
+  // close, the majority on an island, and the lane a zephyr is about to open.
 
   botPlaceBonus(cells, player) {
     const board = this.game.board;
     let value = 0;
     for (const cell of cells) {
+      value += this.templeValue(cell, player, TEMPLE_LAID);
+      value += this.sferaValue(cell);
       // Ground in a wall's lee keeps what you build on it.
       for (const other of board.cells.values()) {
         if (!isWall(other)) continue;
         if (other.x === cell.x || other.y === cell.y) { value += 0.6; break; }
       }
       const z = zephyrOn(cell);
-      if (!z) continue;
-      // What this gust would knock about: temples pay, and a follower of
-      // someone else's blown off a road is worth having done.
-      const dir = worldDir(cell, z);
-      const vertical = dir === 0 || dir === 2;
-      const back = dir === 0 || dir === 3 ? -1 : 1;
-      for (const other of board.cells.values()) {
-        if (other.anchored) continue;
-        const inLane = vertical
-          ? other.x === cell.x && Math.sign(other.y - cell.y) === back
-          : other.y === cell.y && Math.sign(other.x - cell.x) === back;
-        if (!inLane) continue;
-        if (other.type.feats.some((f) => f.type === 'temple')) value += TEMPLE_SHOVE;
-        if (other.meeple && other.meeple.player !== player
-          && other.type.feats[other.meeple.feat]?.type === 'road') value += 1.5;
-        if (other.meeple && other.meeple.player === player) value -= 1.5;
+      if (z) value += this.gustValue(cell, worldDir(cell, z), player);
+    }
+    if (this.islands) value += this.islandValue(player);
+    return value;
+  }
+
+  /** Laying next to somebody's temple pays them, not you. */
+  templeValue(cell, player, rate) {
+    let value = 0;
+    for (const [dx, dy] of RING) {
+      const t = this.game.board.get(cell.x + dx, cell.y + dy);
+      if (!t || !isTemple(t)) continue;
+      if (t.meeple) value += t.meeple.player === player ? rate : -rate;
+      // An empty temple you could stand in yourself is a parish waiting for a
+      // keeper: worth roughly one offering for each square still to be filled.
+      else value += 0.25 * (8 - this.game.board.surroundCount(t.x, t.y));
+    }
+    return value;
+  }
+
+  /** A half-sphere next to its other half is the rule-change, and it's free. */
+  sferaValue(cell) {
+    const board = this.game.board;
+    const has = cell.type.feats.some((f) => f.type === 'sfera');
+    if (!has) return 0;
+    for (let s = 0; s < 4; s++) {
+      const i = board.featAt(cell, s);
+      if (i == null || cell.type.feats[i].type !== 'sfera') continue;
+      const nb = board.neighbor(cell.x, cell.y, s);
+      if (!nb) continue;
+      const theirs = board.featAt(nb, opposite(s));
+      if (theirs != null && nb.type.feats[theirs].type === 'sfera') return this.islands ? 2 : 6;
+    }
+    return 0.5;                                  // a half-sphere is worth having out
+  }
+
+  /**
+   * What letting this gust out does. It is the same three questions the wind
+   * itself asks — how hard is it blowing by the time it gets there, whose
+   * figures are in the way, and whose temples does it feed — answered by
+   * walking the lane rather than by simulating it, because the bot prices
+   * hundreds of candidate squares a turn.
+   */
+  gustValue(cell, dir, player) {
+    const board = this.game.board;
+    const [dx, dy] = SIDE_STEP[dir];
+    let value = 0;
+    let strength = 1;
+    for (let step = 1; step <= 24; step++) {
+      const other = board.get(cell.x + dx * step, cell.y + dy * step);
+      if (!other) continue;
+      const z = zephyrOn(other);
+      if (z && worldDir(other, z) === dir) strength = Math.min(MAX_STRENGTH, strength + 1);
+      // A follower about to be moved: ours is a risk, theirs is an opportunity,
+      // and either way the further it travels the less likely it lands well.
+      if (other.meeple && !isTemple(other)) {
+        const dest = board.get(other.x + dx * strength, other.y + dy * strength);
+        const worse = dest ? 0.6 : 2;            // over open sky it goes home
+        value += other.meeple.player === player ? -worse : worse * 0.7;
       }
+      // Tiles the gust is about to park in one of our parishes.
+      if (!other.anchored && !other.fixed && !isTemple(other)) {
+        value += this.templeValue(
+          { x: other.x + dx * strength, y: other.y + dy * strength }, player, TEMPLE_BLOWN * 0.6);
+      }
+      if (shelters(other, dir)) break;           // a wall face-on ends the lane
+    }
+    return value;
+  }
+
+  /**
+   * Islands pay every round, so a majority on one is worth more than a single
+   * payout — and being one figure short of a majority is worth crossing the
+   * board for.
+   */
+  islandValue(player) {
+    const groups = this.game.board.groups();
+    if (groups.length < 2) return 0;
+    let value = 0;
+    for (const group of groups.slice(1)) {
+      let mine = 0, theirs = 0;
+      for (const cell of group) {
+        if (!cell.meeple) continue;
+        const n = cell.meeple.big ? 2 : 1;
+        if (cell.meeple.player === player) mine += n; else theirs = Math.max(theirs, n);
+      }
+      // Only the stones that haven't paid us yet are worth anything, which is
+      // also why taking an island off somebody is worth its whole size.
+      const owed = group.filter((c) => !c.paid?.has(player)).length;
+      if (mine >= theirs && mine > 0) value += owed;
+      if (theirs >= mine && theirs > 0) value -= owed * 0.5;
     }
     return value;
   }
@@ -472,7 +714,7 @@ export class Girando extends Mode {
 
   /** Solid land reads hard-edged; everything else reads as weather. */
   cellOverlay(cell) {
-    const out = cell.anchored ? { crystal: true } : { cloud: true };
+    const out = cell.anchored || cell.fixed ? { crystal: true } : { cloud: true };
     if (isRaft(cell)) out.raft = true;
     return out;
   }
@@ -493,8 +735,10 @@ export class Girando extends Mode {
   }
 
   status() {
-    const solid = [...this.game.board.cells.values()].filter((c) => c.anchored).length;
-    return `${this.laid} tiles laid · ${solid} solid · ${this.game.board.size - solid} still cloud`;
+    const solid = [...this.game.board.cells.values()].filter((c) => c.anchored || c.fixed).length;
+    const isles = Math.max(0, this.game.board.groups().length - 1);
+    return `${this.laid} tiles laid · ${solid} solid · ${this.game.board.size - solid} still cloud`
+      + (this.islands ? ` · ${isles} island${isles === 1 ? '' : 's'} adrift` : '');
   }
 
   panel() {
@@ -508,7 +752,10 @@ export class Girando extends Mode {
           <span class="pscore">${p.score}</span>
         </div>`;
     }).join('');
-    return `${rows}<p class="hint">${this.gusts} gust${this.gusts === 1 ? '' : 's'} · ${this.fallen} tile${this.fallen === 1 ? '' : 's'} lost to the sky. Nothing pays until it closes, and nothing pays at the end.</p>`;
+    const isles = this.islands
+      ? 'The spheres are joined — islands pay at the end of every round.'
+      : 'Join two half-spheres and the sky starts counting islands.';
+    return `${rows}<p class="hint">${this.gusts} gust${this.gusts === 1 ? '' : 's'} · ${this.fallen} tile${this.fallen === 1 ? '' : 's'} lost to the sky. ${isles}</p>`;
   }
 }
 
@@ -522,5 +769,5 @@ Girando.spec = {
   maxPlayers: 4,
   tideStart: 5,
   opening: 'A first stone hangs in the cloud. Everything else is weather.',
-  hint: 'Claim as normal — but a zephyr blows its whole lane, temples blow the whole board, an Abbazia caps whatever it touches until the wind takes it, and nothing unfinished ever pays.',
+  hint: 'Claim as normal — but a zephyr blows its whole lane and stacks up to three, followers are blown along with the tiles, a temple pays its keeper for every tile that arrives beside it, and two joined spheres make the sky count islands for the rest of the game.',
 };

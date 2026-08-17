@@ -358,31 +358,85 @@ function checkWind() {
     if (reports.length < 2) return fail('a blown zephyr fires in its turn', `${reports.length} gust(s)`);
   }
 
-  // Followers: blown off a road, safe behind city walls.
+  // Followers ride their own tile: it moves, they move, and neither notices.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
-    const road = lay(b, 0, -1, 'U');
+    lay(b, 0, -1, 'U');
     b.addMeeple(0, -1, 0, 0);
-    const town = lay(b, 0, -2, 'E');        // a city edge, facing north
-    b.addMeeple(0, -2, 0, 1);
+    lay(b, 0, -2, 'U');
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (r.unseated.length !== 1 || r.unseated[0].player !== 0) {
-      return fail('a follower on a road is blown off it', JSON.stringify(r.unseated));
-    }
-    if (!town.meeple) return fail('a follower inside a city rides it out', 'it was blown off');
-    if (road.meeple) return fail('the unseated follower leaves the tile', 'it is still standing there');
+    if (b.get(0, -1)) return fail('the road under the follower moves', 'it stayed');
+    if (!b.get(0, -2)?.meeple) return fail('a follower travels with its tile', JSON.stringify(r.carried));
+    if (r.homed.length) return fail('nobody goes home from a tile that landed', JSON.stringify(r.homed));
   }
 
-  // A temple exhaling moves every lane, not just its own.
+  // …and a follower on ground the wind can't move is picked up off it and put
+  // down downwind, on whatever it finds there.
   {
     const b = new Board();
-    lay(b, 0, 0, 'Kt').anchored = true;     // a temple has crystallised by now
-    lay(b, 3, 3, 'U'); lay(b, 4, 3, 'U');           // one lane, far from the temple
-    lay(b, -3, -3, 'U'); lay(b, -4, -3, 'U');       // another, the other way
-    gust(b, { dir: 2, everywhere: true });
-    if (!b.get(3, 4) || !b.get(-3, -2)) return fail('a temple blows every lane', 'some lane sat still');
-    if (!b.get(0, 0)) return fail('a crystallised temple stays where it is', 'it blew itself away');
+    lay(b, 0, 0, 'Kz');
+    const rock = lay(b, 0, -1, 'U');
+    rock.anchored = true;
+    b.addMeeple(0, -1, 0, 0);
+    lay(b, 0, -2, 'U').anchored = true;     // a ledge downwind to be put down on
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (rock.meeple) return fail('a follower is lifted off crystallised ground', 'it stayed put');
+    if (!b.get(0, -2)?.meeple || r.carried.length !== 1) {
+      return fail('the wind puts it down one square on', JSON.stringify(r.carried));
+    }
+  }
+
+  // Blown over open sky, it goes back to its owner's hand — the only way off.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    const rock = lay(b, 0, -1, 'U');
+    rock.anchored = true;
+    b.addMeeple(0, -1, 0, 2);
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (r.homed.length !== 1 || r.homed[0].player !== 2) {
+      return fail('a follower blown into open sky comes home', JSON.stringify(r.homed));
+    }
+  }
+
+  // A temple keeps its keeper: the wind can't move the building, and a figure
+  // inside it is indoors.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    const temple = lay(b, 0, -1, 'Kt');
+    b.addMeeple(0, -1, 0, 1);
+    lay(b, 1, -1, 'U');                     // a neighbour so nothing falls
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (!b.get(0, -1) || b.get(0, -1) !== temple) return fail('a temple does not move', 'it blew away');
+    if (!temple.meeple) return fail('a temple keeps its keeper', 'the wind took them');
+  }
+
+  // Gusts stack: a wind that runs over a zephyr pointing the same way blows a
+  // square harder, and no harder than three however many agree.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // the one we set off, north
+    lay(b, 0, -1, 'Kz');                    // …and three more, all north
+    lay(b, 0, -2, 'Kz'); lay(b, 0, -3, 'Kz'); lay(b, 0, -4, 'Kz');
+    const far = lay(b, 0, -5, 'U');
+    lay(b, 1, -9, 'U');                     // something to land beside
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (r.strength !== 3) return fail('a gust stacks to three and no further', `strength ${r.strength}`);
+    if (far.y !== -8) return fail('the far tile travels three squares', `it is at y=${far.y}`);
+  }
+
+  // A joined sfera is nailed down: the mode locks the pair, and the wind can't.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    const held = lay(b, 0, -1, 'U');
+    held.fixed = true;
+    lay(b, 0, -2, 'U'); lay(b, 0, -3, 'U');
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (b.get(0, -1) !== held) return fail('a locked tile does not move', 'the wind took it');
+    if (!b.get(0, -3)) return fail('the wind carries on past a locked tile', 'the far side sat still');
   }
 
   // A wall only stops a wind that runs into its face.
@@ -443,7 +497,7 @@ function checkWind() {
     if (road.tiles.size !== 1) return fail('a mismatched seam joins nothing', `road spans ${road.tiles.size}`);
   }
 
-  console.log('  ✓ lanes, corners, walls, windbreaks, crystals, vanes, chains, followers, temples, Abbazias, bad seams');
+  console.log('  ✓ lanes, corners, walls, windbreaks, crystals, vanes, chains, stacking, followers, temples, locks, Abbazias, bad seams');
 }
 
 // --- runs -------------------------------------------------------------------
