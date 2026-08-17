@@ -81,15 +81,20 @@ export class Marches extends Mode {
 
   // --- placing: banners -----------------------------------------------------
 
-  afterPlace(cell) {
-    const me = this.game.current;
+  /** Lay a tile beside ground you already hold and your banner goes on it. */
+  raisesBanner(cell, player) {
     const board = this.game.board;
-    let claimed = false;
     for (let s = 0; s < 4; s++) {
       const nb = board.neighbor(cell.x, cell.y, s);
       if (!nb) continue;
-      if (nb.banner === me || this.unitsAt(nb.x, nb.y).some((u) => u.player === me)) claimed = true;
+      if (nb.banner === player || this.unitsAt(nb.x, nb.y).some((u) => u.player === player)) return true;
     }
+    return false;
+  }
+
+  afterPlace(cell) {
+    const me = this.game.current;
+    const claimed = this.raisesBanner(cell, me);
     if (claimed) {
       cell.banner = me;
       this.game.say(`${this.game.player.name} raises a banner over (${cell.x}, ${cell.y}).`);
@@ -310,6 +315,52 @@ export class Marches extends Mode {
   /** A last count when the deck runs out before the season does. */
   finish() {
     if ((this.roundsPlayed || 0) % SCORE_EVERY !== 0) this.count();
+  }
+
+  // --- what a computer player can't see -------------------------------------
+  //
+  // None of this mode's scoring goes through features, so from the board alone
+  // a bot would be playing a version of The Marches with no war in it.
+  //
+  // What it still can't see, and what a better bot would: SEVERING. The
+  // sharpest move here is the tile that cuts a region off from its keep, and
+  // pricing that means running the supply trace for every candidate placement.
+
+  botPlaceBonus(cells, player) {
+    let value = 0;
+    for (const cell of cells) {
+      if (!this.raisesBanner(cell, player)) continue;
+      value += 3;                                    // a banner, counted every levy
+      for (const m of cell.type.marks) {
+        if (m.kind === 'beacon') value += 1;
+        if (['market', 'keep', 'library', 'armoury'].includes(m.kind)) value += CITY_VALUE;
+      }
+    }
+    return value;
+  }
+
+  botMoveValue(unit, dest) {
+    const board = this.game.board;
+    const me = unit.player;
+    const cell = board.get(dest.x, dest.y);
+    if (!cell) return -1;
+
+    // Battle is deterministic, so the odds are simply arithmetic — and losing
+    // a company for nothing is worse than a wasted turn.
+    if (this.enemyAt(dest.x, dest.y, me)) {
+      const attack = this.unitsAt(unit.x, unit.y).filter((u) => u.player === me).length + this.chits[me];
+      const defend = this.unitsAt(dest.x, dest.y).length + this.defenceOf(dest.x, dest.y);
+      return attack > defend ? 5 : -8;
+    }
+
+    let value = cell.banner === me ? 0 : 2.5;        // standing on ground flips it
+    if (cell.banner != null && cell.banner !== me) value += 1.5;   // …off them
+    for (const m of cell.type.marks) if (MARKS[m.kind]?.muster) value += 2;
+    // Ground beside your own is ground that can trace back to the keep.
+    for (let s = 0; s < 4; s++) {
+      if (board.neighbor(dest.x, dest.y, s)?.banner === me) value += 0.8;
+    }
+    return value;
   }
 
   // --- UI -------------------------------------------------------------------

@@ -181,6 +181,49 @@ walking mode "three" means three tiles and three moves before play passes on.
 It is the cheapest way to find out whether a mode is paced wrong — most of
 these were built assuming one, and several are better at two.
 
+## Playing against the computer
+
+**Computer** hands the last seats to a bot, so you're always the first player.
+It starts on, with one opponent: set it to *None* for a hotseat game, or to
+*All* and watch them play each other. It applies immediately, mid-game
+included — switch it on and the computer inherits whatever position you'd got
+yourself into, which is also the quickest way to find out what it would have
+done differently.
+
+**Skill** is three settings of one judgement rather than three bots. *Steady*
+is the evaluation straight. *Careless* is the same one shouted over — about
+nine points of noise on every candidate move, so it misses things without
+playing nonsense. *Sharp* takes the noise off, claims a little more eagerly,
+and bothers with the one-off verbs: the abbey, the big follower, flipping a
+two-faced tile, lifting a placed one when nothing else will fit.
+
+**Thinking** is the pause between its actions. *Instant* is one action per
+frame, which is the setting for watching a whole game go past.
+
+It plays every mode, because it doesn't know what a mode is. Each candidate
+move is genuinely played on the board, the position that results is scored from
+its seat, and the tile comes straight back off — `Board.remove()` rebuilds
+connectivity from scratch, so a trial leaves nothing behind. What it counts is
+what closed and what the closure pays, who is standing in what, what an open
+feature will *probably* be worth by the end (a city with room to grow is worth
+more than a cramped one, and both are worth less with every tile that leaves
+the deck), and whether it's leaving something one tile from closing for the
+player after it.
+
+Anything a mode scores on its own books is invisible to that, so the modes hand
+it the missing points through two hooks — banners and battle odds in The
+Marches, landmarks in Expedition, courtyards in Sprawl, height in Strata,
+mountain ranges in World. A mode that implements neither gets a bot that plays
+the placement game straight and ignores the trimmings, which is a fair
+description of what it is.
+
+It searches one move deep and it does not model the deck. Against random legal
+play in Classic it takes about 90% of decided games on *Careless* and
+effectively all of them on *Sharp*; *Sharp* beats *Steady* about 88% of the
+time, which is the only evidence that the three settings are a ladder rather
+than three flavours. Against a person who is thinking, it is beatable — that's
+the point of it.
+
 ## Playing
 
 | | |
@@ -238,6 +281,7 @@ src/shape.js       area silhouettes — the corner-to-corner rule that makes til
 src/sprites.js     tile sprite cache, so the art is drawn once and then blitted
 src/game.js        the host: turn flow, deck, players, modifiers
 src/modes/         one file per mode, behind a small set of hooks
+src/ai.js          the computer player — one class, one action at a time
 src/interior.js    caves and city streets — a sub-map on the same loop
 src/render.js      camera, canvas painting, overlays, hit-testing
 src/main.js        DOM wiring
@@ -317,6 +361,13 @@ Every hook has a do-nothing default, so a mode file only writes what it changes.
 Walking modes add `visiblePawns`, `reachable`, `select` and `moveSelected`, and
 the renderer draws figures and move targets from those.
 
+Two more are worth writing if your mode keeps score its own way:
+`botPlaceBonus(cells, player)` and `botMoveValue(pawn, dest)` return points on
+the same scale as everything else, and are the only thing standing between a
+computer player and a mode whose scoring it can't see. Both default to zero, so
+skipping them costs you a bot that plays the placement game and ignores your
+banners.
+
 ### Testing
 
 Eleven modes is more than you can click through, and a change in `board.js`
@@ -334,6 +385,13 @@ throws, hangs or gets stuck with no legal action. It also prints turn counts and
 score spreads, which is the cheap way to notice that a mode is degenerate before
 you sit down to play it. The smoke test covers the half that only exists in a
 browser: that each mode renders, builds its panel and survives being clicked.
+
+Then it does both again with the computer player driving every seat, and plays
+it against random legal play in Classic — because "it never hangs" and "it is
+any good" are different claims, and the second one only means anything against
+something. A bot that can't beat random play is broken rather than gentle. The
+browser test has its own version of the question: that a bot takes its turns off
+the render loop unprompted, and that the action buttons go dead while it does.
 
 `package.json` exists only so Node treats `src/` as ES modules for those two
 scripts. The game itself still has no build step and no dependencies.
@@ -490,5 +548,13 @@ to win a fight, the builder has no separate figure, and only the active player
 is offered a wagon walk. Each is one dialog away from being the real rule, and
 in Marches's case the bluff *is* the mechanic.
 
-Also absent: an AI opponent, networked play, and persistence beyond Descent's
-unlocks.
+**A computer player that looks ahead.** The one in `src/ai.js` searches a
+single move and evaluates the position honestly, which is enough to beat random
+play in every mode and to give you a game in Classic. What it can't do is play
+around a tile it hasn't drawn, or notice that the tile it wants is the one it's
+about to hand you. Depth needs a model of the deck, which the engine could give
+it — the remaining pool is `game.deck` — but that's a real search, not an
+evening. It also can't see a *severing* move in The Marches, the sharpest thing
+in that mode, because pricing one means running the supply trace per candidate.
+
+Also absent: networked play, and persistence beyond Descent's unlocks.

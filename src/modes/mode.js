@@ -13,6 +13,8 @@
 //   endTurn/endRound  upkeep
 //   actions()         the contextual buttons in the panel
 //   panel()           HTML replacing the score table, or null to keep it
+//   botPlaceBonus()   what a computer player can't see in your scoring
+//   botMoveValue()    …and what it can't see in your movement
 //
 // Walking modes additionally implement `visiblePawns`, `reachable`, `select`
 // and `moveSelected`, which is all the renderer needs to draw figures and
@@ -65,6 +67,21 @@ export class Mode {
   someoneStillInside() { return null; }
   interiorArrive() {}
   leaveInterior() {}
+
+  // --- advice for the computer player ---------------------------------------
+  //
+  // The bot in src/ai.js prices a move off the board alone: what closed, who
+  // is standing in it, what the closure pays. Anything a mode scores on its
+  // own books is invisible to it, so a mode that keeps score its own way says
+  // so here rather than the bot growing a switch statement on mode ids.
+  //
+  // Both return POINTS, on the same scale as everything else the bot counts.
+
+  /** What laying these cells is worth to `player`, beyond what closed. */
+  botPlaceBonus() { return 0; }
+
+  /** What walking `pawn` to `dest` is worth. Walking modes want this one. */
+  botMoveValue() { return 0; }
 
   // --- UI -------------------------------------------------------------------
 

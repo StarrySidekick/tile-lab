@@ -70,6 +70,28 @@ export class World extends Mode {
     });
   }
 
+  /**
+   * Mountains pay on placement rather than on closure, so they're the one
+   * thing here a computer player reading the board alone would never chase.
+   */
+  botPlaceBonus(cells) {
+    const board = this.game.board;
+    const seen = new Set();
+    let value = 0;
+    for (const cell of cells) {
+      cell.type.feats.forEach((f, i) => {
+        if (f.type !== 'mountain') return;
+        const d = board.featureOf(cell.x, cell.y, i);
+        if (!d || d.tiles.size < 2) return;
+        const root = board.find(d.parts[0]);
+        if (seen.has(root)) return;
+        seen.add(root);
+        value += mountainValue(d.tiles.size);
+      });
+    }
+    return value;
+  }
+
   onClosed(d, closer) {
     const pts = this.game.valueOf(d, false);
     if (d.type === 'forest') this.forestPoints += pts;

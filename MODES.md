@@ -598,6 +598,35 @@ exporting a class plus a spec. The dropdown, the hint, the player-count limits,
 the panel and the action buttons are all built from that spec — adding the
 eighth mode touched exactly one new file and one line of `index.js`.
 
+### And one thing the design didn't ask for: a computer player ✔
+
+Not on the list, and it turned out to be a consequence of primitive #1 rather
+than a project of its own. If a board can have a tile taken off it and rebuild
+itself exactly, then a bot doesn't need a model of the rules: it plays the move
+for real, scores the position the board reports, and takes the move back. One
+file, `src/ai.js`, and it plays all twelve modes without knowing that modes
+exist.
+
+What it evaluates is the part that generalises — what closed, what the closure
+pays, who is standing in it, what an open feature will probably be worth by the
+end, and what it is leaving one tile from closing for the next player. What it
+can't see is everything a mode scores on its own books, so that knowledge went
+back to the modes as two hooks, `botPlaceBonus` and `botMoveValue`. That's the
+mode registry earning out again — a whole new consumer of the hooks, and not
+one line of `game.js` or the renderer knows it exists.
+
+Two things it turned up immediately, neither of which random play could have:
+
+- **Expedition's caves are free turns.** A bot that mines them properly runs a
+  two-player game from 96 turns to 670 and from 26 points to 285, because
+  interior turns don't consume the surface deck and every cave tile can carry
+  treasure. Both players score similarly, so it isn't unfair — it's unbounded.
+  `EXPEDITION_RULES.caveTurnLimit` was declared for exactly this and is read by
+  nothing; wiring it up is the fix.
+- **The bot ladder is real.** Sharp beats Steady in 88% of decided games and
+  Steady beats Careless in 86%, which says the evaluation is doing the work and
+  the noise is doing what noise should.
+
 ---
 
 # What playing them should tell you

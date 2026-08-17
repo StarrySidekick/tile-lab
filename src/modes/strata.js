@@ -95,6 +95,29 @@ export class Strata extends Mode {
     this.game.emit('score', { points: pts });
   }
 
+  /**
+   * Height is the score here, and the generic evaluation only knows a
+   * feature's flat value — so hand a computer player the multiplier, and the
+   * stone that pays for it.
+   */
+  botPlaceBonus(cells) {
+    const board = this.game.board;
+    const seen = new Set();
+    let value = 0;
+    for (const cell of cells) {
+      cell.type.feats.forEach((f, i) => {
+        const d = board.featureOf(cell.x, cell.y, i);
+        if (!d || d.scored || d.open !== 0) return;
+        const root = board.find(d.parts[0]);
+        if (seen.has(root)) return;
+        seen.add(root);
+        value += board.value(d, false) * board.meanHeight(d);
+      });
+      value += cell.h ? -COVER_COST / 2 : GROUND_GAIN / 2;
+    }
+    return value;
+  }
+
   /** Foundations: every buried tile pays 1 to whoever laid it. */
   finish() {
     const buried = new Map();

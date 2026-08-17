@@ -198,6 +198,55 @@ export class Expedition extends Mode {
     }
   }
 
+  // --- what a computer player can't see -------------------------------------
+  //
+  // Every point in this mode is on a landmark, and landmarks go to whoever
+  // arrives first — so the whole game is "walk toward the nearest thing nobody
+  // has taken", and a bot reading the board alone would wander.
+
+  /** Unclaimed landmark points sitting on a cell. */
+  prizeAt(x, y, player) {
+    const cell = this.game.board.get(x, y);
+    if (!cell) return 0;
+    let value = 0;
+    cell.type.marks.forEach((m, i) => {
+      if (this.claimed.has(`${keyOf(x, y)}#${i}`)) return;
+      value += MARKS[m.kind]?.score || 0;
+      if (m.kind === 'cave') value += 3;                       // treasure below
+      if (CITY_LANDMARKS.includes(m.kind) && !this.collections[player].has(m.kind)) {
+        value += EXPEDITION_RULES.setBonus / CITY_LANDMARKS.length;
+      }
+    });
+    return value;
+  }
+
+  botPlaceBonus(cells, player) {
+    // Lay track toward yourself: a landmark you can reach is worth something,
+    // one on the far side of the map is worth nothing.
+    let value = 0;
+    for (const cell of cells) {
+      const prize = this.prizeAt(cell.x, cell.y, player);
+      if (!prize) continue;
+      const near = this.pawnsOf(player)
+        .reduce((best, p) => Math.min(best, Math.abs(p.x - cell.x) + Math.abs(p.y - cell.y)), 99);
+      value += prize / (1 + near);
+    }
+    return value;
+  }
+
+  botMoveValue(pawn, dest) {
+    let value = this.prizeAt(dest.x, dest.y, pawn.player);
+    const cell = this.game.board.get(dest.x, dest.y);
+    if (!pawn.mounted && cell?.type.marks.some((m) => m.kind === 'stable')) value += 4;
+    // Otherwise, head for whatever is closest and still unclaimed.
+    let nearest = 99;
+    for (const c of this.game.board.cells.values()) {
+      if (!this.prizeAt(c.x, c.y, pawn.player)) continue;
+      nearest = Math.min(nearest, Math.abs(c.x - dest.x) + Math.abs(c.y - dest.y));
+    }
+    return value + (nearest < 99 ? 2 / (1 + nearest) : 0);
+  }
+
   canRest(pawn) {
     const cell = this.game.board.get(pawn.x, pawn.y);
     return !!cell && cell.type.marks.some((m) => m.kind === 'village') && !pawn.resting;

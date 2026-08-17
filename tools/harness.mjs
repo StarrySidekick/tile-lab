@@ -15,6 +15,7 @@
 // ---------------------------------------------------------------------------
 
 import { Game, MODES, MECHANICS } from '../src/game.js';
+import { Bot, BOT_LEVELS } from '../src/ai.js';
 import { makePiece, rotatePiece, validatePiece } from '../src/pieces.js';
 import { Board } from '../src/board.js';
 import { TILES } from '../src/tiles.js';
@@ -31,15 +32,27 @@ const fail = (what, err) => {
   console.log(`  ✗ ${what}\n    ${err && err.stack ? err.stack.split('\n').slice(0, 4).join('\n    ') : err}`);
 };
 
-/** One full game of random legal choices. Returns a summary or throws. */
+/**
+ * One full game. Every seat plays random legal moves, except the ones listed
+ * in `bots` — pass `'all'` to hand the whole game to the computer player, or a
+ * list of seats to set it against random play. Returns a summary or throws.
+ */
 function playOut(opts) {
   const game = new Game(opts);
   const rng = mulberry(opts.seed ?? 1);
+  const bots = new Map();
+  if (opts.bots) {
+    const seats = opts.bots === 'all' ? game.players.map((p) => p.id) : opts.bots;
+    for (const seat of seats) {
+      bots.set(seat, new Bot(game, seat, { level: opts.botLevel || 'steady', seed: opts.seed ?? 1 }));
+    }
+  }
   let steps = 0;
 
   while (game.phase !== 'over' && steps++ < MAX_STEPS) {
     const before = state(game);
-    step(game, rng);
+    const bot = bots.get(game.current);
+    if (bot) bot.act(); else step(game, rng);
     const after = state(game);
     if (before === after) {
       // Nothing moved — the mode has no legal action, which is a bug in it.
@@ -51,6 +64,7 @@ function playOut(opts) {
     turns: game.turn,
     tiles: game.board.size,
     scores: game.players.map((p) => p.score),
+    stuck: [...bots.values()].reduce((n, b) => n + b.stuck, 0),
   };
 }
 
@@ -276,11 +290,58 @@ function runMode(spec, games, extraOpts = {}, label = '') {
   const scores = summaries.flatMap((s) => s.scores);
   const turns = summaries.map((s) => s.turns);
   const tiles = summaries.map((s) => s.tiles);
+  const stuck = summaries.reduce((n, s) => n + (s.stuck || 0), 0);
   console.log(
     `  ✓ ${(spec.id + label).padEnd(22)} ${String(games).padStart(3)} games · ` +
     `${avg(turns).toFixed(0)} turns · ${avg(tiles).toFixed(0)} tiles · ` +
-    `score ${Math.min(...scores)}–${Math.max(...scores)} (mean ${avg(scores).toFixed(1)})`);
+    `score ${Math.min(...scores)}–${Math.max(...scores)} (mean ${avg(scores).toFixed(1)})` +
+    (stuck ? ` · ${stuck} position(s) with no move` : ''));
   return summaries;
+}
+
+// --- the computer player ----------------------------------------------------
+
+/**
+ * Two things worth knowing about a bot, and they're different questions.
+ *
+ * The first is whether it can play at all — every mode, every seat, to the
+ * end, without throwing or running out of ideas. That's the same guarantee the
+ * random player gives, and it's the one that keeps the UI from hanging.
+ *
+ * The second is whether it's any good, which only means anything against
+ * something. Random legal play is a low bar, but it is a real one: a bot that
+ * can't clear it is broken rather than gentle.
+ */
+function checkBots(games) {
+  console.log('\nthe computer player, driving every seat');
+  for (const spec of MODES) runMode(spec, games, { bots: 'all' }, ' +bots');
+}
+
+function botVsRandom(rounds) {
+  console.log('\nthe computer player against random play (classic, 2p)');
+  let bad = 0;
+  for (const level of BOT_LEVELS) {
+    let wins = 0, draws = 0, margin = 0;
+    for (let seed = 1; seed <= rounds; seed++) {
+      const seat = seed % 2;                       // alternate who leads
+      const r = playOut({
+        mode: 'classic', players: 2, seed, bots: [seat], botLevel: level.id,
+      });
+      const mine = r.scores[seat], theirs = r.scores[1 - seat];
+      margin += mine - theirs;
+      if (mine > theirs) wins++; else if (mine === theirs) draws++;
+    }
+    const decided = rounds - draws;
+    const rate = decided ? wins / decided : 0;
+    const floor = level.id === 'careless' ? 0.4 : 0.65;
+    const ok = rate >= floor;
+    if (!ok) bad++;
+    console.log(
+      `  ${ok ? '✓' : '✗'} ${level.name.padEnd(10)} ${wins}/${decided} decided games ` +
+      `(${(rate * 100).toFixed(0)}%, mean margin ${(margin / rounds).toFixed(1)})` +
+      (ok ? '' : ` — expected at least ${(floor * 100).toFixed(0)}%`));
+  }
+  if (bad) failures += bad;
 }
 
 const avg = (l) => l.reduce((a, b) => a + b, 0) / (l.length || 1);
@@ -298,7 +359,12 @@ function main() {
     runMode(spec, games);
   }
 
-  if (!only) {
+  if (only) {
+    if (MODE_OF(only)) runMode(MODE_OF(only), games, { bots: 'all' }, ' +bots');
+    else console.log(`  ? no mode called "${only}"`);
+  } else {
+    checkBots(Math.max(4, games / 2));
+    botVsRandom(Math.max(10, games * 2));
     // Classic is the plain case, Cirrus removes tiles, and Sprawl places
     // several at once — between them they cover the ways a modifier can go
     // wrong.
@@ -318,6 +384,10 @@ function main() {
     const all = Object.fromEntries(MECHANICS.map((m) => [m.id, true]));
     runMode(MODE_OF('classic'), Math.max(4, games / 2), { options: all, groups: ALL_GROUPS }, '+everything');
     runMode(MODE_OF('world'), Math.max(4, games / 2), { options: all, groups: ALL_GROUPS }, '+everything');
+    // The bot has a verb for several of these — the abbey, the big follower,
+    // flipping, lifting — so it meets them all at once too.
+    runMode(MODE_OF('classic'), Math.max(4, games / 2),
+      { options: all, groups: ALL_GROUPS, bots: 'all' }, '+everything +bots');
   }
 
   console.log(failures ? `\n${failures} failure(s)` : '\nall good');

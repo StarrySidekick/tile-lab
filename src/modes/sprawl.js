@@ -135,6 +135,18 @@ export class Sprawl extends Mode {
 
   onClosed(d, closer) { this.game.award(d, false, closer); }
 
+  /**
+   * A courtyard is worth points and doesn't go through a feature, so a bot
+   * reading the board alone would seal one only by accident.
+   */
+  botPlaceBonus() {
+    let sealed = 0;
+    for (const h of this.game.board.enclosedHoles()) {
+      if (!this.holes.has(keyOf(h.x, h.y))) sealed++;
+    }
+    return sealed * COURTYARD;
+  }
+
   scoreCourtyards(player) {
     for (const h of this.game.board.enclosedHoles()) {
       const k = keyOf(h.x, h.y);

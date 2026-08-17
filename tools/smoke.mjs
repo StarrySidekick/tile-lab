@@ -53,6 +53,10 @@ await page.waitForFunction(() => window.LAB && window.LAB.game);
 const modes = await page.evaluate(() => window.LAB.MODES.map((m) => ({ id: m.id, name: m.name })));
 let failures = 0;
 
+// Everything below drives the game by hand, so the computer players have to be
+// off or they'd be taking turns underneath the script.
+await page.selectOption('#botCount', '0');
+
 for (const mode of modes) {
   errors.length = 0;
   await page.selectOption('#mode', mode.id);
@@ -123,6 +127,32 @@ for (const mode of modes) {
   } else {
     console.log(`  ✓ ${mode.id.padEnd(12)} ${String(state.tiles).padStart(3)} tiles · ${state.buttons} buttons · phase "${state.phase}"`);
   }
+}
+
+// The computer player, which in the browser is a different claim from the one
+// the harness makes: not "it picks legal moves" but "it takes its turns off the
+// render loop, on its own, without being poked".
+{
+  errors.length = 0;
+  await page.selectOption('#mode', 'classic');
+  await page.selectOption('#botSpeed', '0');
+  await page.selectOption('#botCount', '2');        // both seats — it plays itself
+  await page.click('#newGame');
+  await page.waitForTimeout(2000);
+  const st = await page.evaluate(() => ({
+    tiles: window.LAB.game.board.size,
+    bots: window.LAB.bots.size,
+    locked: document.querySelectorAll('#actions button').length,
+  }));
+  const problems = [];
+  if (errors.length) problems.push(errors[0].split('\n')[0]);
+  if (st.bots !== 2) problems.push(`${st.bots} bots built`);
+  if (st.tiles < 6) problems.push(`only ${st.tiles} tiles laid in 2s`);
+  if (st.locked) problems.push(`${st.locked} action buttons left live on a bot turn`);
+  if (problems.length) { failures++; console.log(`  ✗ computer players: ${problems.join(' · ')}`); }
+  else console.log(`  ✓ computer players  ${st.tiles} tiles laid unattended`);
+  await page.selectOption('#botCount', '0');
+  await page.selectOption('#botSpeed', '380');
 }
 
 // Every mechanic touches the UI too — the market row and the extra action

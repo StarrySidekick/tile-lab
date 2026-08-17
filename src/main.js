@@ -5,9 +5,14 @@
 // the action buttons are all built from the mode registry and from whatever
 // the running mode returns from its hooks — so a new mode file shows up in the
 // UI without this file changing.
+//
+// It also owns the clock the computer players run on, since "one move, then a
+// pause you can watch" is a UI concern and not something src/ai.js should have
+// an opinion about.
 // ---------------------------------------------------------------------------
 
 import { Game, DEFAULT_GROUPS, MODES, MECHANICS, MECHANIC_GROUPS } from './game.js';
+import { Bot, BOT_LEVELS } from './ai.js';
 import { groupsFor } from './mechanics.js';
 import { Renderer } from './render.js';
 import { drawTile, PLAYER_COLORS } from './art.js';
@@ -32,6 +37,58 @@ function bind(g) {
 
 const spec = (id) => MODES.find((m) => m.id === id);
 
+// --- computer players --------------------------------------------------------
+//
+// Bots take the LAST seats, so you are always the first player and the colour
+// you were before you switched one on. They're rebuilt rather than reconfigured
+// whenever anything about them changes, which includes mid-game: turning one on
+// hands it whatever position is on the board right now.
+
+let bots = new Map();
+
+function buildBots() {
+  bots = new Map();
+  if (!game || game.spec.solo) return;
+  const wanted = Math.min(Number($('botCount').value) || 0, game.players.length);
+  const level = $('botSkill').value;
+  for (let seat = game.players.length - wanted; seat < game.players.length; seat++) {
+    bots.set(seat, new Bot(game, seat, { level, seed: (game.seed ?? Date.now()) + seat }));
+  }
+}
+
+const botTurn = () => game.phase !== 'over' && bots.has(game.current);
+
+/** The seat count is per game, so the dropdown is rebuilt with the players. */
+let botSeats = 1;
+function renderBotSeats() {
+  const el = $('botCount');
+  const players = Number($('playerCount').value) || 2;
+  const chosen = Math.min(botSeats, players);
+  el.innerHTML = '';
+  for (let n = 0; n <= players; n++) {
+    const label = n === 0 ? 'None' : n === players ? `All ${n} — watch` : `${n}`;
+    el.insertAdjacentHTML('beforeend', `<option value="${n}">${label}</option>`);
+  }
+  el.value = String(chosen);
+}
+
+/**
+ * One action per tick, never more, and always after a pause — a bot that
+ * resolves its whole turn between two frames looks like a bug rather than an
+ * opponent. Driven from the render loop rather than a timer so it can't outlive
+ * the game it belongs to.
+ */
+let nextBotAt = 0;
+function driveBots(now) {
+  if (!botTurn()) { nextBotAt = 0; return; }
+  renderer.hover = null;              // no ghost tile following your mouse
+  const wait = Number($('botSpeed').value) || 0;
+  if (!nextBotAt) { nextBotAt = now + wait; return; }
+  if (now < nextBotAt) return;
+  nextBotAt = now + wait;
+  bots.get(game.current).act();
+}
+
 // --- new game ---------------------------------------------------------------
 
 function newGame() {
@@ -50,6 +107,7 @@ function newGame() {
     tilesPerTurn: Number($('tilesPerTurn').value) || 1,
   }));
   game.free = $('freePlace').checked;
+  buildBots();
   renderer.centerOn(0, 0);
   renderer.cam.zoom = spec(mode)?.bounds ? 78 : 96;
   syncPanel();
@@ -77,6 +135,10 @@ function onModeChange() {
   for (let n = Math.max(2, min); n <= max; n++) {
     count.insertAdjacentHTML('beforeend', `<option>${n}</option>`);
   }
+  for (const id of ['botRow', 'botSkillRow', 'botSpeedRow']) {
+    $(id).style.display = s?.solo ? 'none' : '';
+  }
+  renderBotSeats();
 
   let hint = s?.hint || '';
   if (id === 'classic' && !$('useMeeples').checked) {
@@ -121,6 +183,7 @@ canvas.addEventListener('pointerup', (e) => {
   const wasDrag = drag && drag.moved > 4;
   drag = null;
   if (wasDrag) return;
+  if (botTurn()) return;              // hands off while the computer is playing
   const { offsetX: sx, offsetY: sy } = e;
 
   // An interior takes over the whole interaction while it's open.
@@ -147,17 +210,26 @@ canvas.addEventListener('pointerup', (e) => {
   if (!acted && game.phase === 'place' && !game.board.get(c.x, c.y) && nearBoard(c)) sfx.play('deny');
 });
 
-canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); game.rotate(1); });
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (!botTurn()) game.rotate(1);
+});
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  if (e.shiftKey) { game.rotate(e.deltaY > 0 ? 1 : -1); return; }
+  if (e.shiftKey) { if (!botTurn()) game.rotate(e.deltaY > 0 ? 1 : -1); return; }
   if (game.interior) return;
   renderer.zoomAt(e.offsetX, e.offsetY, e.deltaY > 0 ? 0.9 : 1.1);
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  // The two view keys still work while the computer plays; nothing else does.
+  if (e.key === 'd' || e.key === 'D') { renderer.showDebug = !renderer.showDebug; $('debug').checked = renderer.showDebug; }
+  if (e.key === 'c' || e.key === 'C') {
+    if (game.lastPlaced) renderer.centerOn(game.lastPlaced.x, game.lastPlaced.y);
+  }
+  if (botTurn()) return;
   if (e.key === 'r' || e.key === 'R') game.rotate(e.shiftKey ? -1 : 1);
   if (e.key === 'f' || e.key === 'F') game.flipTile();
   if (e.key === ' ') {
@@ -170,10 +242,6 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'e' || e.key === 'E') game.enterCity();
   if (e.key === 'l' || e.key === 'L') game.beginLift();
   if (e.key === 'b' || e.key === 'B') game.toggleBig();
-  if (e.key === 'd' || e.key === 'D') { renderer.showDebug = !renderer.showDebug; $('debug').checked = renderer.showDebug; }
-  if (e.key === 'c' || e.key === 'C') {
-    if (game.lastPlaced) renderer.centerOn(game.lastPlaced.x, game.lastPlaced.y);
-  }
   if (e.key >= '1' && e.key <= '9' && game.phase === 'market') {
     game.takeFromMarket(Number(e.key) - 1);
   }
@@ -187,9 +255,17 @@ for (const s of MODES) {
   $('mode').insertAdjacentHTML('beforeend', `<option value="${s.id}">${s.name}</option>`);
 }
 
+for (const l of BOT_LEVELS) {
+  $('botSkill').insertAdjacentHTML('beforeend', `<option value="${l.id}">${l.name}</option>`);
+}
+$('botSkill').value = 'steady';
+
 $('newGame').onclick = newGame;
 $('mode').onchange = onModeChange;
 $('useMeeples').onchange = onModeChange;
+$('playerCount').onchange = () => { renderBotSeats(); buildBots(); };
+$('botCount').onchange = (e) => { botSeats = Number(e.target.value) || 0; buildBots(); };
+$('botSkill').onchange = buildBots;
 $('freePlace').onchange = (e) => { game.free = e.target.checked; };
 $('debug').onchange = (e) => { renderer.showDebug = e.target.checked; };
 $('forceTile').onchange = (e) => {
@@ -352,6 +428,10 @@ function renderMarket() {
 
 /** Contextual buttons — what you can actually do right now, mode included. */
 function renderActions() {
+  if (botTurn()) {
+    $('actions').innerHTML = `<span class="dim" style="font-size:11px">${game.player.name} is thinking…</span>`;
+    return;
+  }
   const btns = [];
   const add = (label, key, fn, disabled = false, wide = false) =>
     btns.push({ label, key, fn, disabled, wide });
@@ -397,9 +477,9 @@ function renderActions() {
 
 function scoreRow(p, i) {
   const active = i === game.current && game.phase !== 'over';
-  const extra = game.useMeeples
+  const extra = (bots.has(i) ? '<span class="dim">cpu</span> ' : '') + (game.useMeeples
     ? '●'.repeat(p.meeples) + `<span class="dim">${'○'.repeat(7 - p.meeples)}</span>`
-    : '';
+    : '');
   const agendas = (p.agendas || []).map((a) => `<div class="quest"><span>◆ ${a.text}</span><span class="dim">${a.points}</span></div>`).join('');
   return `
     <div class="player ${active ? 'active' : ''}">
@@ -432,7 +512,8 @@ function syncPanel() {
       : cur.type ? `${cur.type.id} · ${cur.type.name}` : '—')
     : '—';
   const status = game.m.status();
-  $('phase').textContent = (PHASE_TEXT[game.phase] || '—') + (status ? ` · ${status}` : '');
+  const doing = botTurn() ? `${game.player.name} is playing` : (PHASE_TEXT[game.phase] || '—');
+  $('phase').textContent = doing + (status ? ` · ${status}` : '');
   $('log').innerHTML = game.log.map((l) => `<div class="entry">${l}</div>`).join('');
   $('export').style.display = game.m.toMarkdown ? '' : 'none';
   renderMarket();
@@ -465,13 +546,14 @@ function signature() {
     inv ? `${inv.deck.length}/${inv.rot}/${inv.board.size}/${inv.pos.x},${inv.pos.y}` : '-',
     game.walker ? (game.walker.selected?.id ?? '-') : '-',
     game.m.piece ? game.m.piece.cells.map((c) => `${c.dx}${c.dy}${c.rot}`).join('') : '-',
-    game.tilesLeft, game.useBig ? 'B' : '-', game.usingAbbey ? 'A' : '-',
+    game.tilesLeft, game.useBig ? 'B' : '-', game.usingAbbey ? 'A' : '-', bots.size,
     game.pendingWalk ? game.pendingWalk.targets.length : '-',
     game.players.map((p) => `${p.score}/${p.meeples}`).join(','),
   ].join('|');
 }
 
-function frame() {
+function frame(now = 0) {
+  driveBots(now);
   const sig = signature();
   if (sig !== lastSig) { lastSig = sig; syncPanel(); }
   renderer.draw(game);
@@ -481,8 +563,13 @@ function frame() {
 renderGroups();
 onModeChange();
 game = bind(new Game({ players: 2, groups: [...enabledGroups] }));
+buildBots();
 syncPanel();
 frame();
 
 // Handy for poking at state from the devtools console while iterating.
-window.LAB = { get game() { return game; }, renderer, newGame, THEME, sfx, MODES, MECHANICS };
+window.LAB = {
+  get game() { return game; },
+  get bots() { return bots; },
+  renderer, newGame, THEME, sfx, MODES, MECHANICS,
+};
