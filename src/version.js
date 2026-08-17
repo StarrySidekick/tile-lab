@@ -2,7 +2,7 @@
 // copy in version.json goes out of step and the page starts crying wolf.
 export const VERSION = {
   "version": "0.10.0",
-  "build": 3,
+  "build": 4,
   "date": "2026-08-17",
-  "label": "Girando: sferas, island scoring, temple offerings, stacking gusts"
+  "label": "Girando: the sphere counts islands once, when it closes"
 };

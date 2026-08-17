@@ -32,11 +32,15 @@
 //
 // THE SFERA is half a sphere on one edge, and that edge meets nothing but
 // another sfera's. Join two and they lock together forever — nothing moves them
-// again — and the sky starts COUNTING ISLANDS for the rest of the game: at the
-// end of every round, whoever has the most figures standing on a broken-off
-// piece of country scores a point for each of its tiles, ties paying both. It
-// resolves last, after everything else in the round, so a follower blown off an
-// island a moment before the count is a follower that wasn't there.
+// again — and the sky LOOKS DOWN AND COUNTS: whoever has the most figures on a
+// broken-off piece of country scores a point for each of its tiles, ties paying
+// both. Once, then and there, not every round after. Twelve sfera in the deck
+// makes six spheres, so six counts in a whole game, and that scarcity is what
+// lets the count pay full price — it's a moment you play toward and can be
+// beaten to rather than an income. It resolves at the end of the turn the
+// sphere closed on, after everything else that turn did, so a follower blown
+// off an island a moment before is a follower that wasn't there, and one flown
+// out to one a moment before is.
 //
 // THE WINDVANE AND THE VESTIBULE have four ways in and only two of them
 // joined, and the wind decides which two. A road that ran through one is a
@@ -103,6 +107,7 @@ const TEMPLE_LAID = 1;       // to its keeper, per tile placed in the ring
 const TEMPLE_BLOWN = 2;      // …and per tile the wind puts there
 const MAX_CHAIN = 6;         // storms raised while a storm is still landing
 const FLIGHT_RANGE = 24;     // squares, before we assume the zephyrs are a loop
+const SPHERES = 6;           // twelve sfera in the deck, so six counts in a game
 
 /**
  * What Girando plays instead of parts of the base set. The 3-way junctions
@@ -148,8 +153,8 @@ export class Girando extends Mode {
     this.fallen = 0;
     this.blowing = false;
     this.queued = [];
-    this.islands = false;      // switched on for good by the first joined sfera
-    this.spheres = 0;
+    this.spheres = 0;          // half-spheres joined so far — six of them exist
+    this.counting = false;     // a sphere closed this turn: count islands at the end
     this.paidRing = new Set(); // "temple|tile" pairs already paid this turn
     const seed = this.game.board.get(0, 0);
     if (seed) seed.anchored = true;          // the founding stone stays put
@@ -173,9 +178,19 @@ export class Girando extends Mode {
     return 'meeple';
   }
 
+  /**
+   * The end of the turn is where a closed sphere is cashed — after the wind,
+   * after whatever that finished, and after the follower has been put down or
+   * flown out. "After any other actions" is the whole of the timing rule, and
+   * this is the last moment in the turn that qualifies.
+   */
   endTurn() {
     this.flight = null;
     this.paidRing.clear();
+    if (this.counting) {
+      this.counting = false;
+      this.scoreIslands();
+    }
     if (this.laid >= STORM_LIMIT) {
       this.game.say('The season turns, and the wind drops.');
       this.game.finish();
@@ -234,11 +249,15 @@ export class Girando extends Mode {
   // --- the sfera ------------------------------------------------------------
 
   /**
-   * Two half-spheres meeting is the one event in the mode that changes the
-   * rules rather than the board. It can only happen deliberately — a sfera edge
-   * meets nothing else — and once it has happened it never un-happens, so the
-   * pair is nailed down where it stands and the sky counts islands from here to
-   * the end of the game.
+   * Two half-spheres meeting is the one event in the mode that pays for where
+   * everybody is STANDING rather than for what they built. It can only happen
+   * deliberately — a sfera edge meets nothing else — and it never un-happens:
+   * the pair is nailed down where it stands, and the sky counts the islands
+   * once, there and then.
+   *
+   * Twelve sfera in the deck, so six spheres, so six counts in a whole game.
+   * That scarcity is what lets the count pay full price: it is a moment you
+   * play toward and can be beaten to, not an income.
    */
   joinSferas() {
     const board = this.game.board;
@@ -254,38 +273,27 @@ export class Girando extends Mode {
     }
     if (found <= this.spheres) return;
     this.spheres = found;
-    if (!this.islands) {
-      this.islands = true;
-      this.game.say('The sphere closes. From here on, the sky counts islands.');
-    } else {
-      this.game.say('Another sphere closes, and locks where it stands.');
-    }
+    this.counting = true;
+    this.game.say(`A sphere closes and locks where it stands — the sky looks down and counts (${this.spheres} of 6).`);
   }
 
   /**
-   * Islands, at the end of a round, after everything else — which is the whole
-   * of the timing rule: a follower blown off a rock a moment ago is a follower
-   * that isn't standing on it now.
+   * The count. It happens at the end of the turn a sphere closed on, after
+   * everything else that turn did — which is the whole of the timing rule: a
+   * follower blown off a rock a moment ago is a follower that isn't standing
+   * on it now, and one flown out to a rock a moment ago is.
    *
    * The biggest piece of country is the mainland and pays nobody; everything
    * that has broken off it is an island, and the majority standing on one takes
    * a point for each of its tiles. Ties pay in full, both ways.
-   *
-   * With one brake, and it is load-bearing. A tile pays a given player ONCE —
-   * the stone remembers who it has already paid. Without that the count is
-   * every round for the rest of the game, and twenty games of it read the same
-   * way every time: whoever's follower happened to be standing on the big piece
-   * when it broke off collects its size, thirty times over, and nothing else
-   * that happens in the game matters. Marking the stones keeps every incentive
-   * the rule was for — break country off, stand on it, take it off somebody —
-   * because a rival who seizes the majority collects the whole island fresh,
-   * and an island that grows pays its new stones to whoever holds it.
    */
   scoreIslands() {
-    if (!this.islands) return;
     const g = this.game;
     const groups = g.board.groups();
-    if (groups.length < 2) return;
+    if (groups.length < 2) {
+      g.say('…and finds one unbroken country. Nothing is adrift to count.');
+      return;
+    }
     for (const group of groups.slice(1)) {
       const counts = new Map();
       for (const cell of group) {
@@ -296,21 +304,17 @@ export class Girando extends Mode {
       if (!counts.size) continue;
       const best = Math.max(...counts.values());
       const winners = [...counts.entries()].filter(([, n]) => n === best).map(([p]) => p);
-      for (const p of winners) {
-        const fresh = group.filter((c) => !(c.paid || (c.paid = new Set())).has(p));
-        if (!fresh.length) continue;
-        for (const c of fresh) c.paid.add(p);
-        g.players[p].score += fresh.length;
-        g.say(`Island of ${group.length} tile${group.length > 1 ? 's' : ''} → ${g.players[p].name} +${fresh.length}`);
-        g.emit('score', {
-          points: fresh.length, player: p, players: [p],
-          at: {
-            x: fresh.reduce((s, c) => s + c.x, 0) / fresh.length + 0.5,
-            y: fresh.reduce((s, c) => s + c.y, 0) / fresh.length + 0.5,
-          },
-          cells: fresh.map((c) => ({ x: c.x, y: c.y })),
-        });
-      }
+      const pts = group.length;
+      for (const p of winners) g.players[p].score += pts;
+      g.say(`Island of ${pts} tile${pts > 1 ? 's' : ''} → ${winners.map((p) => g.players[p].name).join(' & ')} +${pts}`);
+      g.emit('score', {
+        points: pts, players: winners,
+        at: {
+          x: group.reduce((s, c) => s + c.x, 0) / group.length + 0.5,
+          y: group.reduce((s, c) => s + c.y, 0) / group.length + 0.5,
+        },
+        cells: group.map((c) => ({ x: c.x, y: c.y })),
+      });
     }
   }
 
@@ -590,9 +594,7 @@ export class Girando extends Mode {
 
   // --- the season -----------------------------------------------------------
 
-  /** Islands last, after every other action in the round — that's the rule. */
   endRound() {
-    this.scoreIslands();
     if (this.game.board.size === 0) this.game.finish();
   }
 
@@ -606,9 +608,11 @@ export class Girando extends Mode {
   botPlaceBonus(cells, player) {
     const board = this.game.board;
     let value = 0;
+    let joining = false;
     for (const cell of cells) {
       value += this.templeValue(cell, player, TEMPLE_LAID);
-      value += this.sferaValue(cell);
+      if (this.joinsSphere(cell)) { joining = true; value += 2; }
+      else if (cell.type.feats.some((f) => f.type === 'sfera')) value += 0.5;
       // Ground in a wall's lee keeps what you build on it.
       for (const other of board.cells.values()) {
         if (!isWall(other)) continue;
@@ -617,7 +621,10 @@ export class Girando extends Mode {
       const z = zephyrOn(cell);
       if (z) value += this.gustValue(cell, worldDir(cell, z), player);
     }
-    if (this.islands) value += this.islandValue(player);
+    // Standing on an island only ever pays when a sphere closes — all of it on
+    // the turn you close one yourself, and a fraction of it the rest of the
+    // time, because somebody else will close one of the remaining five.
+    if (this.spheres < SPHERES) value += this.islandValue(player) * (joining ? 1 : 0.2);
     return value;
   }
 
@@ -635,20 +642,18 @@ export class Girando extends Mode {
     return value;
   }
 
-  /** A half-sphere next to its other half is the rule-change, and it's free. */
-  sferaValue(cell) {
+  /** Does this tile put a half-sphere against its other half? */
+  joinsSphere(cell) {
     const board = this.game.board;
-    const has = cell.type.feats.some((f) => f.type === 'sfera');
-    if (!has) return 0;
     for (let s = 0; s < 4; s++) {
       const i = board.featAt(cell, s);
       if (i == null || cell.type.feats[i].type !== 'sfera') continue;
       const nb = board.neighbor(cell.x, cell.y, s);
       if (!nb) continue;
       const theirs = board.featAt(nb, opposite(s));
-      if (theirs != null && nb.type.feats[theirs].type === 'sfera') return this.islands ? 2 : 6;
+      if (theirs != null && nb.type.feats[theirs].type === 'sfera') return true;
     }
-    return 0.5;                                  // a half-sphere is worth having out
+    return false;
   }
 
   /**
@@ -685,11 +690,7 @@ export class Girando extends Mode {
     return value;
   }
 
-  /**
-   * Islands pay every round, so a majority on one is worth more than a single
-   * payout — and being one figure short of a majority is worth crossing the
-   * board for.
-   */
+  /** What the count would pay us right now, minus what it would pay the best rival. */
   islandValue(player) {
     const groups = this.game.board.groups();
     if (groups.length < 2) return 0;
@@ -701,11 +702,8 @@ export class Girando extends Mode {
         const n = cell.meeple.big ? 2 : 1;
         if (cell.meeple.player === player) mine += n; else theirs = Math.max(theirs, n);
       }
-      // Only the stones that haven't paid us yet are worth anything, which is
-      // also why taking an island off somebody is worth its whole size.
-      const owed = group.filter((c) => !c.paid?.has(player)).length;
-      if (mine >= theirs && mine > 0) value += owed;
-      if (theirs >= mine && theirs > 0) value -= owed * 0.5;
+      if (mine >= theirs && mine > 0) value += group.length;
+      if (theirs >= mine && theirs > 0) value -= group.length;
     }
     return value;
   }
@@ -738,7 +736,7 @@ export class Girando extends Mode {
     const solid = [...this.game.board.cells.values()].filter((c) => c.anchored || c.fixed).length;
     const isles = Math.max(0, this.game.board.groups().length - 1);
     return `${this.laid} tiles laid · ${solid} solid · ${this.game.board.size - solid} still cloud`
-      + (this.islands ? ` · ${isles} island${isles === 1 ? '' : 's'} adrift` : '');
+      + ` · ${isles} island${isles === 1 ? '' : 's'} adrift`;
   }
 
   panel() {
@@ -752,9 +750,8 @@ export class Girando extends Mode {
           <span class="pscore">${p.score}</span>
         </div>`;
     }).join('');
-    const isles = this.islands
-      ? 'The spheres are joined — islands pay at the end of every round.'
-      : 'Join two half-spheres and the sky starts counting islands.';
+    const isles = `${this.spheres} of ${SPHERES} spheres closed — each one counts the islands once, `
+      + 'the moment it closes.';
     return `${rows}<p class="hint">${this.gusts} gust${this.gusts === 1 ? '' : 's'} · ${this.fallen} tile${this.fallen === 1 ? '' : 's'} lost to the sky. ${isles}</p>`;
   }
 }
@@ -769,5 +766,5 @@ Girando.spec = {
   maxPlayers: 4,
   tideStart: 5,
   opening: 'A first stone hangs in the cloud. Everything else is weather.',
-  hint: 'Claim as normal — but a zephyr blows its whole lane and stacks up to three, followers are blown along with the tiles, a temple pays its keeper for every tile that arrives beside it, and two joined spheres make the sky count islands for the rest of the game.',
+  hint: 'Claim as normal — but a zephyr blows its whole lane and stacks up to three, followers are blown along with the tiles, a temple pays its keeper for every tile that arrives beside it, and joining two half-spheres makes the sky count the islands then and there. Six spheres, six counts.',
 };
