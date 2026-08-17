@@ -7,7 +7,8 @@
 // to the sky: you place tiles and claim features like Carcassonne, and then
 // the wind rearranges the country underneath you.
 //
-// THE ZEPHYR is the engine, and a fifth of the deck is zephyrs. Play one and
+// THE ZEPHYR is the engine — twelve of them in a seventy-two tile deck, which
+// is a full Carcassonne set's worth of country. Play one and
 // it blows down its lane — everything in that row or column, downwind, slides
 // one square. A gust runs the whole length of the lane: crystallised ground
 // doesn't move and a tile jammed against it has nowhere to go, but the wind
@@ -66,8 +67,17 @@ import { PLAYER_COLORS } from '../theme.js';
 import { partOfScored, claimableFeatures } from '../mechanics.js';
 import { storm, zephyrOn, worldDir, isRaft, isWall } from '../wind.js';
 
-const DECK_SIZE = 56;
-const SEASON = 20;           // rounds; tiles come back, so the clock has to be real
+const DECK_SIZE = 72;        // a full Carcassonne set's worth of country
+/**
+ * The backstop, in tiles laid rather than rounds played. Tiles blown off the
+ * board go back in the deck, so "play until the deck runs out" isn't a promise
+ * the mode can keep on its own — but a round cap can't be the answer either,
+ * because two players get through the deck in half as many rounds as four.
+ * Counting placements is the only clock that means the same thing at every
+ * player count, and this one sits a third above the deck: enough slack for the
+ * sky to hand tiles back, tight enough that it can't blow forever.
+ */
+const STORM_LIMIT = 96;
 const TEMPLE_SHOVE = 2;      // for blowing a temple with a zephyr
 const MAX_CHAIN = 6;         // temples setting off temples
 const FLIGHT_RANGE = 24;     // squares, before we assume the zephyrs are a loop
@@ -103,6 +113,8 @@ export class Girando extends Mode {
 
   setup() {
     this.flight = null;
+    this.rattled = new Set();
+    this.laid = 0;
     this.crystals = 0;
     this.gusts = 0;
     this.fallen = 0;
@@ -116,6 +128,7 @@ export class Girando extends Mode {
 
   afterPlace(cell) {
     cell.round = this.game.round;
+    this.laid++;
     const z = zephyrOn(cell);
     if (z) {
       this.game.say(`${this.game.player.name} lets the zephyr out.`);
@@ -127,7 +140,14 @@ export class Girando extends Mode {
     return 'meeple';
   }
 
-  endTurn() { this.flight = null; }
+  endTurn() {
+    this.flight = null;
+    this.rattled.clear();
+    if (this.laid >= STORM_LIMIT) {
+      this.game.say('The season turns, and the wind drops.');
+      this.game.finish();
+    }
+  }
 
   // --- scoring --------------------------------------------------------------
 
@@ -258,9 +278,15 @@ export class Girando extends Mode {
       g.say(`${r.swung.length} vane${r.swung.length > 1 ? 's' : ''} swing${r.swung.length > 1 ? '' : 's'} into the wind.`);
     }
 
-    // A temple likes being shoved.
+    // A temple likes being shoved — once. A gust that sets off three more
+    // gusts can put a hand on the same temple four times in one turn, and
+    // paying for each of them turns rattling into an income stream that
+    // dwarfs anything you could earn by actually finishing something.
     if (by != null) {
       for (const cell of r.temples) {
+        const key = `${cell.x},${cell.y}`;
+        if (this.rattled.has(key)) continue;
+        this.rattled.add(key);
         g.players[by].score += TEMPLE_SHOVE;
         g.say(`${g.players[by].name} rattles the temple at (${cell.x}, ${cell.y}) +${TEMPLE_SHOVE}`);
         g.emit('score', {
@@ -403,10 +429,6 @@ export class Girando extends Mode {
   // --- the season -----------------------------------------------------------
 
   endRound() {
-    if (this.game.round > SEASON) {
-      this.game.say('The season turns, and the wind drops.');
-      this.game.finish();
-    }
     if (this.game.board.size === 0) this.game.finish();
   }
 
@@ -472,7 +494,7 @@ export class Girando extends Mode {
 
   status() {
     const solid = [...this.game.board.cells.values()].filter((c) => c.anchored).length;
-    return `round ${Math.min(this.game.round, SEASON)}/${SEASON} · ${solid} solid · ${this.game.board.size - solid} still cloud`;
+    return `${this.laid} tiles laid · ${solid} solid · ${this.game.board.size - solid} still cloud`;
   }
 
   panel() {
