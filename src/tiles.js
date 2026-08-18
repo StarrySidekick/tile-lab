@@ -93,8 +93,17 @@ const river = (sides) => ({ type: 'river', sides });
  */
 export const CAP = '*';
 
+/**
+ * The dock edge. A ship presents one on all four sides and it is the opposite
+ * of a wildcard in every way but fitting: it goes anywhere, and it does
+ * NOTHING to what it touches. No join, no cap. A road running into a moored
+ * ship is a road that is still looking for its other end.
+ */
+export const DOCK = '~';
+
 /** Do two edges meet? Same letter, or one of them takes anything. */
-export const edgesMeet = (a, b) => a === b || a === CAP || b === CAP;
+export const edgesMeet = (a, b) => a === b || a === CAP || b === CAP
+  || a === DOCK || b === DOCK;
 
 /** Edge letter per feature type. Two edges match only if their letters do. */
 export const EDGE_LETTER = {
@@ -124,7 +133,7 @@ export const GROUPS = [
   { id: 'adventure', name: 'Adventure sites', note: 'Wayshrines, ruins, campsites, merchants.', classic: false, expedition: false, adventure: true },
   { id: 'marches', name: 'War terrain', note: 'Keeps, forts, hills, fords, beacons.', classic: false, expedition: false, adventure: false },
   { id: 'descent', name: 'Dangers', note: 'Stairs down, bandits, wolves, barrows.', classic: false, expedition: false, adventure: false },
-  { id: 'cloud', name: 'Cloud kingdom', note: 'Zephyrs, sferas, temples, Abbazias, flying machines, windvanes, vestibules, skywalls and flutitantes.', classic: false, expedition: false, adventure: false },
+  { id: 'cloud', name: 'Cloud kingdom', note: 'Zephyrs, sferas, temples, tower turbines, Abbazias, flying machines and windvanes.', classic: false, expedition: false, adventure: false },
   { id: 'mountains', name: 'Mountains', note: 'Pay the moment the chain grows, scaling with its size. Nothing can be claimed on them.', classic: false, expedition: false, adventure: false },
   { id: 'forests', name: 'Forests', note: '1 per tile, +1 per log. No complete/incomplete distinction — a forest is just as big as it is.', classic: false, expedition: false, adventure: false },
   { id: 'lakes', name: 'Lakes', note: 'Shores and corners, never all four sides. A city beside water is worth more.', classic: false, expedition: false, adventure: false },
@@ -154,7 +163,10 @@ export const TILE_TYPES = [
   { id: 'R', n: 3, group: 'base', name: 'City 3-sided',            feats: [city([N, E, W])] },
   { id: 'S', n: 2, group: 'base', name: 'City 3-sided + road (sh)',feats: [city([N, E, W], true), road([S])] },
   { id: 'T', n: 1, group: 'base', name: 'City 3-sided + road',     feats: [city([N, E, W]), road([S])] },
-  { id: 'U', n: 8, group: 'base', name: 'Road straight',           feats: [road([N, S])] },
+  // A straight road lies along whatever wind is blowing through it: hit side
+  // on, it swings onto the wind's axis. `align` is the quiet half of `swing` —
+  // same behaviour in the weather, none of the vane's art.
+  { id: 'U', n: 8, group: 'base', name: 'Road straight',           feats: [road([N, S])], align: true },
   { id: 'V', n: 9, group: 'base', name: 'Road bend',               feats: [road([W, S])] },
   { id: 'W', n: 4, group: 'base', name: 'Road 3-way',              feats: [road([E]), road([S]), road([W])] },
   { id: 'X', n: 1, group: 'base', name: 'Road 4-way',              feats: [road([N]), road([E]), road([S]), road([W])] },
@@ -215,12 +227,11 @@ export const TILE_TYPES = [
 
   // --- cloud: the sky kingdom, and the weather that runs it -----------------
   //
-  // Girando's pool. Five of these exist to make the board MOVE rather than to
-  // score: the zephyr blows a lane, the temple blows everything, the windvane
-  // and the vestibule re-point themselves in the wind and re-cut what's
-  // finished, and the skywall is the only thing that stops any of it.
-  { id: 'Ka', n: 2, group: 'cloud', name: 'Skyhold',    feats: [city([N, W])],  marks: [mark('skyhold', 0)] },
-
+  // Girando's pool. Most of these exist to make the board MOVE rather than to
+  // score: the zephyr blows a lane, the windvane re-points itself in the wind
+  // and re-cuts what runs through it, and the turbine is paid for every gust
+  // that arrives. The only thing that stops any of it is a city somebody has
+  // finished, which turns to stone and is solid all the way up.
   // Gusts, pointing north on the tile and wherever you turn it in the world.
   // Sixteen single-facing ones, on every kind of ground there is: wind that
   // only ever arrived on empty fields would be wind you could plan around.
@@ -239,6 +250,13 @@ export const TILE_TYPES = [
   { id: 'Kzw', n: 1, group: 'cloud', name: 'Trident wind',  feats: [], marks: [zephyr([N, E, W])] },
   { id: 'Kzq', n: 1, group: 'cloud', name: 'Compass rose',  feats: [], marks: [zephyr([N, E, S, W])] },
 
+  // The tower turbine: a windmill built into a city wall. Every gust that runs
+  // through it pays a point to whoever holds the city it belongs to, which
+  // makes a city something you want the weather to keep visiting rather than
+  // something you want it to leave alone.
+  { id: 'Ktb', n: 3, group: 'cloud', name: 'Tower turbine',  feats: [city([N])],    marks: [mark('turbine', 0)] },
+  { id: 'Ktc', n: 2, group: 'cloud', name: 'Turbine corner', feats: [city([N, W])], marks: [mark('turbine', 0)] },
+
   // The sfera: one edge is half a sphere and meets nothing but its other half.
   // Join two and the sky starts counting islands, for the rest of the game.
   { id: 'Kso', n: 3, group: 'cloud', name: 'Sfera',          feats: [sfera(N)] },
@@ -252,19 +270,15 @@ export const TILE_TYPES = [
   // base set allows.
   { id: 'Kce', n: 5, group: 'cloud', name: 'Cloud city cap', feats: [city([N])] },
 
-  // The vane and the vestibule are the same idea twice: four ways in, only two
-  // of them joined, and the wind decides which two. Every edge matches, so
-  // they always fit — what changes is what runs THROUGH them.
-  { id: 'Kw', n: 2, group: 'cloud', name: 'Windvane',   swing: true, feats: [road([N, S]), road([E]), road([W])] },
-  { id: 'Kv', n: 2, group: 'cloud', name: 'Vestibule',  swing: true, feats: [city([N, S]), city([E]), city([W])] },
+  // The windvane: four ways in, only two of them joined, and the wind decides
+  // which two. Every edge matches, so it always fits — what changes is what
+  // runs THROUGH it. Its city twin, the vestibule, is out: it was a four-sided
+  // city, and a city with four ways in and no way to cap it is a city the
+  // weather never lets you finish.
+  { id: 'Kw', n: 3, group: 'cloud', name: 'Windvane',   swing: true, feats: [road([N, S]), road([E]), road([W])] },
 
   { id: 'Kt',  n: 3, group: 'cloud', name: 'Temple',        feats: [temple(N)] },
   { id: 'Kta', n: 0, group: 'cloud', name: 'Temple + road', feats: [temple(N), road([S])] },
-
-  // A wall only stops what runs into its face. The mark's direction is the way
-  // it looks, so the wall itself lies across that axis and the wind slides
-  // straight past it the other way.
-  { id: 'Kl', n: 3, group: 'cloud', name: 'Skywall',    feats: [],              marks: [mark('wall', null, N)] },
 
   // The Abbazia: every edge is a wildcard, and everything it touches ends
   // there. Blow it away and all of that is unfinished again.
@@ -274,17 +288,13 @@ export const TILE_TYPES = [
   // the way it points, riding any zephyr it crosses.
   { id: 'Kfl', n: 3, group: 'cloud', name: 'Flying machine', feats: [road([S])], marks: [mark('flier', null, N)] },
 
-  // Flutitantes: terrain built on a hull. You may move one instead of playing
-  // a tile, and the wind can strand one in open sky without sinking it.
-  { id: 'Kf', n: 2, group: 'cloud', name: 'Flutitante road',  feats: [road([N, S])], marks: [mark('raft')] },
-  { id: 'Kg', n: 2, group: 'cloud', name: 'Flutitante hold',  feats: [city([N, W])], marks: [mark('raft')] },
-  { id: 'Kh', n: 1, group: 'cloud', name: 'Flutitante field', feats: [],             marks: [mark('raft')] },
-
-  // Not dealt: Girando swaps these in for the base 3-way junctions, so a road
-  // running into one carries on instead of ending. Fewer things close, which
-  // is the point — a kingdom that keeps finishing stops being weather.
-  { id: 'Gw', n: 0, group: 'cloud', name: 'Road 3-way (open)',    feats: [road([E, S, W])] },
-  { id: 'Gl', n: 0, group: 'cloud', name: 'City + 3-way (open)',  feats: [city([N]), road([E, S, W])] },
+  // Not dealt: Girando swaps these in for the base 3-way junctions. They END
+  // the three roads that run into them, the way the base set's do, and they
+  // carry the village that grew up at the junction. Girando tried the opposite
+  // for two passes — junctions that carried a road straight through, to stop
+  // things closing — and the mode did not need the help.
+  { id: 'Gw', n: 0, group: 'cloud', name: 'Road 3-way + village',    feats: [road([E]), road([S]), road([W])],            marks: [mark('village')] },
+  { id: 'Gl', n: 0, group: 'cloud', name: 'City + 3-way + village',  feats: [city([N]), road([E]), road([S]), road([W])], marks: [mark('village')] },
 
   // --- mountains ------------------------------------------------------------
   // Mountain edges only meet mountain edges, so a range grows as one mass and
@@ -366,6 +376,15 @@ export const RIVER_TYPES = [
   { id: 'w8', n: 1, group: 'river', name: 'River bend + wood', feats: [river([S, W]), forest([N])] },
   { id: 'w9', n: 1, group: 'river', name: 'The lake',          feats: [river([N])],                    marks: [mark('mouth')] },
 ];
+
+/**
+ * The ship. One per player, in their colour, held rather than drawn — the only
+ * piece on the board that belongs to somebody. Every edge is a DOCK, so it
+ * moors anywhere and does nothing at all to what it moors against: unlike the
+ * Abbazia it caps no road and walls no city. What it does is sit there being
+ * yours, and pay you for what the island it's tied to finishes.
+ */
+export const SHIP_TILE = { id: 'SHIP', n: 0, group: 'ship', name: 'Sky ship', dock: true, feats: [], marks: [mark('ship')] };
 
 /**
  * The Abbey — Carcassonne expansion 5. One per player, held in hand rather
@@ -470,12 +489,10 @@ export const MARKS = {
   mouth:     { label: 'The lake',  score: 0, note: 'Where the river ends.' },
 
   // cloud
-  skyhold: { label: 'Skyhold', score: 3, note: 'Pays a bonus to whoever holds its city when it closes.' },
+  turbine: { label: 'Tower turbine', score: 0, note: 'Pays 1 to whoever holds its city every time a gust runs through it.' },
   zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane when played, and again whenever the wind reaches it. Gusts stack up to three squares.' },
-  wall:    { label: 'Skywall', score: 0, note: 'Stops a wind that runs into its face; wind along it passes by. It is shoved along like anything else, so the shelter moves with it.' },
   abbazia: { label: 'Abbazia', score: 0, note: 'Caps every feature it touches — and un-caps them if the wind takes it away.' },
   flier:   { label: 'Flying machine', score: 0, note: 'Place it and a follower may fly out along it, riding any zephyr it crosses.' },
-  raft:    { label: 'Flutitante', score: 0, note: 'Move it instead of playing a tile. It floats — the wind can strand it in open sky.' },
 };
 
 /**
@@ -511,9 +528,10 @@ function prepare(list) {
     t.edges = ['f', 'f', 'f', 'f'];
     t.shields = 0;
     if (t.wild) t.edges = [CAP, CAP, CAP, CAP];
+    if (t.dock) t.edges = [DOCK, DOCK, DOCK, DOCK];
     for (const f of t.feats) {
       if (f.shield) t.shields++;
-      if (t.wild) continue;                    // an Abbazia takes anything
+      if (t.wild || t.dock) continue;          // an Abbazia or a ship takes anything
       for (const s of f.sides) t.edges[s] = EDGE_LETTER[f.type] || 'r';
     }
     t.spots = t.feats.map(featureSpot);
@@ -532,9 +550,11 @@ prepare(CAVE_TYPES);
 prepare(CITY_TYPES);
 prepare(RIVER_TYPES);
 prepare([ABBEY_TILE]);
+prepare([SHIP_TILE]);
 
 export const TILES = Object.fromEntries(
-  [...TILE_TYPES, ...CAVE_TYPES, ...CITY_TYPES, ...RIVER_TYPES, ABBEY_TILE].map((t) => [t.id, t]));
+  [...TILE_TYPES, ...CAVE_TYPES, ...CITY_TYPES, ...RIVER_TYPES, ABBEY_TILE, SHIP_TILE]
+    .map((t) => [t.id, t]));
 
 /** The river pool, spring and mouth held back to bookend it. */
 export function buildRiverDeck(rng = Math.random) {

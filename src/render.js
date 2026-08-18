@@ -32,6 +32,7 @@ export class Renderer {
     this.pointer = null;    // raw screen coords, needed for the cave overlay
     this.showDebug = false;
     this.showHints = true;  // highlight every square the tile could go in
+    this.terrain = 'surface';   // the mode's ground, restamped every frame
     this.meepleSpots = [];
     this.pawnSpots = [];
     this.moveSpots = [];
@@ -157,6 +158,7 @@ export class Renderer {
     this.drawBackdrop();
     if (game.options?.tide) this.drawWater(game);
 
+    this.terrain = game.m.terrain || 'surface';
     const fog = game.options?.fog ? this.fogSet(game) : null;
 
     for (const cell of game.board.cells.values()) {
@@ -167,12 +169,13 @@ export class Renderer {
       if (lift) this.drawStackShadow(cell, lift);
       ctx.save();
       if (fog && !fog.has(`${cell.x},${cell.y}`)) ctx.globalAlpha = 0.26;
-      this.paintTile(cell.x, cell.y - lift, cell.rot, cell.type);
+      this.paintTile(cell.x, cell.y - lift, cell.rot, cell.type, game.m.terrain || 'surface');
       ctx.restore();
       if (overlay) this.drawCellOverlay(cell, overlay, lift);
     }
 
     if (game.phase === 'lift') this.drawCellTargets(game.m.allLiftable ? game.m.allLiftable() : liftableCells(game.board), THEME.violet, '107,90,140');
+    if (game.m.sailing) this.drawCellTargets(game.m.moorings(), THEME.teal, '95,191,174');
     if (game.phase === 'recall') this.drawCellTargets(game.myMeeples(), MOVE_COSTLY.line, MOVE_COSTLY.rgb);
     if (game.phase === 'walk') this.drawCellTargets(game.pendingWalk?.targets || [], MOVE_OK.line, MOVE_OK.rgb);
     if (game.phase === 'place') this.drawPlacementHints(game);
@@ -288,14 +291,14 @@ export class Renderer {
       ctx.lineWidth = 2;
       ctx.strokeRect(sx + 1, sy + 1, z - 2, z - 2);
     }
-    // A flutitante wears its hull, because "which of these can I move" is a
-    // question you ask every turn and shouldn't have to answer from memory.
-    if (overlay.raft) {
+    // A crystallised CITY is solid all the way up and stops a gust; a
+    // crystallised road doesn't. That is the single most consequential thing
+    // about a square in this mode, so it gets a heavier rim than the crystal.
+    if (overlay.rampart) {
       ctx.save();
-      ctx.strokeStyle = 'rgba(155,120,78,0.95)';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([z * 0.16, z * 0.09]);
-      ctx.strokeRect(sx + 2.5, sy + 2.5, z - 5, z - 5);
+      ctx.strokeStyle = 'rgba(198,181,147,0.85)';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(sx + 2, sy + 2, z - 4, z - 4);
       ctx.restore();
     }
 
@@ -307,6 +310,81 @@ export class Renderer {
       ctx.fillStyle = haze;
       ctx.fillRect(sx, sy, z, z);
     }
+
+    // The turbine's sails. They can't live in the tile sprite — a sprite is
+    // one picture, and these turn — so the sprite draws the tower and the hub
+    // and the renderer puts the sails on every frame.
+    if (overlay.turbine) this.drawSails(cell, sx, sy, z);
+
+    // A ship flies its owner's colours. The sprite is the hull and the mast;
+    // the sail is the half that says whose it is, so it's painted here.
+    if (overlay.ship != null) this.drawSail(cell, sx, sy, z, PLAYER_COLORS[overlay.ship]);
+  }
+
+  /**
+   * Four sails on a hub, turning. Speed is fixed rather than tied to the wind:
+   * the wind in this game is instantaneous, and a mill that spun only during a
+   * gust would look broken for the ninety-nine frames in between.
+   */
+  drawSails(cell, sx, sy, z) {
+    const ctx = this.ctx;
+    const spot = this.markSpot(cell, 'turbine');
+    if (!spot) return;
+    const cx = sx + spot[0] * z;
+    const cy = sy + spot[1] * z - z * 0.16;
+    const a = (performance.now() / 1400) % (Math.PI * 2);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(a);
+    ctx.strokeStyle = 'rgba(232,222,208,0.92)';
+    ctx.lineWidth = Math.max(1.4, z * 0.028);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -z * 0.20);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(232,222,208,0.55)';       // the canvas on each arm
+      ctx.beginPath();
+      ctx.moveTo(0, -z * 0.07);
+      ctx.lineTo(z * 0.055, -z * 0.19);
+      ctx.lineTo(0, -z * 0.20);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** The ship's sail, in its owner's colour, luffing a little. */
+  drawSail(cell, sx, sy, z, color) {
+    const ctx = this.ctx;
+    const belly = Math.sin(performance.now() / 900) * 0.03;
+    ctx.save();
+    ctx.translate(sx + z * 0.5, sy + z * 0.5);
+    ctx.scale(z, z);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = 'rgba(13,11,17,0.55)';
+    ctx.lineWidth = 0.022;
+    ctx.beginPath();
+    ctx.moveTo(0.01, -0.34);
+    ctx.quadraticCurveTo(0.30 + belly, -0.14, 0.01, 0.06);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.moveTo(-0.01, -0.30);
+    ctx.quadraticCurveTo(-0.22 - belly, -0.16, -0.01, 0.02);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Where a named mark sits on a placed tile, in unit space, after rotation. */
+  markSpot(cell, kind) {
+    const i = cell.type.marks.findIndex((m) => m.kind === kind);
+    if (i < 0) return null;
+    return rotPoint(cell.type.markSpots[i], cell.rot);
   }
 
   /** Pulsing highlights on a list of cells — lifting, recalling, walking on. */
@@ -407,7 +485,7 @@ export class Renderer {
     if (covering && !ok) return;              // don't smear a ghost over the board
     ctx.save();
     ctx.globalAlpha = ok ? 0.92 : 0.32;
-    this.paintTile(h.x, h.y, game.rot, game.tile);
+    this.paintTile(h.x, h.y, game.rot, game.tile, game.m.terrain || 'surface');
     ctx.restore();
 
     const [sx, sy] = this.toScreen(h.x, h.y);
@@ -448,7 +526,7 @@ export class Renderer {
     ctx.save();
     ctx.globalAlpha = ok ? 0.92 : 0.30;
     for (const c of piece.cells) {
-      this.paintTile(h.x + c.dx, h.y + c.dy, c.rot, c.type);
+      this.paintTile(h.x + c.dx, h.y + c.dy, c.rot, c.type, game.m.terrain || 'surface');
     }
     ctx.restore();
     ctx.lineWidth = 3;
@@ -853,7 +931,7 @@ export class Renderer {
           const s = z * scale;
           const [sx, sy] = at(wx - 0.5, wy - 0.5);
           ctx.globalAlpha = Math.min(1, 0.35 + t * 3);
-          this.paintTile(0, 0, e.rot, e.type, 'surface', s, () => [sx - (s - z) / 2, sy - (s - z) / 2]);
+          this.paintTile(0, 0, e.rot, e.type, this.terrain, s, () => [sx - (s - z) / 2, sy - (s - z) / 2]);
           break;
         }
 
@@ -879,7 +957,7 @@ export class Renderer {
           ctx.save();
           ctx.translate(sx + z / 2, sy + z / 2);
           ctx.rotate(e.spin * k);
-          this.paintTile(0, 0, e.rot, e.type, 'surface', shrink, () => [-shrink / 2, -shrink / 2]);
+          this.paintTile(0, 0, e.rot, e.type, this.terrain, shrink, () => [-shrink / 2, -shrink / 2]);
           if (sink) {
             ctx.fillStyle = `rgba(48,84,110,${0.25 + k * 0.55})`;
             ctx.fillRect(-shrink / 2, -shrink / 2, shrink, shrink);

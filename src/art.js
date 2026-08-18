@@ -511,7 +511,7 @@ function district(ctx, roof, glyph) {
   if (glyph) glyph(ctx);
 }
 
-/** A blunt tower body — keeps, forts and skyholds are all variations on it. */
+/** A blunt tower body — keeps and forts are variations on it. */
 function turret(ctx, w, h, fill) {
   ctx.fillStyle = fill;
   ctx.beginPath();
@@ -746,13 +746,30 @@ const MARK_ART = {
   },
 
   // --- cloud -----------------------------------------------------------------
-  skyhold(ctx) {
-    turret(ctx, 0.40, 0.56, THEME.plaster);
-    ctx.fillStyle = 'rgba(255,255,255,0.30)';   // the cloud it rests on
+  /**
+   * A tower turbine: a mill tower built into a city wall, with a hub where the
+   * sails go. The sails themselves are NOT drawn here — they turn, and this art
+   * is baked into a static sprite. The renderer spins them on top; all the
+   * sprite owes it is a tower and a hub in the right place.
+   */
+  turbine(ctx) {
+    ctx.fillStyle = THEME.plaster;
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.05;
     ctx.beginPath();
-    ctx.ellipse(-0.18, 0.36, 0.30, 0.15, 0, 0, Math.PI * 2);
-    ctx.ellipse(0.20, 0.36, 0.26, 0.13, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(-0.22, 0.56); ctx.lineTo(-0.13, -0.28);
+    ctx.lineTo(0.13, -0.28); ctx.lineTo(0.22, 0.56);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(30,24,18,0.28)';           // courses up the tower
+    ctx.lineWidth = 0.035;
+    for (const y of [0.34, 0.10, -0.14]) {
+      ctx.beginPath(); ctx.moveTo(-0.20, y); ctx.lineTo(0.20, y); ctx.stroke();
+    }
+    roofTri(ctx, 0, -0.28, 0.44, 0.22, THEME.roof);
+    ctx.fillStyle = THEME.timber;                      // the hub the sails sit on
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.05;
+    ctx.beginPath(); ctx.arc(0, -0.34, 0.09, 0, Math.PI * 2); ctx.fill();
   },
   /**
    * A zephyr: three curls of moving air and the arrowhead they're headed for.
@@ -777,41 +794,54 @@ const MARK_ART = {
     ctx.lineCap = 'butt';
   },
 
-  /** A skywall: too tall to blow over, and too tall to see past. */
-  wall(ctx) {
-    ctx.fillStyle = THEME.city;
-    ctx.beginPath(); ctx.rect(-0.52, -0.16, 1.04, 0.46); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = THEME.wallLit;
-    ctx.beginPath(); ctx.rect(-0.52, -0.16, 1.04, 0.10); ctx.fill(); ctx.stroke();
-    for (let x = -0.52; x < 0.5; x += 0.26) {          // crenellations
-      ctx.fillStyle = THEME.city;
-      ctx.beginPath(); ctx.rect(x, -0.32, 0.13, 0.17); ctx.fill(); ctx.stroke();
-    }
-    ctx.strokeStyle = 'rgba(30,24,18,0.35)';           // courses
-    ctx.lineWidth = 0.03;
-    for (const y of [0.00, 0.14]) {
-      ctx.beginPath(); ctx.moveTo(-0.50, y); ctx.lineTo(0.50, y); ctx.stroke();
-    }
-    ctx.strokeStyle = THEME.timber;
-    ctx.lineWidth = 0.055;
-  },
-
   /**
    * An Abbazia: a walled house that everything stops at. Drawn big and squared
    * off, against the temple's open ring — one of them ends what it touches,
    * the other blows it about, and you have to tell them apart at a glance.
    */
+  /**
+   * An Abbazia. It caps every feature it touches on all four sides, so it is
+   * drawn as a precinct wall running right out to all four EDGES of the tile —
+   * there is deliberately no field showing anywhere around it. That silhouette
+   * is the rule: nothing gets past this tile, and you can see that a road
+   * running into one has run into a wall rather than into a building with a
+   * garden.
+   *
+   * The mark is scaled to 0.46 by `drawMark`, so a unit here is a bit over two
+   * tile-widths; 1.09 either side of centre is a hair past the tile edge, which
+   * is what fills the corners once the tile clip has taken its bite.
+   */
   abbazia(ctx) {
-    ctx.fillStyle = THEME.cityGround;                 // the precinct
-    ctx.beginPath(); ctx.rect(-0.72, -0.62, 1.44, 1.30); ctx.fill();
-    ctx.fillStyle = THEME.cityWall;                   // its wall, all the way round
+    const R = 1.09;                                   // just past the tile edge
+    ctx.fillStyle = THEME.cityWall;                   // wall, corner to corner
+    ctx.beginPath(); ctx.rect(-R, -R, R * 2, R * 2); ctx.fill();
+    ctx.fillStyle = THEME.cityGround;                 // the precinct inside it
+    ctx.beginPath(); ctx.rect(-R + 0.26, -R + 0.26, (R - 0.26) * 2, (R - 0.26) * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(30,24,18,0.55)';
     ctx.lineWidth = 0.05;
-    ctx.strokeStyle = 'rgba(30,24,18,0.6)';
-    ctx.beginPath(); ctx.rect(-0.72, -0.62, 1.44, 1.30); ctx.stroke();
-    for (let x = -0.72; x < 0.7; x += 0.24) {         // crenellations along the top
+    ctx.beginPath(); ctx.rect(-R + 0.26, -R + 0.26, (R - 0.26) * 2, (R - 0.26) * 2); ctx.stroke();
+
+    // The walkway on top of the wall, lit along every run so the tile reads as
+    // walled from all four directions however it's turned.
+    ctx.fillStyle = THEME.wallLit;
+    ctx.beginPath();
+    ctx.rect(-R, -R, R * 2, 0.09);
+    ctx.rect(-R, R - 0.09, R * 2, 0.09);
+    ctx.rect(-R, -R, 0.09, R * 2);
+    ctx.rect(R - 0.09, -R, 0.09, R * 2);
+    ctx.fill();
+    for (let t = -R + 0.05; t < R; t += 0.30) {       // crenellations, all round
       ctx.fillStyle = THEME.city;
-      ctx.beginPath(); ctx.rect(x, -0.72, 0.13, 0.14); ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.rect(t, -R, 0.15, 0.24);
+      ctx.rect(t, R - 0.24, 0.15, 0.24);
+      ctx.rect(-R, t, 0.24, 0.15);
+      ctx.rect(R - 0.24, t, 0.24, 0.15);
+      ctx.fill();
     }
+
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.05;
     ctx.fillStyle = THEME.plaster;                    // the house itself
     ctx.beginPath(); ctx.rect(-0.36, -0.30, 0.72, 0.72); ctx.fill(); ctx.stroke();
     roofTri(ctx, 0, -0.30, 0.86, 0.34, THEME.roof);
@@ -821,6 +851,31 @@ const MARK_ART = {
     ctx.beginPath(); ctx.arc(0, -0.10, 0.09, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.lineWidth = 0.055;
     ctx.strokeStyle = THEME.timber;
+  },
+
+  /**
+   * A sky ship. Drawn flat and pale here because it is finished in the player's
+   * colour by the renderer — this is the hull, the mast and the rigging, and
+   * the sail is the bit that gets painted.
+   */
+  ship(ctx) {
+    ctx.save();
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.06;
+    ctx.fillStyle = THEME.timber;
+    ctx.beginPath();                                  // hull
+    ctx.moveTo(-0.62, 0.16);
+    ctx.lineTo(0.62, 0.16);
+    ctx.quadraticCurveTo(0.42, 0.66, 0, 0.66);
+    ctx.quadraticCurveTo(-0.42, 0.66, -0.62, 0.16);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';       // a gunwale line
+    ctx.lineWidth = 0.07;
+    ctx.beginPath(); ctx.moveTo(-0.50, 0.30); ctx.lineTo(0.50, 0.30); ctx.stroke();
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.06;
+    ctx.beginPath(); ctx.moveTo(0, 0.16); ctx.lineTo(0, -0.74); ctx.stroke();  // mast
+    ctx.restore();
   },
 
   /** A flying machine on its strip, pointing the way a follower can leave. */
@@ -850,29 +905,6 @@ const MARK_ART = {
     ctx.restore();
     ctx.lineWidth = 0.055;
     ctx.strokeStyle = THEME.timber;
-  },
-
-  /** A flutitante: the terrain above is ordinary, the hull under it isn't. */
-  raft(ctx) {
-    // Small and low: it's the hull the terrain is built on, not the subject of
-    // the tile. In play the dashed rim does the work of saying "you can move
-    // this"; this is what tells you why.
-    ctx.save();
-    ctx.translate(0, 0.62);
-    ctx.scale(0.62, 0.62);
-    ctx.fillStyle = THEME.timber;
-    ctx.beginPath();
-    ctx.moveTo(-0.62, -0.10);
-    ctx.lineTo(0.62, -0.10);
-    ctx.quadraticCurveTo(0.40, 0.34, 0, 0.34);
-    ctx.quadraticCurveTo(-0.40, 0.34, -0.62, -0.10);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.20)';
-    ctx.lineWidth = 0.06;
-    ctx.beginPath(); ctx.moveTo(-0.46, 0.04); ctx.lineTo(0.46, 0.04); ctx.stroke();
-    ctx.restore();
-    ctx.strokeStyle = THEME.timber;
-    ctx.lineWidth = 0.055;
   },
 
   stable(ctx) {
@@ -1352,7 +1384,7 @@ function drawRiver(ctx, f) {
  * a shaft of daylight has nothing to cast a shadow with, and giving them one
  * turns a spring into a coin sitting on the grass.
  */
-const FLAT_MARKS = new Set(['mouth', 'spring', 'ford', 'shaft', 'hill', 'zephyr', 'raft']);
+const FLAT_MARKS = new Set(['mouth', 'spring', 'ford', 'shaft', 'hill', 'zephyr', 'ship']);
 
 /**
  * Draw a landmark centred at (x, y) in unit tile space.
@@ -1421,6 +1453,31 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     for (let i = 0.14; i < 1; i += 0.24) {
       ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(1, i); ctx.stroke();
     }
+  } else if (terrain === 'sky') {
+    // Girando is a kingdom in the air. Nothing mechanical hangs on this — the
+    // rules don't care what colour the ground is — but "field" was doing real
+    // damage to the fiction, because a tile blown off the edge of a green
+    // meadow is a nonsense and a tile blown off the edge of the sky is the
+    // whole mode. Banded rather than flat so a big board reads as depth, and
+    // deliberately low-contrast so the roads and walls still carry.
+    const air = ctx.createLinearGradient(0, 0, 0, 1);
+    air.addColorStop(0, '#5d7492');
+    air.addColorStop(0.55, '#6b83a1');
+    air.addColorStop(1, '#7e93ac');
+    ctx.fillStyle = air;
+    ctx.fillRect(0, 0, 1, 1);
+    // Thin cloud, drawn as crossed strokes for the same reason the field hatch
+    // is: it has to survive a quarter turn without showing a seam.
+    ctx.strokeStyle = 'rgba(228,240,248,0.10)';
+    ctx.lineWidth = 0.05;
+    for (let i = -1.2; i < 2.4; i += 0.42) {
+      ctx.beginPath();
+      ctx.moveTo(i, -0.2);
+      ctx.lineTo(i + 1.4, 1.2);
+      ctx.moveTo(i + 1.4, -0.2);
+      ctx.lineTo(i, 1.2);
+      ctx.stroke();
+    }
   } else {
     ctx.fillStyle = THEME.field;
     ctx.fillRect(0, 0, 1, 1);
@@ -1481,9 +1538,11 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
   for (const f of type.feats) if (f.type === 'monastery') drawAbbey(ctx, L);
   for (const f of type.feats) if (f.type === 'temple') drawTemple(ctx, f, L);
 
-  // A vestibule can't show a gap the way a vane can — city art merges into one
-  // silhouette — so the sides it ISN'T joined to get a shut gate across the
-  // throat. Same message, drawn the way a city can carry it.
+  // A swinging tile made of CITY can't show a gap the way a road vane can —
+  // city art merges into one silhouette — so the sides it ISN'T joined to get a
+  // shut gate across the throat. Same message, drawn the way a city can carry
+  // it. Nothing in the pool uses this today; it costs four lines and it is what
+  // a city vane would need the moment one comes back.
   if (type.swing) {
     for (const f of type.feats) {
       if (f.type !== 'city' || f.sides.length !== 1) continue;
@@ -1499,8 +1558,10 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     }
   }
 
-  // The pivot a vane or a vestibule turns on, so a tile that will re-point
-  // itself in the next gust says so while it's still in your hand.
+  // The pivot a vane turns on, so a tile that will re-point itself in the next
+  // gust says so while it's still in your hand. Straight roads swing too but
+  // get no pivot: there'd be one on a third of the deck, and the road visibly
+  // lying a different way afterwards is cue enough.
   if (type.swing) {
     ctx.beginPath();
     ctx.arc(0.5, 0.5, 0.085, 0, Math.PI * 2);

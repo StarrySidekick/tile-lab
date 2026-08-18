@@ -18,7 +18,7 @@
 // `scoredParts` as a set of cell-feature keys.
 // ---------------------------------------------------------------------------
 
-import { SIDE_STEP, opposite, CENTRE_FEATURES, CAP, edgesMeet } from './tiles.js';
+import { SIDE_STEP, opposite, CENTRE_FEATURES, CAP, DOCK, edgesMeet } from './tiles.js';
 
 export const keyOf = (x, y) => `${x},${y}`;
 
@@ -186,6 +186,11 @@ export class Board {
       // During a rebuild the neighbours are replayed in placement order, so a
       // later one isn't wired up yet — it'll make this same join from its side.
       const wired = this.parent.has(id);
+
+      // A dock edge does neither: a ship moored against a road leaves the road
+      // exactly as open as it found it. It is the one edge in the game that is
+      // purely a fitting rule and not a connectivity one.
+      if (myEdge === DOCK || theirEdge === DOCK) continue;
 
       // A wildcard edge CAPS rather than joins: the feature on the other side
       // loses that open slot and can finish against nothing.

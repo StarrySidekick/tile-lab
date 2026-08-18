@@ -2,7 +2,7 @@
 // copy in version.json goes out of step and the page starts crying wolf.
 export const VERSION = {
   "version": "0.10.0",
-  "build": 5,
-  "date": "2026-08-17",
-  "label": "Favicon; four multi-way zephyrs; no more crystallising"
+  "build": 6,
+  "date": "2026-08-18",
+  "label": "Sky, ships, turbines, crystals back; the sphere counts its own island"
 };

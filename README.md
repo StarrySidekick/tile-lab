@@ -65,26 +65,24 @@ hold still, and neither will the people standing on it.
 
 | | |
 |---|---|
-| **Zephyr** | Twenty of them in a seventy-two tile deck. Played, one blows its lane downwind — the whole length of it. Gusts **stack**, and only one thing stacks them: a wind that runs over a zephyr blowing the *same* way absorbs it and blows a square harder, up to three. One blowing *across* isn't absorbed and fires in its own turn, so a line of them is a chain; one blowing straight *back* does nothing, because the two brace against each other. And no zephyr blows twice in one storm. Rooted things don't move and what's jammed against them can't either, but the gust carries on past and shoves everything loose beyond. Tiles that land touching nothing (corners count) fall out of the sky and go back in the deck |
+| **Zephyr** | Twenty of them in a seventy-two tile deck. Played, one blows its lane downwind — the whole length of it. Gusts **stack**, and only one thing stacks them: a wind that runs over a zephyr blowing the *same* way absorbs it and blows a square harder, up to three. One blowing *across* isn't absorbed and fires in its own turn, so a line of them is a chain; one blowing straight *back* does nothing, because the two brace. No zephyr blows twice in one storm, and no zephyr is ever nailed down — a zephyr tile never crystallises, because weather you can freeze in place stops being weather |
 | **The four winds** | One crosswind, one split wind, one trident and one compass rose — each opens two, three or four lanes at once out of the same square, in the turn it's played. One of each in the deck |
-| **Followers** | Weather too. Once a figure is on the board it never comes off by choice: a gust blows it as far as everything else in its lane and it takes up whatever it lands in — its own kind of feature if there is one, anything claimable if not, and simply lying on the tile holding nothing if there's nothing there. Blown over open sky it goes back to its owner's hand, and that is the only way home. A figure inside a temple is indoors and the wind can't reach it |
-| **Temple** | A monastery with no cloisters left in the sky — every one is a temple. Claim it and it pays by the tile: **1** every time somebody *lays* a tile in the eight squares around it, **2** every time the wind *blows* one in. It cannot be moved, and the figure inside it is the only one the weather can't take. When the parish fills, the income stops and the keeper walks home |
-| **Sfera** | Twelve of them, each half a sphere on one edge, and that edge meets nothing but another sfera's. Join two and they **lock forever** — nothing moves them again — and the sky looks down and **counts the islands**: whoever has the most figures on a broken-off piece of country scores a point for each of its tiles, ties paying both. Once, then and there. Twelve sfera makes six spheres, so **six counts in a whole game**, which is what lets each one pay full price — it's a moment you play toward and can be beaten to, not an income. Resolved at the end of the turn the sphere closed on, after everything else that turn did, so a follower blown off an island a moment before wasn't there and one flown out to it was |
-| **Abbazia** | Takes any edge, and **caps** everything it touches — a road ends there, a city walls itself against it, and both can finish without meeting anything. It's an ordinary tile, so the wind can take it away again, and then everything it was holding shut is unfinished and can be **scored a second time** |
-| **Flying machine** | Place one and a follower flies out along the lane it points down, landing on any feature out there *including one somebody already holds* — but not on a tile with a figure standing on it. A zephyr crossed on the way is a wind you're in: the flight turns and follows it, so a zephyr pointed the wrong way is a wall for fliers |
-| **Windvane / vestibule** | Four ways in, two of them joined, and the wind decides which two. A road that ran through one is a dead end after the next gust |
-| **Skywall** | The only thing that stops a gust, and only face-on: wind into its face stops dead, wind along it goes past. It isn't rooted, though — a wall is shoved along like anything else, so the shelter it casts moves with it, and safe ground is only safe until the next gust comes down the other axis |
-| **Flutitante** | Terrain on a hull. The only tiles you may pick up and move yourself, and the only ones that survive being stranded in open sky |
+| **Falling** | A tile that lands touching nothing **edge to edge** falls out of the sky. Corners don't hold anything up, so the sky sheds tiles readily — and they fall into the **hand** of whoever set the wind off. Blowing the board apart isn't vandalism, it's a supply line, and your hand is the face-up row you choose from each turn |
+| **Followers** | Weather too. Once a figure is on the board it never comes off by choice: a gust blows it as far as everything else in its lane and it takes up whatever it lands in — its own kind of feature if there is one, anything claimable if not, and simply lying on the tile holding nothing if there's nothing there. Blown over open sky it goes back to its owner's hand, and that is the only way home |
+| **Crystals** | Finishing a feature turns its tiles to permanent land. A crystallised **city** is solid all the way up: it stops a gust dead and shelters everything in its lee. A crystallised **road** is flat ground — it doesn't move, but the wind goes straight over it. Cities are the walls you build; roads are the floor you build them on |
+| **Temple** | A monastery with no cloisters left in the sky — every one is a temple. Claim it and it pays by the tile: **1** every time somebody *lays* a tile in the eight squares around it, **2** every time the wind *blows* one in. The sky can pick the whole building up and move it, parish, keeper and all |
+| **Tower turbine** | A mill built into a city wall. Every gust that runs through it pays **1** to whoever holds that city — the one thing on the board that wants the weather to keep coming back |
+| **Sfera** | Twelve of them, each half a sphere on one edge, and that edge meets nothing but another sfera's. Join two and they **lock forever**, and the sky counts **the island they are standing on**: most figures on that piece of country takes a point for each of its tiles, ties paying both. Once, then and there. Six spheres, six counts in a whole game — so *where* you close one is as much of the decision as when. Resolved at the end of that turn, after everything else it did |
+| **Sky ship** | One per player, in your colour, held rather than drawn. Moor it to the **outside** of a piece of country — never an internal hole — and every feature that finishes on that piece pays **2** more. It fits anywhere and does nothing to what it touches: no road ends at a ship, no city walls itself against one. Once moored it stays moored until a gust reaches it, which is the tension — the ship wants to be where the weather never goes, and it can't leave unless the weather comes |
+| **Straight roads** | Are quietly weathervanes. A road hit side-on swings to lie along the wind, so a road you built is a road the weather has opinions about. Three-way junctions end their roads and carry a village; the windvane still has four ways in and two of them joined |
+| **Abbazia** | Takes any edge, and **caps** everything it touches — a road ends there, a city walls itself against it, and both can finish without meeting anything. It's drawn walled edge to edge, because that's what it does. It's an ordinary tile, so the wind can take it away again, and then everything it was holding shut is unfinished and can be **scored a second time** |
+| **Flying machine** | Points down a lane. Place one and your follower may go on **any tile out along that lane** rather than only the tile you laid — including a feature somebody already holds, but never a tile with a figure on it. A zephyr crossed on the way is a wind you're *in*: the flight turns and follows it, and one blowing straight back at you is where the flight ends |
 
-**Nothing crystallises.** Only two things in the sky are rooted — a temple, and
-a pair of sfera that have found each other. Everything else stays loose for the
-whole game, the city you just scored included, and when the wind pulls one apart
-it is simply open country again: unfinished, and worth finishing a second time.
-Cities pay the ordinary 2 a tile, and the deck carries more end caps than the
-base set and no four-sided city, because a country that keeps being rearranged
-needs more ways to stop. Nothing pays until it closes, nothing unfinished pays
-at the end, and nothing is ever banked — the temple and the island are the two
-exceptions, and both of them are the sky's terms rather than yours.
+Cities pay the ordinary 2 a tile, and there is no four-sided city anywhere in
+the pool, because a city with four ways in and no way to cap it is one the
+weather never lets you finish. Nothing pays until it closes, nothing unfinished
+pays at the end — the temple, the turbine, the ship and the island count are the
+exceptions, and all four are the sky's terms rather than yours.
 
 **World** — the countryside gets the rest of its geography, in four families
 you can also switch on inside any other mode:
@@ -161,7 +159,7 @@ Classic, or onto each other.
 | | |
 |---|---|
 | **Drafting market** | A face-up row instead of a blind draw. The first is free; reaching past a tile discards it, so cost needs no currency |
-| **Lift placed tiles** | Instead of placing, pick up an unclaimed tile that isn't holding the board together, and play it somewhere better. Girando narrows this to flutitantes; this is the unrestricted version |
+| **Lift placed tiles** | Instead of placing, pick up an unclaimed tile that isn't holding the board together, and play it somewhere better |
 | **Build on top of tiles** | Strata's rule, anywhere. Cover a tile that hasn't scored and has nobody on it. Three levels maximum |
 | **Recall a follower** | Instead of claiming, take one of your followers back off the board |
 | **Followers walk on** | Abbey & Mayor's wagon. When a feature scores, your follower steps along the road to the next unclaimed, unfinished thing instead of going home |
@@ -348,8 +346,8 @@ Tiles are grouped, and each group toggles on and off independently:
 - **War terrain** — keeps, forts, hills, fords, beacons, muster fields
 - **Dangers** — stairs down, bandit camps, wolf dens, barrows
 - **Cloud kingdom** — zephyrs (including four that blow more than one way at
-  once), sferas, temples, Abbazias, flying machines, windvanes, vestibules,
-  skywalls, flutitantes, city end caps and skyholds (Girando's pool)
+  once), sferas, temples, tower turbines, Abbazias, flying machines, windvanes
+  and city end caps (Girando's pool)
 - **Mountains** — spurs, ridges, bends, massifs, passes, and one peak
 - **Forests** — edges, corners, deep forest and old growth, some with logs
 - **Lakes** — shores, corners, narrows, headlands

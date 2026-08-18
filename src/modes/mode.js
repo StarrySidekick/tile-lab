@@ -107,6 +107,13 @@ export class Mode {
   /** What walking `pawn` to `dest` is worth. Walking modes want this one. */
   botMoveValue() { return 0; }
 
+  /**
+   * A move that REPLACES the turn rather than decorating it. Return true if
+   * you took it. Asked once, before the bot starts pricing squares, because
+   * "moor the ship instead of building" is a decision only the mode can price.
+   */
+  botAction() { return false; }
+
   // --- UI -------------------------------------------------------------------
 
   actions() { return []; }

@@ -28,26 +28,27 @@
 //     directions to it once. It's the other half of what stops a chain from
 //     running away, and it's what makes a chain finite rather than merely
 //     capped.
-//   SOLID THINGS DON'T MOVE, BUT THEY DON'T STOP THE WIND EITHER. A temple, a
-//     joined sfera and ground a mode has anchored all stay where they are, and
-//     a tile with nowhere to go stays too — but the gust carries on past them
-//     and shoves everything loose further down the lane.
-//   A SKYWALL SHELTERS ITS LEE — if it's standing across the wind. A wall
-//     faces one way; wind into its face stops there, wind along it goes by. It
-//     is the only thing that stops a gust — and it is not itself rooted: the
-//     wall is shoved along with everything else, so the shelter moves with it.
-//   CORNERS COUNT. A tile that lands touching anything, even diagonally, stays
-//     up. A tile that lands touching nothing falls out of the sky. Diagonal
-//     contact is a state placement can never produce, which is exactly why the
-//     board after a gust doesn't look like a board you could have built.
+//   A ZEPHYR IS NEVER NAILED DOWN. Whatever else a mode has decided about a
+//     tile, if it carries a zephyr the wind can move it. Weather that could be
+//     frozen in place stops being weather, and a board of stuck zephyrs is a
+//     board where the engine has quietly switched itself off.
+//   SOLID THINGS DON'T MOVE, AND A SOLID CITY ALSO STOPS THE WIND. Ground a
+//     mode has anchored doesn't budge, and neither does a tile with nowhere to
+//     go — but the gust carries on past both and shoves everything loose
+//     beyond. The exception is a BLOCKER: anchored ground the mode has marked
+//     as solid all the way up. Wind hits it and stops, and everything in its
+//     lee is untouched.
+//   CORNERS DON'T COUNT. A tile has to land orthogonally beside something. One
+//     that ends up touching the board only at a corner falls out of the sky,
+//     which is what keeps a blown board from fraying into a diagonal lattice
+//     no placement could ever have produced.
 //   FOLLOWERS ARE BLOWN LIKE TILES. A follower travels the same distance as
 //     everything else in its lane, so one standing on a tile that also moves
 //     rides along and never notices — and one standing on a tile that DOESN'T
 //     move gets picked up and put down on whatever is downwind of it, which
 //     may be a feature somebody else holds, or nothing at all. Nothing at all
 //     means it goes back to its owner's hand; that is the only way a follower
-//     leaves the board. There is one exception, and it is a building: a figure
-//     inside a TEMPLE is indoors, and the weather doesn't reach it.
+//     leaves the board.
 //   THE FAR END GOES FIRST. Tiles are moved downwind-first, so a lane slides
 //     along behind whatever's in front of it instead of piling up.
 // ---------------------------------------------------------------------------
@@ -69,10 +70,9 @@ const markOf = (cell, kind) => cell.type.marks.find((m) => m.kind === kind) || n
 /** Which way a direction-carrying mark points once its tile has been turned. */
 export const worldDir = (cell, m) => ((m.dir ?? 0) + cell.rot) % 4;
 
-const wallOn = (cell) => markOf(cell, 'wall');
-export const isWall = (cell) => !!wallOn(cell);
-export const isRaft = (cell) => !!markOf(cell, 'raft');
 export const zephyrOn = (cell) => markOf(cell, 'zephyr');
+export const turbineOn = (cell) => markOf(cell, 'turbine');
+export const isTemple = (cell) => cell.type.feats.some((f) => f.type === 'temple');
 
 /**
  * Every way a zephyr blows, in world directions. Most blow one way; the four
@@ -84,30 +84,24 @@ export function zephyrDirs(cell) {
   if (!z) return [];
   return (z.dirs || [z.dir ?? 0]).map((d) => (d + cell.rot) % 4);
 }
-export const isTemple = (cell) => cell.type.feats.some((f) => f.type === 'temple');
 
-/** Weathervanes and vestibules: four ways in, and the wind picks the two. */
-export const swings = (cell) => !!cell.type.swing;
-
-/**
- * Everything the wind can't move, and it's a short list on purpose: a temple,
- * a sfera the mode has locked because it found its other half, and ground a
- * mode has anchored for reasons of its own. Everything else in the sky is
- * loose, skywalls included — a wall stops the wind without standing still in
- * it.
- */
-export const immovable = (cell) => !!cell.anchored || !!cell.fixed || isTemple(cell);
+/** Weathervanes and straight roads: the wind decides which way they lie. */
+export const swings = (cell) => !!(cell.type.swing || cell.type.align);
 
 /**
- * A wall only stops what runs into its face. Its mark points the way it looks,
- * so the wall itself lies across that axis: a wind travelling along the same
- * axis hits the flat of it and stops, and a wind travelling across slides past
- * the end of it and carries on.
+ * Everything the wind can't move: ground a mode has anchored, and a tile a
+ * mode has pinned outright. A zephyr overrides both — see the header.
  */
-export function shelters(cell, dir) {
-  const w = wallOn(cell);
-  return !!w && (worldDir(cell, w) & 1) === (dir & 1);
-}
+export const immovable = (cell) =>
+  (!!cell.anchored || !!cell.fixed) && !zephyrOn(cell);
+
+/**
+ * …and the smaller set that also STOPS a gust dead. A mode marks these itself
+ * (`cell.blocks`), because "solid all the way up" is a rule about that mode's
+ * terrain rather than about wind: in Girando it's a crystallised city, and a
+ * crystallised road — flat ground you can be blown across — is not.
+ */
+export const blocks = (cell) => !!cell.blocks && !zephyrOn(cell);
 
 /**
  * One gust.
@@ -122,7 +116,8 @@ export function gust(board, { dir, from = null, everywhere = false }) {
   const [dx, dy] = SIDE_STEP[dir];
   const report = {
     dir, from, everywhere, strength: 1,
-    moved: [], fell: [], carried: [], homed: [], swung: [], zephyrs: [],
+    moved: [], fell: [], carried: [], homed: [], swung: [],
+    turbines: [], reached: [], zephyrs: [],
   };
 
   // --- who the wind can reach ------------------------------------------------
@@ -142,8 +137,8 @@ export function gust(board, { dir, from = null, everywhere = false }) {
 
   // --- walk each lane, upwind first -----------------------------------------
   // One pass decides three things at once: how hard the wind is blowing by the
-  // time it reaches each tile, where a wall cuts it off, and which zephyrs it
-  // sets off rather than absorbs.
+  // time it reaches each tile, where something solid cuts it off, and which
+  // zephyrs it sets off rather than absorbs.
   const sheltered = new Set();
   const force = new Map();                        // cell -> squares it will move
   const lanes = new Map();
@@ -158,6 +153,7 @@ export function gust(board, { dir, from = null, everywhere = false }) {
     let blocked = false;
     for (const c of row) {
       if (blocked) { sheltered.add(c); continue; }
+      if (blocks(c)) { blocked = true; continue; }  // solid all the way up
       for (const d of zephyrDirs(c)) {
         // Blowing our way: absorbed, and the gust hardens.
         if (d === dir) { strength = Math.min(MAX_STRENGTH, strength + 1); continue; }
@@ -167,18 +163,19 @@ export function gust(board, { dir, from = null, everywhere = false }) {
       }
       force.set(c, strength);
       report.strength = Math.max(report.strength, strength);
-      if (shelters(c, dir)) blocked = true;
+      if (turbineOn(c)) report.turbines.push(c);
     }
   }
 
-  const exposed = reached.filter((c) => !sheltered.has(c));
+  const exposed = reached.filter((c) => !sheltered.has(c) && !blocks(c));
+  report.reached = exposed;
 
   // --- pick the followers up -------------------------------------------------
   // Before anything moves, because a follower travels the same distance as its
   // lane and has to be put down against the board the gust leaves behind.
   const riders = [];
   for (const c of exposed) {
-    if (!c.meeple || isTemple(c)) continue;      // its keeper is indoors
+    if (!c.meeple) continue;
     riders.push({
       meeple: c.meeple,
       was: { x: c.x, y: c.y },
@@ -204,9 +201,10 @@ export function gust(board, { dir, from = null, everywhere = false }) {
   }
 
   // --- what the move did to them --------------------------------------------
+  // Corners don't hold a tile up: it has to land beside something edge to edge.
   for (const { cell } of report.moved) {
-    if (isRaft(cell) || board.touching(cell.x, cell.y)) continue;
-    report.fell.push({ id: cell.type.id, x: cell.x, y: cell.y, type: cell.type, rot: cell.rot });
+    if (board.degree(cell.x, cell.y) > 0) continue;
+    report.fell.push({ id: cell.type.id, x: cell.x, y: cell.y, type: cell.type, rot: cell.rot, cell });
   }
   for (const f of report.fell) board.remove(f.x, f.y);
 
@@ -228,11 +226,13 @@ export function gust(board, { dir, from = null, everywhere = false }) {
     if (to.x !== r.was.x || to.y !== r.was.y) report.carried.push({ ...r.meeple, from: r.was, to });
   }
 
-  // --- the weathervanes ------------------------------------------------------
-  // A vane turns whether or not it moved — it's a vane. Crystallised ones have
+  // --- the things that turn into the wind ------------------------------------
+  // A vane turns whether or not it moved — it's a vane — and so does a straight
+  // road, which lies along whatever is blowing through it. Anchored ones have
   // stopped being weather and don't.
   for (const cell of exposed) {
-    if (!swings(cell) || cell.anchored || board.get(cell.x, cell.y) !== cell) continue;
+    if (!swings(cell) || cell.anchored || cell.fixed) continue;
+    if (board.get(cell.x, cell.y) !== cell) continue;
     const want = dx === 0 ? 0 : 1;                        // through-feature is N-S at rot 0
     if ((cell.rot & 1) === want) continue;
     board.replace(cell.x, cell.y, cell.type, want);

@@ -450,7 +450,14 @@ export class Game {
 
   placeAt(x, y) {
     if (this.phase !== 'place') return false;
-    if (this.m.placeAt && !this.usingAbbey && !this.riverActive) return this.m.placeAt(x, y);
+    // A mode that owns placement says so by answering. Returning `undefined`
+    // means "not mine this time" — Girando only intercepts when the thing in
+    // your hand is a ship rather than a tile, and wants the ordinary path for
+    // everything else.
+    if (this.m.placeAt && !this.usingAbbey && !this.riverActive) {
+      const done = this.m.placeAt(x, y);
+      if (done !== undefined) return done;
+    }
     if (!this.canPlaceAt(x, y)) return false;
 
     const covering = !!this.board.get(x, y);

@@ -495,7 +495,7 @@ function currentTile() {
   const inv = game.interior;
   if (inv && game.phase === 'interior-place') return { type: inv.tile, rot: inv.rot, terrain: inv.kind };
   if (game.m.piece) return { piece: game.m.piece };
-  if (game.tile) return { type: game.tile, rot: game.rot, terrain: 'surface' };
+  if (game.tile) return { type: game.tile, rot: game.rot, terrain: game.m.terrain || 'surface' };
   return null;
 }
 
@@ -573,7 +573,7 @@ function renderMarket() {
     cv.width = cv.height = 56;
     const ctx = cv.getContext('2d');
     ctx.scale(56, 56);
-    drawTile(ctx, TILES[id]);
+    drawTile(ctx, TILES[id], { terrain: game.m.terrain || 'surface' });
     wrap.appendChild(cv);
     wrap.insertAdjacentHTML('beforeend', `<kbd>${i + 1}</kbd>`);
     wrap.onclick = () => game.takeFromMarket(i);

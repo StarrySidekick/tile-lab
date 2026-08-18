@@ -297,34 +297,69 @@ function checkWind() {
     if (!at(b, 0, 0)) return fail('the zephyr stays put', 'it blew itself away');
   }
 
-  // Corners count: a tile that lands touching only a diagonal survives, and a
-  // tile that lands touching nothing at all does not.
+  // Corners DON'T count: a tile that lands touching the board only at a corner
+  // falls, and so does one touching nothing at all. Edge to edge or nothing.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
     lay(b, 0, -2, 'U');                     // alone in the lane, two clear
-    lay(b, 1, -3, 'U');                     // …but there's a corner to catch it
-    gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (!at(b, 0, -3)) return fail('a diagonal contact keeps a tile up', 'it fell');
+    lay(b, 1, -4, 'U');                     // only a corner to catch it
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (at(b, 0, -3) || r.fell.length !== 1) return fail('a diagonal contact does not hold a tile up', JSON.stringify(r.fell));
 
     const c = new Board();
     lay(c, 0, 0, 'Kz');
-    lay(c, 0, -3, 'U');
-    const r = gust(c, { dir: 0, from: { x: 0, y: 0 } });
-    if (at(c, 0, -4) || r.fell.length !== 1) return fail('a tile touching nothing falls', JSON.stringify(r.fell));
+    lay(c, 0, -2, 'U');
+    lay(c, 1, -3, 'U'); lay(c, 0, -3, 'U'); // …and now an edge, so it holds
+    gust(c, { dir: 0, from: { x: 0, y: 0 } });
+    if (!at(c, 0, -3)) return fail('an edge contact does hold a tile up', 'it fell anyway');
   }
 
-  // A skywall shelters its lee — and is shoved along like everything else, so
-  // the shelter it casts is a thing that moves.
+  // A crystallised city is solid all the way up: the gust stops at it and
+  // everything in its lee is untouched.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
-    lay(b, 0, -1, 'Kl');                    // the wall
-    lay(b, 0, -3, 'U');                     // behind it, with a square to spare
-    lay(b, 1, -3, 'U');                     // and a neighbour, so nothing falls
+    const keep = lay(b, 0, -1, 'E');        // a city, finished and turned to stone
+    keep.anchored = true; keep.blocks = true;
+    lay(b, 0, -2, 'U'); lay(b, 1, -2, 'U');
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (!at(b, 0, -3)) return fail('a skywall shelters its lee', 'the sheltered tile moved');
-    if (at(b, 0, -1) || !at(b, 0, -2)) return fail('a skywall is shoved along', 'it stood still');
+    if (!at(b, 0, -1)) return fail('a crystallised city does not move', 'it blew away');
+    if (!at(b, 0, -2)) return fail('a crystallised city shelters its lee', 'the lee moved anyway');
+  }
+
+  // …and a crystallised ROAD is only flat ground. It stays put, and the wind
+  // goes straight over it and shoves what's beyond.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    const paved = lay(b, 0, -1, 'U');
+    paved.anchored = true;                  // anchored, but not `blocks`
+    lay(b, 0, -2, 'U'); lay(b, 0, -3, 'U');
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (!at(b, 0, -1)) return fail('a crystallised road does not move', 'it moved');
+    if (!at(b, 0, -4)) return fail('the wind goes over a crystallised road', 'the far side sat still');
+  }
+
+  // A zephyr is never nailed down, whatever the mode has decided about it.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    const frozen = lay(b, 0, -1, 'Kzr');
+    frozen.anchored = true;
+    lay(b, 0, -3, 'U');
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (at(b, 0, -1)) return fail('a crystallised zephyr still blows about', 'it stayed put');
+  }
+
+  // A turbine is reported for every gust that runs over it.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    lay(b, 0, -1, 'Ktb');
+    lay(b, 1, -1, 'U');
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (r.turbines.length !== 1) return fail('a gust turns a turbine', `${r.turbines.length} reported`);
   }
 
   // Solid ground is a windbreak: nothing shifts into an occupied square.
@@ -336,6 +371,17 @@ function checkWind() {
     crystal.anchored = true;
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (!at(b, 0, -1) || !at(b, 0, -2)) return fail('a tile pressed against solid ground stays put', 'something moved');
+  }
+
+  // A straight road lies along whatever is blowing through it.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz', 1);                  // blowing east
+    lay(b, 1, 0, 'U');                      // road N-S at rot 0, side on to it
+    lay(b, 2, 1, 'U');                      // something for it to land beside
+    gust(b, { dir: 1, from: { x: 0, y: 0 } });
+    const after = b.get(2, 0) || b.get(1, 0);
+    if (!after || (after.rot & 1) !== 1) return fail('a straight road swings onto the wind', `rot ${after && after.rot}`);
   }
 
   // A weathervane turns to the wind, which re-cuts what runs through it.
@@ -438,17 +484,18 @@ function checkWind() {
     }
   }
 
-  // A temple keeps its keeper: the wind can't move the building, and a figure
-  // inside it is indoors.
+  // A temple is blown about like anything else — parish, keeper and all. It
+  // used to be rooted and the figure inside it sheltered; now the sky can pick
+  // the whole building up and put it somewhere else.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
     const temple = lay(b, 0, -1, 'Kt');
     b.addMeeple(0, -1, 0, 1);
-    lay(b, 1, -1, 'U');                     // a neighbour so nothing falls
+    lay(b, 0, -2, 'U'); lay(b, 0, -3, 'U');
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (!b.get(0, -1) || b.get(0, -1) !== temple) return fail('a temple does not move', 'it blew away');
-    if (!temple.meeple) return fail('a temple keeps its keeper', 'the wind took them');
+    if (b.get(0, -1) === temple) return fail('a temple is blown about', 'it stood still');
+    if (temple.meeple?.player !== 1) return fail('its keeper rides along with it', JSON.stringify(temple.meeple));
   }
 
   // Gusts stack: a wind that runs over a zephyr pointing the same way blows a
@@ -475,23 +522,6 @@ function checkWind() {
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (b.get(0, -1) !== held) return fail('a locked tile does not move', 'the wind took it');
     if (!b.get(0, -3)) return fail('the wind carries on past a locked tile', 'the far side sat still');
-  }
-
-  // A wall only stops a wind that runs into its face.
-  {
-    const b = new Board();
-    lay(b, 0, 0, 'Kz', 1);                  // blowing east
-    lay(b, 1, 0, 'Kl');                     // a wall facing north — along this wind
-    lay(b, 2, 0, 'U'); lay(b, 2, 1, 'U');
-    gust(b, { dir: 1, from: { x: 0, y: 0 } });
-    if (!at(b, 3, 0)) return fail('a wall side-on lets the wind past', 'the lee was sheltered');
-
-    const c = new Board();
-    lay(c, 0, 0, 'Kz', 1);
-    lay(c, 1, 0, 'Kl', 1);                  // …and now facing east, into the wind
-    lay(c, 2, 0, 'U'); lay(c, 2, 1, 'U');
-    gust(c, { dir: 1, from: { x: 0, y: 0 } });
-    if (!at(c, 2, 0)) return fail('a wall face-on shelters its lee', 'the lee moved anyway');
   }
 
   // Crystallised ground doesn't move and doesn't stop the wind: what's jammed
@@ -528,14 +558,89 @@ function checkWind() {
     lay(b, 0, 0, 'Kz');
     lay(b, 0, -1, 'U');                     // road N-S
     lay(b, 0, -3, 'E', 2);                  // city facing south, two clear
-    lay(b, 1, -3, 'U');                     // a corner so nothing falls
+    lay(b, 1, -2, 'U'); lay(b, 1, -4, 'U'); // edges to land against, both ends
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
     const road = b.featureOf(0, -2, 0);
     if (!road || road.type !== 'road') return fail('the shoved road survives as a road', road && road.type);
     if (road.tiles.size !== 1) return fail('a mismatched seam joins nothing', `road spans ${road.tiles.size}`);
   }
 
-  console.log('  ✓ lanes, corners, walls, windbreaks, crystals, vanes, chains, head-on, once-per-storm, the rose, stacking, followers, temples, locks, Abbazias, bad seams');
+  console.log('  ✓ lanes, corners, ramparts, paving, loose zephyrs, turbines, vanes, straight roads, chains, head-on, once-per-storm, the rose, stacking, followers, temples, locks, Abbazias, bad seams');
+}
+
+/**
+ * Girando's own pieces, which the wind engine knows nothing about: the ship,
+ * the hand the sky keeps refilling, and the sphere that counts the island it
+ * is standing on. All three are cheap to assert and expensive to notice
+ * missing — the sphere in particular shipped twice paying the wrong islands.
+ */
+function checkGirando() {
+  console.log('girando');
+  const g = new Game({ mode: 'girando', players: 2, seed: 7 });
+  const m = g.m;
+
+  // The hand IS the face-up row, so taking a tile has to empty the hand slot.
+  if (g.phase !== 'market' || g.market !== m.hands[0]) {
+    return fail('the hand is the row', `phase ${g.phase}`);
+  }
+  const held = g.market.length;
+  g.takeFromMarket(0);
+  if (m.hands[0].length !== held - 1) {
+    return fail('taking a tile takes it out of your hand', `${m.hands[0].length} left of ${held}`);
+  }
+
+  // A ship moors on the outside of the country and never in a hole.
+  {
+    const b = g.board;
+    for (const [x, y] of [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]]) {
+      if (!b.get(x, y)) b.place(x, y, TILES.Kz, 0, { free: true });
+    }
+    b.remove(0, 0);                            // a courtyard, walled all round
+    const spots = m.moorings();
+    if (spots.some((s) => s.x === 0 && s.y === 0)) {
+      return fail('a ship does not moor in an internal hole', 'it offered the courtyard');
+    }
+    if (!spots.length) return fail('a ship has somewhere to moor', 'no moorings offered');
+
+    const at = spots[0];
+    m.beginSail();
+    g.placeAt(at.x, at.y);
+    const ship = b.get(at.x, at.y);
+    if (!ship || ship.type.id !== 'SHIP') return fail('the ship moors where it was sent', 'nothing there');
+    if (m.ships[0].charged) return fail('a moored ship is becalmed', 'it is still free to move');
+
+    // …and it caps nothing. A road running into a ship is still open.
+    const road = b.place(at.x + 1, at.y, TILES.U, 0, { free: true });
+    const open = b.featureOf(road.x, road.y, 0).open;
+    if (open !== 2) return fail('a ship caps nothing it moors against', `road open ${open}`);
+  }
+
+  // The sphere counts the island it is standing on — including the mainland,
+  // which is the whole of the bug this replaced.
+  {
+    const h = new Game({ mode: 'girando', players: 2, seed: 3 });
+    const b = h.board;
+    for (const c of [...b.cells.values()]) b.remove(c.x, c.y);
+    b.place(0, 0, TILES.Kso, 2, { free: true });   // sfera facing south
+    b.place(0, 1, TILES.Kso, 0, { free: true });   // …meeting one facing north
+    b.place(1, 0, TILES.Kz, 0, { free: true });    // three tiles in the island
+    // The zephyr has no features to stand in, so the follower simply lies on
+    // it — which is exactly the state the wind leaves figures in, and it still
+    // counts for the island.
+    b.get(1, 0).meeple = { player: 0, feat: null, big: false };
+    b.rebuild();
+    h.players[0].score = 0;
+    h.m.joinSferas();
+    h.m.endTurn();
+    if (h.players[0].score !== 3) {
+      return fail('a sphere counts its own island, mainland included', `paid ${h.players[0].score}`);
+    }
+    if (!b.get(0, 0).fixed || !b.get(0, 1).fixed) {
+      return fail('a joined sphere locks both tiles', 'they are still loose');
+    }
+  }
+
+  console.log('  ✓ hand, moorings, dock edges, becalming, the island count');
 }
 
 // --- runs -------------------------------------------------------------------
@@ -620,6 +725,7 @@ function main() {
   checkBoard();
   checkPieces();
   checkWind();
+  checkGirando();
 
   console.log('\nmodes');
   for (const spec of MODES) {
