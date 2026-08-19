@@ -250,6 +250,14 @@ export const TILE_TYPES = [
   { id: 'Kzw', n: 1, group: 'cloud', name: 'Trident wind',  feats: [], marks: [zephyr([N, E, W])] },
   { id: 'Kzq', n: 1, group: 'cloud', name: 'Compass rose',  feats: [], marks: [zephyr([N, E, S, W])] },
 
+  // The Palazzo: the founding stone of the kingdom, and the only tile on the
+  // board that was there before anybody played. Same connections as the base
+  // set's start tile — a city gate with the road running under it — and no more
+  // rooted than anything else, so the sky can and does shove the seat of
+  // government around. What it has instead is worth: the island it is sitting
+  // on counts double when a sphere closes.
+  { id: 'Kpz', n: 0, group: 'cloud', name: 'The Palazzo', feats: [city([N]), road([E, W])], marks: [mark('palazzo', 0)] },
+
   // The tower turbine: a windmill built into a city wall. Every gust that runs
   // through it pays a point to whoever holds the city it belongs to, which
   // makes a city something you want the weather to keep visiting rather than
@@ -493,6 +501,7 @@ export const MARKS = {
 
   // cloud
   turbine: { label: 'Tower turbine', score: 0, note: 'Pays 1 to whoever holds its city every time a gust runs through it.' },
+  palazzo: { label: 'The Palazzo', score: 0, note: 'The seat of the kingdom. The island it sits on is worth double when a sphere closes.' },
   zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane when played, and again whenever the wind reaches it. Gusts stack up to three squares.' },
   abbazia: { label: 'Abbazia', score: 0, note: 'Caps every feature it touches — and un-caps them if the wind takes it away.' },
   flier:   { label: 'Flying machine', score: 0, note: 'Place it and a follower may fly out along it, riding any zephyr it crosses.' },

@@ -176,6 +176,18 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 >
 > Turbines also kept turning after their city closed, which took writing the holder onto the tile at the moment of closing — closing hands the followers back, so by the time the mill wants paying there is nobody standing in the city to read a majority off.
 
+> **Seventh pass: the count gets a flat rate, and the sky gets a chart.** Paying an island a point a tile was three quarters of every point in the game and had taken the mode's skill ceiling down with it — a sharp bot beat random 23–17, when it beat it 37–3 before islands existed. The fix is a FLAT THREE per island, every island counted rather than only the sphere's, and it works: island income fell from 204 a game to 54, the split is now island 54 / temple 42 / city 17 / ship 9, and the bot is back to **31–9**. Flat also changes what you play for — three points doesn't care how big a piece of country is, so a count rewards standing on several pieces of sky rather than parking on the biggest one.
+>
+> **The Palazzo** is the exception that gives the flat rate a shape: the tile the game starts on, same connections as any start tile and no more rooted than anything else, and whichever island it has ended up on counts 6. The seat of government is a thing the wind pushes around and everyone chases.
+>
+> **Catch and throw.** A tile the wind knocks loose already fell into the hand of whoever set the wind off; now catching one on your own turn buys you a second placement that turn, while the hole the wind just made is still open. Capped at once a turn — a caught zephyr would otherwise buy the placement that catches the next one, forever.
+>
+> **Flying machines cross open sky.** They used to stop at the first gap, which meant the one piece on the board built for reaching somewhere unreachable couldn't reach an island. Now the flight goes straight over open air and lands anywhere along its lane; it still needs a tile under it to catch a zephyr and turn, so gaps are crossed but not steered through.
+>
+> **The backdrop is a portolan.** A flat blue wash with a hairline grid read as a spreadsheet you could sail on; it's now a chart of the sky — a graticule with heavy meridians every fifth square, the rhumb network a portolan strikes from a ring of compass nodes, and a rose on the origin with the Latin winds named round it. All in world space, so it pans and zooms with the board and reads as the paper the kingdom is printed on.
+>
+> One lesson worth recording. Restructuring the renderer spliced out four methods including `drawCellOverlay`, and because the frame is now wrapped in a try/catch, the result was a board that silently drew one tile instead of a tab that froze — logged once to the console and then invisible. The net did its job and it also hid the bug for two screenshots. If a frame ever *keeps* throwing, read the console before you read the code.
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 

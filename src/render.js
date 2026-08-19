@@ -20,6 +20,16 @@ const MOVE_OK = { rgb: '124,196,108', line: '#7cc46c' };
 const MOVE_SPECIAL = { rgb: '95,191,174', line: THEME.teal };
 const MOVE_COSTLY = { rgb: '196,104,80', line: '#c46850' };
 
+/** How a portolan's rhumb network is struck: nodes on a ring, 16 bearings each. */
+const RHUMB_NODES = 12;
+const RHUMB_RING = 11;        // squares out from the origin
+
+/** The Latin winds, named round the rose. 0=N 1=E 2=S 3=W. */
+const WINDS = [
+  { name: 'SEPTENTRIO', dir: 0 }, { name: 'ORIENS', dir: 1 },
+  { name: 'MERIDIES', dir: 2 }, { name: 'OCCIDENS', dir: 3 },
+];
+
 /** Cloud banks for a sky backdrop: [x, y, radius, drift speed], all fractions. */
 const CLOUDS = [
   [0.08, 0.17, 0.09, 0.9], [0.42, 0.09, 0.06, 1.5], [0.71, 0.24, 0.11, 0.6],
@@ -219,21 +229,51 @@ export class Renderer {
    */
   drawBackdrop(game) {
     const ctx = this.ctx;
-    const sky = game?.m?.backdrop === 'sky';
-    if (sky) {
-      const air = ctx.createLinearGradient(0, 0, 0, this.h);
-      air.addColorStop(0, '#2f4a6b');
-      air.addColorStop(0.45, '#456d92');
-      air.addColorStop(1, '#7fa0bd');
-      ctx.fillStyle = air;
-    } else {
+    if (game?.m?.backdrop !== 'sky') {
       ctx.fillStyle = THEME.night;
+      ctx.fillRect(0, 0, this.w, this.h);
+      return this.drawGrid(THEME.grid);
     }
-    ctx.fillRect(0, 0, this.w, this.h);
-    if (sky) this.drawClouds();
+    this.drawChart();
+  }
+
+  /**
+   * The sky, drawn as an old chart of it.
+   *
+   * A flat blue wash with a hairline grid read as a spreadsheet you could sail
+   * on. What it wanted was a MAP: a sea-chart ground with a real graticule —
+   * thin parallels, heavy meridians every five squares — the rhumb lines a
+   * portolan draws from its compass nodes, and a rose sitting on the origin
+   * with the Latin winds named round it. All of it is drawn in WORLD space, so
+   * it pans and zooms with the board and reads as the chart the kingdom is
+   * printed on rather than as wallpaper behind it.
+   */
+  drawChart() {
+    const ctx = this.ctx;
     const z = this.cam.zoom;
-    if (z < 40) return;
-    ctx.strokeStyle = sky ? 'rgba(255,255,255,0.07)' : THEME.grid;
+
+    const sea = ctx.createLinearGradient(0, 0, 0, this.h);
+    sea.addColorStop(0, '#26405c');
+    sea.addColorStop(0.5, '#375a7c');
+    sea.addColorStop(1, '#5c7f9e');
+    ctx.fillStyle = sea;
+    ctx.fillRect(0, 0, this.w, this.h);
+    this.drawClouds();
+
+    // The rhumb network and the rose are the expensive half and the half that
+    // stops meaning anything when the squares get small, so both drop out with
+    // the grid rather than piling detail into an unreadable zoom.
+    if (z < 26) return;
+    this.drawRhumbs();
+    this.drawGraticule();
+    if (z >= 40) this.drawRose();
+  }
+
+  /** The plain hairline grid, for every mode that isn't a chart. */
+  drawGrid(color) {
+    const ctx = this.ctx;
+    if (this.cam.zoom < 40) return;
+    ctx.strokeStyle = color;
     ctx.lineWidth = 1;
     ctx.beginPath();
     const [x0, y0] = this.toWorld(0, 0);
@@ -251,7 +291,150 @@ export class Renderer {
     ctx.stroke();
   }
 
-  // --- overlays the modes ask for -------------------------------------------
+  /**
+   * Parallels and meridians. Two weights, because a graticule with one weight
+   * is graph paper: every square gets a hairline, every fifth gets an ink line,
+   * and that fifth is what lets you count squares across a board at a glance
+   * instead of following a lane with your finger.
+   */
+  drawGraticule() {
+    const ctx = this.ctx;
+    const [x0, y0] = this.toWorld(0, 0);
+    const [x1, y1] = this.toWorld(this.w, this.h);
+
+    for (const [step, color, width] of [[1, 'rgba(232,222,208,0.11)', 1], [5, 'rgba(212,175,95,0.28)', 1.6]]) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) {
+        const [sx] = this.toScreen(x, 0);
+        ctx.moveTo(Math.round(sx) + 0.5, 0);
+        ctx.lineTo(Math.round(sx) + 0.5, this.h);
+      }
+      for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) {
+        const [, sy] = this.toScreen(0, y);
+        ctx.moveTo(0, Math.round(sy) + 0.5);
+        ctx.lineTo(this.w, Math.round(sy) + 0.5);
+      }
+      ctx.stroke();
+    }
+  }
+
+  /**
+   * Rhumb lines: the sixteen bearings struck from each of a ring of compass
+   * nodes, which is the thing that makes a portolan look like a portolan. Drawn
+   * long enough to always cross the viewport and clipped by it, and kept faint
+   * — they're the paper the map is on, not something you're meant to read.
+   */
+  drawRhumbs() {
+    const ctx = this.ctx;
+    const z = this.cam.zoom;
+    const R = RHUMB_RING;                                  // node ring, in squares
+    const reach = (Math.hypot(this.w, this.h) / z) + R * 2;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(232,222,208,0.085)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let n = 0; n < RHUMB_NODES; n++) {
+      const a = (n / RHUMB_NODES) * Math.PI * 2;
+      const nx = Math.cos(a) * R, ny = Math.sin(a) * R;
+      const [sx, sy] = this.toScreen(nx, ny);
+      if (sx < -reach * z || sy < -reach * z || sx > this.w + reach * z || sy > this.h + reach * z) continue;
+      for (let i = 0; i < 16; i++) {
+        const b = (i / 16) * Math.PI * 2;
+        const [ex, ey] = this.toScreen(nx + Math.cos(b) * reach, ny + Math.sin(b) * reach);
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * The rose on the origin, with the Latin winds named round it. Septentrio is
+   * north, Oriens east, Meridies south, Occidens west — the names a mediaeval
+   * chart actually used, and the reason the tile that blows a lane is called a
+   * zephyr in the first place (Favonius, the west wind, is Zephyrus in Greek).
+   */
+  drawRose() {
+    const ctx = this.ctx;
+    const z = this.cam.zoom;
+    const [cx, cy] = this.toScreen(0.5, 0.5);
+    const r = z * 1.9;                    // just under four squares across
+    if (cx < -r * 2 || cy < -r * 2 || cx > this.w + r * 2 || cy > this.h + r * 2) return;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.strokeStyle = 'rgba(212,175,95,0.22)';
+    ctx.lineWidth = 1.2;
+    for (const k of [1, 0.72, 0.16]) {
+      ctx.beginPath();
+      ctx.arc(0, 0, r * k, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // Eight points, the cardinals long and filled, the ordinals short and open.
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+      const len = i % 2 === 0 ? r : r * 0.66;
+      const w = r * (i % 2 === 0 ? 0.10 : 0.06);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * len, Math.sin(a) * len);
+      ctx.lineTo(Math.cos(a + Math.PI / 2) * w, Math.sin(a + Math.PI / 2) * w);
+      ctx.lineTo(Math.cos(a - Math.PI / 2) * w, Math.sin(a - Math.PI / 2) * w);
+      ctx.closePath();
+      if (i % 2 === 0) { ctx.fillStyle = 'rgba(212,175,95,0.16)'; ctx.fill(); }
+      ctx.stroke();
+    }
+    // Small caps, letter-spaced, and clamped: the names are an inscription on
+    // the chart, not a headline. Left unclamped they scale with the zoom and
+    // SEPTENTRIO ends up the size of a tile.
+    const size = Math.max(8, Math.min(15, r * 0.12));
+    ctx.fillStyle = 'rgba(212,175,95,0.40)';
+    ctx.font = `600 ${size}px ui-serif, Georgia, serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    WINDS.forEach(({ name, dir }) => {
+      const a = (dir / 4) * Math.PI * 2 - Math.PI / 2;
+      const [tx, ty] = [Math.cos(a) * r * 1.28, Math.sin(a) * r * 1.28];
+      ctx.save();
+      ctx.translate(tx, ty);
+      for (let i = 0; i < name.length; i++) {          // hand-spaced letters
+        ctx.fillText(name[i], (i - (name.length - 1) / 2) * size * 0.78, 0);
+      }
+      ctx.restore();
+    });
+    ctx.restore();
+  }
+
+  /**
+   * Slow cloud, drifting behind everything. Parallaxed against the camera
+   * rather than pinned to the screen, so panning reads as moving over the sky
+   * instead of dragging a wallpaper about — and laid out from a fixed table
+   * rather than at random, so it never flickers or reshuffles between frames.
+   */
+  drawClouds() {
+    const ctx = this.ctx;
+    const t = performance.now() / 90000;
+    const drift = this.cam.zoom * 0.12;
+    ctx.save();
+    for (const [ox, oy, r, speed] of CLOUDS) {
+      const x = (((ox + t * speed) % 1.4) - 0.2) * this.w - this.cam.x * drift;
+      const y = oy * this.h - this.cam.y * drift;
+      const rad = r * Math.min(this.w, this.h);
+      // Feathered rather than a hard ellipse. A flat white blob at 15% alpha
+      // reads as a smudge on the glass; a radial falloff reads as distance.
+      const soft = ctx.createRadialGradient(x, y, 0, x, y, rad * 2.1);
+      soft.addColorStop(0, 'rgba(255,255,255,0.16)');
+      soft.addColorStop(0.55, 'rgba(255,255,255,0.09)');
+      soft.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = soft;
+      ctx.beginPath();
+      ctx.ellipse(x, y, rad * 2.1, rad * 0.72, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
 
   /**
    * Strata: a dropped shadow under a raised tile sells the height. It falls
@@ -407,35 +590,6 @@ export class Renderer {
     const i = cell.type.marks.findIndex((m) => m.kind === kind);
     if (i < 0) return null;
     return rotPoint(cell.type.markSpots[i], cell.rot);
-  }
-
-  /**
-   * Slow cloud, drifting behind everything. Parallaxed against the camera
-   * rather than pinned to the screen, so panning reads as moving over the sky
-   * instead of dragging a wallpaper about — and laid out from a fixed table
-   * rather than at random, so it never flickers or reshuffles between frames.
-   */
-  drawClouds() {
-    const ctx = this.ctx;
-    const t = performance.now() / 90000;
-    const drift = this.cam.zoom * 0.12;
-    ctx.save();
-    for (const [ox, oy, r, speed] of CLOUDS) {
-      const x = (((ox + t * speed) % 1.4) - 0.2) * this.w - this.cam.x * drift;
-      const y = oy * this.h - this.cam.y * drift;
-      const rad = r * Math.min(this.w, this.h);
-      // Feathered rather than a hard ellipse. A flat white blob at 15% alpha
-      // reads as a smudge on the glass; a radial falloff reads as distance.
-      const soft = ctx.createRadialGradient(x, y, 0, x, y, rad * 2.1);
-      soft.addColorStop(0, 'rgba(255,255,255,0.16)');
-      soft.addColorStop(0.55, 'rgba(255,255,255,0.09)');
-      soft.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = soft;
-      ctx.beginPath();
-      ctx.ellipse(x, y, rad * 2.1, rad * 0.72, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
   }
 
   /** Pulsing highlights on a list of cells — lifting, recalling, walking on. */

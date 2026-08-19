@@ -747,6 +747,47 @@ const MARK_ART = {
 
   // --- cloud -----------------------------------------------------------------
   /**
+   * The Palazzo: the seat of the kingdom, a domed hall with a standard over it.
+   * Bigger and finer than anything else on the board, because it is the one
+   * tile that was there before the game started and the one everybody can see
+   * from wherever the wind has put them.
+   */
+  palazzo(ctx) {
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.05;
+    ctx.fillStyle = THEME.plaster;
+    ctx.beginPath(); ctx.rect(-0.46, -0.16, 0.92, 0.62); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(30,24,18,0.20)';             // an arcade along the front
+    for (let x = -0.36; x < 0.34; x += 0.24) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0.46);
+      ctx.lineTo(x, 0.14);
+      ctx.quadraticCurveTo(x + 0.07, 0.02, x + 0.14, 0.14);
+      ctx.lineTo(x + 0.14, 0.46);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = THEME.roof;                        // the dome
+    ctx.beginPath();
+    ctx.moveTo(-0.34, -0.16);
+    ctx.quadraticCurveTo(0, -0.72, 0.34, -0.16);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.roofLit;
+    ctx.beginPath();
+    ctx.moveTo(-0.30, -0.18);
+    ctx.quadraticCurveTo(-0.14, -0.60, 0.02, -0.56);
+    ctx.quadraticCurveTo(-0.12, -0.44, -0.16, -0.18);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = THEME.timber;                    // the standard on top
+    ctx.lineWidth = 0.04;
+    ctx.beginPath(); ctx.moveTo(0, -0.58); ctx.lineTo(0, -0.92); ctx.stroke();
+    ctx.fillStyle = THEME.gold;
+    ctx.beginPath();
+    ctx.moveTo(0.01, -0.92); ctx.lineTo(0.30, -0.83); ctx.lineTo(0.01, -0.72);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = 0.055;
+  },
+
+  /**
    * A tower turbine: a mill tower built into a city wall, with a hub where the
    * sails go. The sails themselves are NOT drawn here — they turn, and this art
    * is baked into a static sprite. The renderer spins them on top; all the

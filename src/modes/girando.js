@@ -22,7 +22,10 @@
 // A TILE THAT LANDS TOUCHING NOTHING ORTHOGONALLY falls out of the sky — and it
 // falls into the hand of whoever set the wind off. Corners don't hold anything
 // up any more, which means the sky sheds tiles readily, and the player doing
-// the shedding is the one who gets to play them again.
+// the shedding is the one who gets to play them again. Better than that: catch
+// one on your own turn and you may THROW IT STRAIGHT BACK DOWN, taking a second
+// placement while the hole the wind just made is still open. Once a turn, or a
+// caught zephyr would buy the placement that catches the next one.
 //
 // FOLLOWERS ARE WEATHER TOO. Once a figure is on the board it never comes off
 // by choice: a gust blows it the same distance as everything else in its lane,
@@ -49,11 +52,17 @@
 //
 // THE SFERA is half a sphere on one edge, and that edge meets nothing but
 // another sfera's. Join two and they lock together forever — nothing moves them
-// again — and the sky looks down and COUNTS THE ISLAND THEY ARE PART OF:
-// whoever has the most figures standing on that piece of country scores a point
-// for each of its tiles, ties paying both. Once, then and there. Twelve sfera
-// makes six spheres, so six counts in a whole game, and where you close one is
-// as much of the decision as when.
+// again — and the sky looks down and COUNTS EVERY ISLAND: whoever has the most
+// figures on each piece of country takes a flat THREE points for it, ties paying
+// both. Once, then and there. Twelve sfera makes six spheres, so six counts in a
+// whole game.
+//
+// Flat is load-bearing. Paying a point a tile made this one rule three quarters
+// of every point in the game, because the piece being counted is usually the
+// mainland and the mainland is forty-odd tiles: one count buried everything
+// anybody had built. Three an island doesn't care how big the island is, so
+// the way to win a count is to be standing on SEVERAL pieces of sky rather than
+// parked on the biggest one.
 //
 // THE SKY SHIP is one tile per player, in their colour, held rather than drawn.
 // Moor it to the outside edge of a piece of country and every feature that
@@ -121,6 +130,8 @@ const SHIP_BONUS = 2;        // added to a feature finished on your ship's islan
 const MAX_CHAIN = 6;         // storms raised while a storm is still landing
 const FLIGHT_RANGE = 24;     // squares, before we assume the zephyrs are a loop
 const SPHERES = 6;           // twelve sfera in the deck, so six counts in a game
+const ISLAND = 3;            // flat, per island, to whoever has the most figures on it
+const SEAT = 6;              // …and double, for whichever island holds the Palazzo
 const HAND_CAP = 5;          // blown tiles you can be holding at once
 
 /**
@@ -141,7 +152,12 @@ const inRing = (a, b) => a && b && Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.
 const isShip = (cell) => cell?.type.id === SHIP_TILE.id;
 const hasCity = (cell) => cell.type.feats.some((f) => f.type === 'city');
 
+const hasPalazzo = (cells) => cells.some((c) => c.type.id === 'Kpz');
+
 export class Girando extends Mode {
+  /** The kingdom starts with a seat, and the seat is as blowable as anything. */
+  seeds() { return [{ x: 0, y: 0, id: 'Kpz', rot: 0 }]; }
+
   /**
    * The SPACE between the tiles is open sky, not the ground on them. That
    * distinction is the whole readability of the mode: a field is a field, and
@@ -182,7 +198,8 @@ export class Girando extends Mode {
     this.blame = null;         // whose weather is currently running
     this.queued = [];
     this.spheres = 0;          // half-spheres joined so far — six of them exist
-    this.pendingCounts = [];   // islands a closing sphere still owes a count to
+    this.counts = 0;           // sphere counts still owed at the end of this turn
+    this.caught = false;       // a tile fell into our hands this turn
     this.paidRing = new Set(); // "temple|tile" pairs already paid this turn
     this.hands = this.game.players.map(() => []);
     this.ships = this.game.players.map(() => ({ at: null, charged: true }));
@@ -260,7 +277,8 @@ export class Girando extends Mode {
   endTurn() {
     this.flight = null;
     this.paidRing.clear();
-    while (this.pendingCounts.length) this.scoreIsland(this.pendingCounts.shift());
+    this.caught = false;
+    while (this.counts > 0) { this.counts--; this.scoreIslands(); }
     if (this.laid >= STORM_LIMIT) {
       this.game.say('The season turns, and the wind drops.');
       this.game.finish();
@@ -371,7 +389,7 @@ export class Girando extends Mode {
       if (cells.every((c) => c.fixed)) continue;         // an old one, already locked
       for (const cell of cells) cell.fixed = true;
       this.game.emit('landmark');
-      this.pendingCounts.push(cells[0]);
+      this.counts++;
     }
     if (found <= this.spheres) return;
     this.spheres = found;
@@ -379,45 +397,57 @@ export class Girando extends Mode {
   }
 
   /**
-   * The count. One island: the piece of country the sphere itself is part of,
-   * which is what makes WHERE you close a sphere as much of the decision as
-   * when. Most figures standing on it takes a point for each of its tiles, and
-   * a tie pays both in full.
+   * The count. EVERY piece of country on the board, not just the one the sphere
+   * is standing on, and a FLAT three points for whoever has the most figures on
+   * each — ties paying both in full.
+   *
+   * Flat is the whole of it. Paying a point a tile made this one rule 74% of
+   * every point in the game, because the piece being counted is usually the
+   * mainland and the mainland is forty-odd tiles: one count swamped everything
+   * anybody had built. Three points an island doesn't care how big the island
+   * is, so a count is worth roughly what a small city is worth — and it rewards
+   * being spread across several pieces of sky rather than parked on the biggest.
    *
    * It runs at the end of the turn the sphere closed on, after everything else
-   * that turn did — so a follower blown off the island a moment before is a
-   * follower that wasn't there, and one flown out to it a moment before is.
+   * that turn did — so a follower blown off an island a moment before is a
+   * follower that wasn't there, and one flown out to one a moment before is.
    */
-  scoreIsland(anchor) {
+  scoreIslands() {
     const g = this.game;
-    const board = g.board;
-    if (!anchor || board.get(anchor.x, anchor.y) !== anchor) return;
-    const group = board.groups().find((cells) => cells.includes(anchor));
-    if (!group) return;
-
-    const counts = new Map();
-    for (const cell of group) {
-      if (!cell.meeple) continue;
-      const n = cell.meeple.big ? 2 : 1;
-      counts.set(cell.meeple.player, (counts.get(cell.meeple.player) || 0) + n);
+    let paid = 0;
+    for (const group of g.board.groups()) {
+      const counts = new Map();
+      for (const cell of group) {
+        if (!cell.meeple) continue;
+        const n = cell.meeple.big ? 2 : 1;
+        counts.set(cell.meeple.player, (counts.get(cell.meeple.player) || 0) + n);
+      }
+      if (!counts.size) continue;
+      const best = Math.max(...counts.values());
+      const winners = [...counts.entries()].filter(([, n]) => n === best).map(([p]) => p);
+      // Whichever piece of country the Palazzo has ended up on is the kingdom
+      // proper, and counts double. It is not rooted, so which island that is
+      // changes every time the wind gets hold of it.
+      const seat = hasPalazzo(group);
+      const pts = seat ? SEAT : ISLAND;
+      paid++;
+      for (const p of winners) g.players[p].score += pts;
+      g.say(`${seat ? 'The Palazzo\'s island' : 'Island'} of ${group.length} tile${group.length > 1 ? 's' : ''} → ${winners.map((p) => g.players[p].name).join(' & ')} +${pts}`);
+      // Flash the FIGURES, not the island. Lighting up every tile of a
+      // forty-tile piece of country flashes most of the board at once, which
+      // reads as a bug and says nothing; lighting up the figures says exactly
+      // why these players and not the others.
+      const standing = group.filter((c) => c.meeple).map((c) => ({ x: c.x, y: c.y }));
+      g.emit('score', {
+        points: pts, players: winners,
+        at: {
+          x: standing.reduce((s, c) => s + c.x, 0) / standing.length + 0.5,
+          y: standing.reduce((s, c) => s + c.y, 0) / standing.length + 0.5,
+        },
+        cells: standing,
+      });
     }
-    if (!counts.size) {
-      g.say(`The sphere's island of ${group.length} has nobody standing on it.`);
-      return;
-    }
-    const best = Math.max(...counts.values());
-    const winners = [...counts.entries()].filter(([, n]) => n === best).map(([p]) => p);
-    const pts = group.length;
-    for (const p of winners) g.players[p].score += pts;
-    g.say(`The sphere's island of ${pts} tile${pts > 1 ? 's' : ''} → ${winners.map((p) => g.players[p].name).join(' & ')} +${pts}`);
-    g.emit('score', {
-      points: pts, players: winners,
-      at: {
-        x: group.reduce((s, c) => s + c.x, 0) / group.length + 0.5,
-        y: group.reduce((s, c) => s + c.y, 0) / group.length + 0.5,
-      },
-      cells: group.map((c) => ({ x: c.x, y: c.y })),
-    });
+    if (!paid) g.say('The sky looks down and finds nobody standing anywhere.');
   }
 
   // --- the ship -------------------------------------------------------------
@@ -546,8 +576,12 @@ export class Girando extends Mode {
       const key = `${x},${y}`;
       if (seen.has(key)) break;                  // zephyrs pointed in a circle
       seen.add(key);
+      // Open sky is something a flying machine crosses, not something that
+      // stops it: reaching an island nobody has built a road to is most of what
+      // the machine is for. A gap has no tile to land on and no wind to catch,
+      // so the flight simply carries on straight over it.
       const over = board.get(x, y);
-      if (!over) break;                          // open sky: nowhere to land
+      if (!over) continue;
       path.push(over);
       // You don't choose to ride it. A wind already going your way changes
       // nothing; one going across turns you; and one blowing straight back at
@@ -639,16 +673,28 @@ export class Girando extends Mode {
 
     // A tile the wind pushes off the edge of the world lands in the hand of
     // whoever set that wind off. A ship never does: it goes back to its owner.
+    let caught = 0;
     for (const f of r.fell) {
       this.fallen++;
       if (isShip(f.cell)) continue;              // resettleShips will find it gone
       const hand = this.blame != null ? this.hands[this.blame] : null;
-      if (hand && hand.length < HAND_CAP) hand.push(f.id);
+      if (hand && hand.length < HAND_CAP) { hand.push(f.id); caught++; }
       else g.deck.push(f.id);
     }
     if (r.fell.length) {
       const who = this.blame != null ? g.players[this.blame].name : 'The sky';
       g.say(`${r.fell.length} tile${r.fell.length > 1 ? 's' : ''} blow off the edge of the world, into ${who}'s hand.`);
+    }
+    // …and you may throw one straight back down. Catching a tile buys you
+    // another placement this turn, which is what turns a big storm from
+    // bookkeeping into a swing: the wind clears you a hole and hands you
+    // something to put in it while it's still open. Once a turn, because a
+    // caught zephyr would otherwise buy the placement that catches the next.
+    if (caught && this.blame === g.current && !this.caught) {
+      this.caught = true;
+      g.tilesLeft++;
+      g.say(`${g.player.name} catches one out of the air, and may throw it straight back down.`);
+      g.emit('landmark');
     }
 
     // Followers travel with the weather. One the wind put down somewhere is
@@ -810,7 +856,7 @@ export class Girando extends Mode {
     // Standing on an island only ever pays when a sphere closes — all of it on
     // the turn you close one yourself, and a fraction of it the rest of the
     // time, because somebody else will close one of the remaining five.
-    if (this.spheres < SPHERES) value += this.islandValue(player) * (joining ? 1 : 0.15);
+    if (this.spheres < SPHERES) value += this.islandValue(player) * (joining ? 1 : 0.35);
     return value;
   }
 
@@ -957,7 +1003,11 @@ export class Girando extends Mode {
     return value;
   }
 
-  /** What a count would pay us right now, minus what it would pay the best rival. */
+  /**
+   * What a count would pay us right now, minus what it would pay the best
+   * rival. Flat per island, so a scatter of small holdings beats one big one —
+   * which is exactly the behaviour the flat rate exists to produce.
+   */
   islandValue(player) {
     let value = 0;
     for (const group of this.game.board.groups()) {
@@ -967,8 +1017,9 @@ export class Girando extends Mode {
         const n = cell.meeple.big ? 2 : 1;
         if (cell.meeple.player === player) mine += n; else theirs = Math.max(theirs, n);
       }
-      if (mine >= theirs && mine > 0) value += group.length;
-      if (theirs >= mine && theirs > 0) value -= group.length;
+      const pts = hasPalazzo(group) ? SEAT : ISLAND;
+      if (mine >= theirs && mine > 0) value += pts;
+      if (theirs >= mine && theirs > 0) value -= pts;
     }
     return value;
   }

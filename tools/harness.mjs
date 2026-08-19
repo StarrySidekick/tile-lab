@@ -615,25 +615,33 @@ function checkGirando() {
     if (open !== 2) return fail('a ship caps nothing it moors against', `road open ${open}`);
   }
 
-  // The sphere counts the island it is standing on — including the mainland,
-  // which is the whole of the bug this replaced.
+  // A sphere counts EVERY island, at a flat three points each — so two separate
+  // pieces of country pay twice, and neither pays more for being bigger.
   {
     const h = new Game({ mode: 'girando', players: 2, seed: 3 });
     const b = h.board;
     for (const c of [...b.cells.values()]) b.remove(c.x, c.y);
     b.place(0, 0, TILES.Kso, 2, { free: true });   // sfera facing south
     b.place(0, 1, TILES.Kso, 0, { free: true });   // …meeting one facing north
-    b.place(1, 0, TILES.Kz, 0, { free: true });    // three tiles in the island
+    for (const [x, y] of [[1, 0], [2, 0], [1, 1]]) b.place(x, y, TILES.Kz, 0, { free: true });
     // The zephyr has no features to stand in, so the follower simply lies on
     // it — which is exactly the state the wind leaves figures in, and it still
     // counts for the island.
     b.get(1, 0).meeple = { player: 0, feat: null, big: false };
+    // …and a second island, far away, with one figure each on it.
+    b.place(9, 9, TILES.Kz, 0, { free: true });
+    b.place(10, 9, TILES.Kz, 0, { free: true });
+    b.get(9, 9).meeple = { player: 1, feat: null, big: false };
     b.rebuild();
     h.players[0].score = 0;
+    h.players[1].score = 0;
     h.m.joinSferas();
     h.m.endTurn();
     if (h.players[0].score !== 3) {
-      return fail('a sphere counts its own island, mainland included', `paid ${h.players[0].score}`);
+      return fail('an island pays a flat three, whatever its size', `the five-tile one paid ${h.players[0].score}`);
+    }
+    if (h.players[1].score !== 3) {
+      return fail('every island is counted, not just the sphere\'s', `the far one paid ${h.players[1].score}`);
     }
     if (!b.get(0, 0).fixed || !b.get(0, 1).fixed) {
       return fail('a joined sphere locks both tiles', 'they are still loose');
@@ -660,7 +668,42 @@ function checkGirando() {
     }
   }
 
-  console.log('  ✓ hand, moorings, dock edges, becalming, the island count, mills in stone');
+  // A flying machine crosses open sky. Reaching an island nobody has built a
+  // road to is most of what the machine is for, so a gap in the country has to
+  // be something the flight goes over rather than something that stops it.
+  {
+    const h = new Game({ mode: 'girando', players: 2, seed: 8 });
+    const b = h.board;
+    for (const c of [...b.cells.values()]) b.remove(c.x, c.y);
+    const flier = b.place(0, 0, TILES.Kfl, 0, { free: true });   // pointing north
+    b.place(0, -5, TILES.E, 0, { free: true });                  // an island, five clear
+    b.rebuild();
+    const path = h.m.flightPath(flier);
+    if (!path || !path.some((c) => c.x === 0 && c.y === -5)) {
+      return fail('a flight crosses open sky to a far island', `reached ${path ? path.length : 0} tiles`);
+    }
+  }
+
+  // The Palazzo's island counts double, and the Palazzo blows about like
+  // anything else, so which island that is keeps changing.
+  {
+    const h = new Game({ mode: 'girando', players: 2, seed: 6 });
+    const b = h.board;
+    if (b.get(0, 0)?.type.id !== 'Kpz') return fail('the kingdom starts with a Palazzo', b.get(0, 0)?.type.id);
+    for (const c of [...b.cells.values()]) b.remove(c.x, c.y);
+    b.place(0, 0, TILES.Kpz, 0, { free: true });
+    b.get(0, 0).meeple = { player: 0, feat: null, big: false };
+    b.place(9, 9, TILES.Kz, 0, { free: true });
+    b.get(9, 9).meeple = { player: 1, feat: null, big: false };
+    b.rebuild();
+    h.players[0].score = 0;
+    h.players[1].score = 0;
+    h.m.scoreIslands();
+    if (h.players[0].score !== 6) return fail('the Palazzo\'s island counts double', `paid ${h.players[0].score}`);
+    if (h.players[1].score !== 3) return fail('every other island counts once', `paid ${h.players[1].score}`);
+  }
+
+  console.log('  ✓ hand, moorings, dock edges, becalming, island counts, mills in stone, long flights, the Palazzo');
 }
 
 // --- runs -------------------------------------------------------------------
