@@ -384,7 +384,10 @@ export const RIVER_TYPES = [
  * Abbazia it caps no road and walls no city. What it does is sit there being
  * yours, and pay you for what the island it's tied to finishes.
  */
-export const SHIP_TILE = { id: 'SHIP', n: 0, group: 'ship', name: 'Sky ship', dock: true, feats: [], marks: [mark('ship')] };
+export const SHIP_TILE = {
+  id: 'SHIP', n: 0, group: 'ship', name: 'Sky ship',
+  dock: true, ground: 'sky', feats: [], marks: [mark('ship')],
+};
 
 /**
  * The Abbey — Carcassonne expansion 5. One per player, held in hand rather

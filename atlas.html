@@ -51,9 +51,7 @@
       const ctx = cv.getContext('2d');
       ctx.save();
       ctx.scale(SIZE, SIZE);
-      // The cloud kingdom is drawn over open sky, the way Girando draws it, so
-      // a tile in the atlas looks like the tile you'll actually be handed.
-      drawTile(ctx, t, { cave, terrain: cave ? 'cave' : (t.group === 'cloud' ? 'sky' : 'surface') });
+      drawTile(ctx, t, { cave });
       ctx.restore();
       t.spots.forEach(([sx, sy], i) => {
         // Water and mountains can't be claimed, so their anchors are ghosted

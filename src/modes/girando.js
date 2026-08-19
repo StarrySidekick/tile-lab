@@ -142,8 +142,14 @@ const isShip = (cell) => cell?.type.id === SHIP_TILE.id;
 const hasCity = (cell) => cell.type.feats.some((f) => f.type === 'city');
 
 export class Girando extends Mode {
-  /** Everything in this mode is drawn over open sky rather than over farmland. */
-  terrain = 'sky';
+  /**
+   * The SPACE between the tiles is open sky, not the ground on them. That
+   * distinction is the whole readability of the mode: a field is a field, and
+   * every gap you can see through is somewhere a tile could fall out of. The
+   * only sky that appears ON a tile is a tile that is literally a hole in the
+   * country — the ship's mooring — and that one says so with its own ground.
+   */
+  backdrop = 'sky';
 
   /**
    * A guaranteed mix rather than a cut of the shuffled pool: this mode is its
@@ -317,9 +323,14 @@ export class Girando extends Mode {
     for (const cell of cells) {
       if (board.get(cell.x, cell.y) !== cell) continue;
       const t = turbineOn(cell);
-      const d = t && t.on != null ? board.featureOf(cell.x, cell.y, t.on) : null;
-      if (!d) continue;
-      for (const p of board.majority(d)) {
+      if (!t || t.on == null) continue;
+      // A finished city has had its followers handed back, so there is nobody
+      // standing in it to read a majority off. The mill doesn't stop turning
+      // because the city got built — whoever held it when it closed keeps the
+      // income, and `millers` is where that survives the reclaim.
+      const d = board.featureOf(cell.x, cell.y, t.on);
+      const holders = d && d.meeples.length ? board.majority(d) : (cell.millers || []);
+      for (const p of holders) {
         this.pay(p, TURBINE, `${this.game.players[p].name}'s turbine turns`,
           [{ x: cell.x, y: cell.y }]);
       }
@@ -713,10 +724,12 @@ export class Girando extends Mode {
     if (d.type === 'sfera') return;              // a sphere isn't scored, it's a rule
     if (d.type === 'temple') return this.templeCloses(d);
 
+    // The majority has to be read BEFORE the award, because awarding a feature
+    // hands its followers back and there is nobody standing in it afterwards.
     const winners = this.game.board.majority(d);
     this.game.award(d, false, closer);
     this.shipBonus(d, winners);
-    this.crystallise(d);
+    this.crystallise(d, winners);
   }
 
   /** A feature that finishes on a piece of country a ship is tied to pays more. */
@@ -742,8 +755,11 @@ export class Girando extends Mode {
    * crystallised CITY is solid all the way up and stops a gust; a crystallised
    * road is flat ground the wind goes straight over.
    */
-  crystallise(d) {
+  crystallise(d, holders = []) {
     for (const cell of this.game.board.cellsOf(d)) {
+      // A turbine in a city that just closed keeps paying whoever held it, so
+      // the majority is written onto the tile before the followers go home.
+      if (turbineOn(cell) && holders.length) cell.millers = holders.slice();
       if (cell.anchored || isShip(cell) || zephyrDirs(cell).length) continue;
       cell.anchored = true;
       cell.blocks = hasCity(cell);
@@ -816,6 +832,7 @@ export class Girando extends Mode {
   turbineValue(cell, player) {
     const t = turbineOn(cell);
     if (!t || t.on == null) return 0;
+    if (cell.millers) return cell.millers.includes(player) ? 4 : -2;
     const d = this.game.board.featureOf(cell.x, cell.y, t.on);
     if (!d) return 3;                            // unclaimed, and we could hold it
     const mine = d.meeples.some((m) => m.player === player);

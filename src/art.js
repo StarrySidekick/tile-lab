@@ -1432,6 +1432,11 @@ export function drawMark(ctx, kind, [x, y], s = 0.46, L = LIGHT, dir = null) {
  * would otherwise bleed a few percent past the edge and break the seams.
  */
 export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 'surface', rot = 0 } = {}) {
+  // A tile may insist on its own ground. Exactly one does: the ship's mooring
+  // is a piece of open sky rather than a piece of country, which is what makes
+  // it obvious that it fits anywhere and joins nothing — the tile looks like
+  // the gap between tiles, because that is what it is.
+  if (type.ground) terrain = type.ground;
   // The art is drawn unrotated and the caller turns the canvas, so the light
   // has to be turned the other way to stay put in the world. Everything below
   // shades against `L`; nothing bakes in a direction of its own.
@@ -1621,6 +1626,22 @@ export function drawMeeple(ctx, x, y, size, color, opts = {}) {
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(size, size);
+
+  // Adrift: standing on a tile with nothing claimable on it, holding nothing
+  // and counting for nobody until the country underneath changes. Drawn inside
+  // a broken ring, because "why is that follower not scoring" is a question the
+  // board should answer rather than the rules.
+  if (opts.adrift) {
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.setLineDash([0.20, 0.16]);
+    ctx.lineWidth = 0.11;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 0.78, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   if (opts.resting) {                           // face-down at a village
     ctx.globalAlpha = 0.55;

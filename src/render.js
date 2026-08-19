@@ -20,6 +20,13 @@ const MOVE_OK = { rgb: '124,196,108', line: '#7cc46c' };
 const MOVE_SPECIAL = { rgb: '95,191,174', line: THEME.teal };
 const MOVE_COSTLY = { rgb: '196,104,80', line: '#c46850' };
 
+/** Cloud banks for a sky backdrop: [x, y, radius, drift speed], all fractions. */
+const CLOUDS = [
+  [0.08, 0.17, 0.09, 0.9], [0.42, 0.09, 0.06, 1.5], [0.71, 0.24, 0.11, 0.6],
+  [0.19, 0.52, 0.07, 1.2], [0.58, 0.63, 0.10, 0.8], [0.88, 0.47, 0.05, 1.8],
+  [0.33, 0.86, 0.08, 1.0], [0.77, 0.91, 0.06, 1.4],
+];
+
 /** Fast then slow — the shape almost everything transient here moves on. */
 const ease = (t) => 1 - (1 - t) ** 3;
 
@@ -32,7 +39,6 @@ export class Renderer {
     this.pointer = null;    // raw screen coords, needed for the cave overlay
     this.showDebug = false;
     this.showHints = true;  // highlight every square the tile could go in
-    this.terrain = 'surface';   // the mode's ground, restamped every frame
     this.meepleSpots = [];
     this.pawnSpots = [];
     this.moveSpots = [];
@@ -155,10 +161,9 @@ export class Renderer {
     const ctx = this.ctx;
     this.glideStep();
     ctx.clearRect(0, 0, this.w, this.h);
-    this.drawBackdrop();
+    this.drawBackdrop(game);
     if (game.options?.tide) this.drawWater(game);
 
-    this.terrain = game.m.terrain || 'surface';
     const fog = game.options?.fog ? this.fogSet(game) : null;
 
     for (const cell of game.board.cells.values()) {
@@ -169,7 +174,7 @@ export class Renderer {
       if (lift) this.drawStackShadow(cell, lift);
       ctx.save();
       if (fog && !fog.has(`${cell.x},${cell.y}`)) ctx.globalAlpha = 0.26;
-      this.paintTile(cell.x, cell.y - lift, cell.rot, cell.type, game.m.terrain || 'surface');
+      this.paintTile(cell.x, cell.y - lift, cell.rot, cell.type);
       ctx.restore();
       if (overlay) this.drawCellOverlay(cell, overlay, lift);
     }
@@ -205,13 +210,30 @@ export class Renderer {
     return sx > -z && sy > -z && sx < this.w + z && sy < this.h + z;
   }
 
-  drawBackdrop() {
+  /**
+   * What's between the tiles. In every mode but one it's the night the board
+   * hangs in; in Girando it's open sky, because there the gaps are the point —
+   * a tile blown off the edge falls into that, and islands are pieces of
+   * country with it running between them. The tiles themselves stay ordinary
+   * countryside: the sky is the SPACE, not the ground.
+   */
+  drawBackdrop(game) {
     const ctx = this.ctx;
-    ctx.fillStyle = THEME.night;
+    const sky = game?.m?.backdrop === 'sky';
+    if (sky) {
+      const air = ctx.createLinearGradient(0, 0, 0, this.h);
+      air.addColorStop(0, '#2f4a6b');
+      air.addColorStop(0.45, '#456d92');
+      air.addColorStop(1, '#7fa0bd');
+      ctx.fillStyle = air;
+    } else {
+      ctx.fillStyle = THEME.night;
+    }
     ctx.fillRect(0, 0, this.w, this.h);
+    if (sky) this.drawClouds();
     const z = this.cam.zoom;
     if (z < 40) return;
-    ctx.strokeStyle = THEME.grid;
+    ctx.strokeStyle = sky ? 'rgba(255,255,255,0.07)' : THEME.grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
     const [x0, y0] = this.toWorld(0, 0);
@@ -387,6 +409,35 @@ export class Renderer {
     return rotPoint(cell.type.markSpots[i], cell.rot);
   }
 
+  /**
+   * Slow cloud, drifting behind everything. Parallaxed against the camera
+   * rather than pinned to the screen, so panning reads as moving over the sky
+   * instead of dragging a wallpaper about — and laid out from a fixed table
+   * rather than at random, so it never flickers or reshuffles between frames.
+   */
+  drawClouds() {
+    const ctx = this.ctx;
+    const t = performance.now() / 90000;
+    const drift = this.cam.zoom * 0.12;
+    ctx.save();
+    for (const [ox, oy, r, speed] of CLOUDS) {
+      const x = (((ox + t * speed) % 1.4) - 0.2) * this.w - this.cam.x * drift;
+      const y = oy * this.h - this.cam.y * drift;
+      const rad = r * Math.min(this.w, this.h);
+      // Feathered rather than a hard ellipse. A flat white blob at 15% alpha
+      // reads as a smudge on the glass; a radial falloff reads as distance.
+      const soft = ctx.createRadialGradient(x, y, 0, x, y, rad * 2.1);
+      soft.addColorStop(0, 'rgba(255,255,255,0.16)');
+      soft.addColorStop(0.55, 'rgba(255,255,255,0.09)');
+      soft.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = soft;
+      ctx.beginPath();
+      ctx.ellipse(x, y, rad * 2.1, rad * 0.72, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   /** Pulsing highlights on a list of cells — lifting, recalling, walking on. */
   drawCellTargets(cells, line, rgb) {
     const ctx = this.ctx;
@@ -485,7 +536,7 @@ export class Renderer {
     if (covering && !ok) return;              // don't smear a ghost over the board
     ctx.save();
     ctx.globalAlpha = ok ? 0.92 : 0.32;
-    this.paintTile(h.x, h.y, game.rot, game.tile, game.m.terrain || 'surface');
+    this.paintTile(h.x, h.y, game.rot, game.tile);
     ctx.restore();
 
     const [sx, sy] = this.toScreen(h.x, h.y);
@@ -526,7 +577,7 @@ export class Renderer {
     ctx.save();
     ctx.globalAlpha = ok ? 0.92 : 0.30;
     for (const c of piece.cells) {
-      this.paintTile(h.x + c.dx, h.y + c.dy, c.rot, c.type, game.m.terrain || 'surface');
+      this.paintTile(h.x + c.dx, h.y + c.dy, c.rot, c.type);
     }
     ctx.restore();
     ctx.lineWidth = 3;
@@ -543,9 +594,16 @@ export class Renderer {
     for (const cell of game.board.cells.values()) {
       if (!cell.meeple || !this.onScreen(cell.x, cell.y)) continue;
       if (this.fx?.veiled(`meeple:${cell.x},${cell.y}`)) continue;   // on its way
-      const spot = rotPoint(cell.type.spots[cell.meeple.feat], cell.rot);
+      // A follower with no feature is holding nothing — the wind put it down on
+      // a tile with nothing claimable on it. It stands in the middle of the
+      // tile, waiting for the country underneath it to change. There is no
+      // anchor to look up, and looking one up anyway used to throw and take the
+      // whole render loop down with it, which is what "the game froze" was.
+      const anchor = cell.meeple.feat == null ? [0.5, 0.5] : cell.type.spots[cell.meeple.feat];
+      const spot = rotPoint(anchor || [0.5, 0.5], cell.rot);
       const [sx, sy] = this.toScreen(cell.x + spot[0], cell.y + spot[1]);
-      drawMeeple(this.ctx, sx, sy, this.cam.zoom * 0.42, PLAYER_COLORS[cell.meeple.player]);
+      drawMeeple(this.ctx, sx, sy, this.cam.zoom * 0.42, PLAYER_COLORS[cell.meeple.player],
+        { adrift: cell.meeple.feat == null });
     }
   }
 
@@ -931,7 +989,7 @@ export class Renderer {
           const s = z * scale;
           const [sx, sy] = at(wx - 0.5, wy - 0.5);
           ctx.globalAlpha = Math.min(1, 0.35 + t * 3);
-          this.paintTile(0, 0, e.rot, e.type, this.terrain, s, () => [sx - (s - z) / 2, sy - (s - z) / 2]);
+          this.paintTile(0, 0, e.rot, e.type, 'surface', s, () => [sx - (s - z) / 2, sy - (s - z) / 2]);
           break;
         }
 
@@ -957,7 +1015,7 @@ export class Renderer {
           ctx.save();
           ctx.translate(sx + z / 2, sy + z / 2);
           ctx.rotate(e.spin * k);
-          this.paintTile(0, 0, e.rot, e.type, this.terrain, shrink, () => [-shrink / 2, -shrink / 2]);
+          this.paintTile(0, 0, e.rot, e.type, 'surface', shrink, () => [-shrink / 2, -shrink / 2]);
           if (sink) {
             ctx.fillStyle = `rgba(48,84,110,${0.25 + k * 0.55})`;
             ctx.fillRect(-shrink / 2, -shrink / 2, shrink, shrink);

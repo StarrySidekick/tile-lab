@@ -495,7 +495,7 @@ function currentTile() {
   const inv = game.interior;
   if (inv && game.phase === 'interior-place') return { type: inv.tile, rot: inv.rot, terrain: inv.kind };
   if (game.m.piece) return { piece: game.m.piece };
-  if (game.tile) return { type: game.tile, rot: game.rot, terrain: game.m.terrain || 'surface' };
+  if (game.tile) return { type: game.tile, rot: game.rot, terrain: 'surface' };
   return null;
 }
 
@@ -573,7 +573,7 @@ function renderMarket() {
     cv.width = cv.height = 56;
     const ctx = cv.getContext('2d');
     ctx.scale(56, 56);
-    drawTile(ctx, TILES[id], { terrain: game.m.terrain || 'surface' });
+    drawTile(ctx, TILES[id]);
     wrap.appendChild(cv);
     wrap.insertAdjacentHTML('beforeend', `<kbd>${i + 1}</kbd>`);
     wrap.onclick = () => game.takeFromMarket(i);
@@ -743,11 +743,28 @@ function signature() {
   ].join('|');
 }
 
+/**
+ * One frame. The draw is wrapped because a throw inside it used to kill the
+ * requestAnimationFrame chain outright, and a dead chain is indistinguishable
+ * from a hung tab — the board stops, the bots stop, nothing in the console
+ * says why unless you had it open at the moment it happened. Now a bad frame
+ * is a dropped frame: it's logged once per distinct error and the loop carries
+ * on, so a rendering bug degrades into a glitch instead of a freeze.
+ */
+const drawFailures = new Set();
 function frame(now = 0) {
   driveBots(now);
   const sig = signature();
   if (sig !== lastSig) { lastSig = sig; syncPanel(); }
-  renderer.draw(game);
+  try {
+    renderer.draw(game);
+  } catch (err) {
+    const key = String(err && err.stack ? err.stack.split('\n').slice(0, 3).join('|') : err);
+    if (!drawFailures.has(key)) {
+      drawFailures.add(key);
+      console.error('The renderer threw; the frame is skipped and the game carries on.', err);
+    }
+  }
   requestAnimationFrame(frame);
 }
 

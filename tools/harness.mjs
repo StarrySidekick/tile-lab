@@ -640,7 +640,27 @@ function checkGirando() {
     }
   }
 
-  console.log('  ✓ hand, moorings, dock edges, becalming, the island count');
+  // A turbine keeps paying after its city closes. Closing hands the followers
+  // back, so there is nobody left to read a majority off — the holder at the
+  // moment of closing is written onto the tile instead.
+  {
+    const h = new Game({ mode: 'girando', players: 2, seed: 4 });
+    const b = h.board;
+    for (const c of [...b.cells.values()]) b.remove(c.x, c.y);
+    b.place(0, 0, TILES.Ktb, 0, { free: true });     // turbine in a city facing north
+    b.place(0, -1, TILES.E, 2, { free: true });      // a cap facing south, closing it
+    b.addMeeple(0, 0, 0, 1);
+    b.rebuild();
+    h.m.settle(1);
+    if (!b.get(0, 0).anchored) return fail('a finished city crystallises', 'it stayed cloud');
+    const before = h.players[1].score;
+    h.m.payTurbines([b.get(0, 0)]);
+    if (h.players[1].score === before) {
+      return fail('a turbine in a finished city still collects', 'it paid nobody');
+    }
+  }
+
+  console.log('  ✓ hand, moorings, dock edges, becalming, the island count, mills in stone');
 }
 
 // --- runs -------------------------------------------------------------------
