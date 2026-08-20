@@ -1,6 +1,6 @@
 # The modes
 
-Tile Lab is a place to find out which tile mechanic is worth building a whole
+Tilemaker's Workshop is a place to find out which tile mechanic is worth building a whole
 game around. This file is the reasoning behind each one: **what it changes
 mechanically**, what it cost against the engine, and — most importantly —
 **what question it answers**. A prototype that doesn't answer a question isn't

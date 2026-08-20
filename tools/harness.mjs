@@ -14,12 +14,12 @@
 // down to play it.
 // ---------------------------------------------------------------------------
 
-import { Game, MODES, MECHANICS } from '../src/game.js';
+import { Game, MODES, MECHANICS, LIVE_MECHANICS } from '../src/game.js';
 import { Bot, BOT_LEVELS } from '../src/ai.js';
 import { makePiece, rotatePiece, validatePiece } from '../src/pieces.js';
 import { Board } from '../src/board.js';
 import { TILES } from '../src/tiles.js';
-import { liftableCells } from '../src/mechanics.js';
+import { liftableCells, BASE_LAYER } from '../src/mechanics.js';
 import { gust, storm } from '../src/wind.js';
 import { GROUPS } from '../src/tiles.js';
 
@@ -806,11 +806,25 @@ function main() {
     // Sprawl places several at once — between them they cover the ways a
     // modifier can go wrong.
     console.log('\nmechanics, against a plain mode, a removing one and a piece one');
-    for (const mech of MECHANICS) {
+    // Only what the engine actually implements: the catalogue also lists rules
+    // that are named but not built, and switching one of those on proves
+    // nothing except that an inert flag is inert.
+    for (const mech of LIVE_MECHANICS) {
       if (mech.id === 'fog') continue;                // purely a render flag
+      if (mech.on) continue;                          // base layer, tested below
       for (const host of ['classic', 'girando', 'sprawl']) {
         runMode(MODE_OF(host), Math.max(4, games / 2), { options: { [mech.id]: true } }, `+${mech.id}`);
       }
+    }
+
+    // The other direction, which is the new one: pull a base rule OUT. Taking
+    // cities away strips most of the pool, so the thing being checked is that
+    // the game still deals, places and finishes rather than running dry.
+    console.log('\nbase layer, one rule at a time, switched off');
+    for (const layer of BASE_LAYER) {
+      if (layer.status === 'planned') continue;
+      runMode(MODE_OF('classic'), Math.max(4, games / 2),
+        { options: { [layer.id]: false } }, `-${layer.id}`);
     }
 
     console.log('\ntiles per turn');
@@ -818,7 +832,7 @@ function main() {
       runMode(MODE_OF('classic'), Math.max(4, games / 2), { tilesPerTurn: n }, ` x${n}`);
     }
     console.log('\nall mechanics at once');
-    const all = Object.fromEntries(MECHANICS.map((m) => [m.id, true]));
+    const all = Object.fromEntries(LIVE_MECHANICS.map((m) => [m.id, true]));
     runMode(MODE_OF('classic'), Math.max(4, games / 2), { options: all, groups: ALL_GROUPS }, '+everything');
     runMode(MODE_OF('world'), Math.max(4, games / 2), { options: all, groups: ALL_GROUPS }, '+everything');
     // The bot has a verb for several of these — the abbey, the big follower,

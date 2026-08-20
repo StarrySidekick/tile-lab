@@ -13,7 +13,10 @@
 
 import { Game, DEFAULT_GROUPS, MODES, MECHANICS, MECHANIC_GROUPS } from './game.js';
 import { Bot, BOT_LEVELS } from './ai.js';
-import { groupsFor } from './mechanics.js';
+import {
+  groupsFor, missingNeeds, defaultMechanics, LIVE_MECHANICS, MECHANIC_BY_ID,
+  RULESETS, RULESET_BY_ID, DEFAULT_RULESET,
+} from './mechanics.js';
 import { Renderer } from './render.js';
 import { drawTile, PLAYER_COLORS } from './art.js';
 import { THEME } from './theme.js';
@@ -33,7 +36,10 @@ const fx = new Effects({ enabled: !stillness });
 renderer.fx = fx;
 
 let enabledGroups = new Set(DEFAULT_GROUPS.classic);
-let mechanics = {};
+// The workshop starts as plain Carcassonne: the base layer on, nothing bolted
+// on. Every other state the panel can be in is a departure from this one.
+let mechanics = defaultMechanics();
+let ruleset = DEFAULT_RULESET;
 let game;
 
 /**
@@ -168,6 +174,7 @@ function newGame() {
     meeples: $('useMeeples').checked,
     groups: [...enabledGroups],
     options: { ...mechanics },
+    ruleset,
     tilesPerTurn: Number($('tilesPerTurn').value) || 1,
   }));
   game.free = $('freePlace').checked;
@@ -412,7 +419,7 @@ $('botSkill').value = 'steady';
 
 $('newGame').onclick = newGame;
 $('mode').onchange = onModeChange;
-$('useMeeples').onchange = onModeChange;
+$('useMeeples').onchange = (e) => { setMechanic('meeple', e.target.checked); onModeChange(); };
 $('playerCount').onchange = () => { renderBotSeats(); buildBots(); };
 $('botCount').onchange = (e) => { botSeats = Number(e.target.value) || 0; buildBots(); };
 $('botSkill').onchange = buildBots;
@@ -433,21 +440,148 @@ for (const t of TILE_TYPES) {
   $('forceTile').appendChild(o);
 }
 
-$('mechanics').innerHTML = MECHANIC_GROUPS.map((g) => {
-  const items = MECHANICS.filter((m) => m.group === g.id);
-  if (!items.length) return '';
-  return `<h3>${g.name}</h3>` + items.map((m) => `
-    <label title="${m.note}"><input type="checkbox" data-mech="${m.id}" /> ${m.name}</label>`).join('');
-}).join('');
-for (const el of $('mechanics').querySelectorAll('input[data-mech]')) {
-  el.onchange = (e) => {
-    const id = e.target.dataset.mech;
-    if (e.target.checked) mechanics[id] = true; else delete mechanics[id];
-    // Fog is pure rendering, so it can take effect without a new game.
-    if (id === 'fog' && game) game.options.fog = !!mechanics.fog;
-    if (MECHANICS.find((m) => m.id === id)?.groups?.length) renderGroups();
-  };
+// --- the workshop -----------------------------------------------------------
+//
+// One panel, every rule the catalogue knows about, in the order they stack:
+// the base layer first, then the boxes that bolt onto it. Rules the engine
+// doesn't implement yet are still listed — greyed, with a dot that says so —
+// because a catalogue that hides its gaps is worse than one that admits them.
+//
+// Nothing here knows what any individual rule DOES. It renders src/mechanics.js
+// and writes back into `mechanics`, so a new rule is a new entry in that file
+// and nothing else.
+
+for (const r of RULESETS) {
+  $('ruleset').insertAdjacentHTML('beforeend', `<option value="${r.id}">${r.name}</option>`);
 }
+$('ruleset').value = ruleset;
+
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * Rows matching what's in the search box: name, note, or the box it came out
+ * of — and the id as well, so that typing an exact rule key finds exactly the
+ * one row, which is what the browser test relies on.
+ */
+function matches(m, q) {
+  if (!q) return true;
+  return `${m.id} ${m.name} ${m.note} ${m.pack || ''}`.toLowerCase().includes(q);
+}
+
+/**
+ * A rule you can't have yet, and why. The engine gates on nothing here — this
+ * is the panel refusing to let you tick "pig" when there are no fields for it
+ * to stand in, which is a better answer than a switch that silently does
+ * nothing.
+ */
+function blockedBy(m) {
+  if (m.status === 'planned') return 'not built yet';
+  const missing = missingNeeds(m.id, mechanics);
+  if (!missing.length) return null;
+  return `needs ${missing.map((n) => (MECHANIC_BY_ID[n]?.name || n).toLowerCase()).join(' + ')}`;
+}
+
+function renderMechanics() {
+  const q = $('mechSearch').value.trim().toLowerCase();
+  const host = $('mechanics');
+  const open = new Set(
+    [...host.querySelectorAll('details[open]')].map((d) => d.dataset.layer),
+  );
+  // First paint, and every search: the base layer stands open, the rest fold
+  // away. Seventy rules unfolded is a wall, not a panel.
+  if (!host.dataset.painted) open.add('base');
+
+  host.innerHTML = MECHANIC_GROUPS.map((layer) => {
+    const items = MECHANICS.filter((m) => m.layer === layer.id && matches(m, q));
+    if (!items.length) return '';
+    const live = items.filter((m) => mechanics[m.id]).length;
+
+    // Sub-headings are the box a rule came out of, printed once per run.
+    let pack = null;
+    const rows = items.map((m) => {
+      const head = m.pack && m.pack !== pack ? `<h4>${esc(m.pack)}</h4>` : '';
+      pack = m.pack;
+      const why = blockedBy(m);
+      const on = !!mechanics[m.id];
+      const title = esc(m.note) + (why ? ` — ${esc(why)}` : '');
+      return `${head}<label class="mech ${why ? 'off' : ''}" title="${title}">
+        <input type="checkbox" data-mech="${m.id}" ${on ? 'checked' : ''} ${why ? 'disabled' : ''} />
+        <span class="dot ${m.status}"></span>
+        <span class="mech-name">${esc(m.name)}</span>
+        ${m.wiki ? `<a class="mech-doc" href="${m.wiki}" target="_blank" rel="noreferrer"
+            title="The real rule, on WikiCarpedia">?</a>` : ''}
+      </label>`;
+    }).join('');
+
+    const isOpen = q || open.has(layer.id);
+    return `<details data-layer="${layer.id}" ${isOpen ? 'open' : ''}>
+      <summary>${esc(layer.name)}
+        <span class="dim">${live ? `${live} on · ` : ''}${items.length}</span>
+      </summary>
+      <p class="hint">${esc(layer.note)}</p>
+      ${rows}
+    </details>`;
+  }).join('') || '<p class="hint">Nothing matches that.</p>';
+
+  host.dataset.painted = '1';
+
+  for (const el of host.querySelectorAll('input[data-mech]')) {
+    el.onchange = (e) => setMechanic(e.target.dataset.mech, e.target.checked);
+  }
+  updateMechCount();
+}
+
+/**
+ * Flip one rule. A base-layer rule is stored as an explicit false when it's
+ * off, because "absent" already means "on" everywhere else — see Game.has().
+ */
+function setMechanic(id, on) {
+  const m = MECHANIC_BY_ID[id];
+  if (!m) return;
+  if (m.on) mechanics[id] = on; else if (on) mechanics[id] = true; else delete mechanics[id];
+
+  // Anything that depended on what just went off has to go off too, or you
+  // end up with a cathedral in a game with no cities.
+  if (!on) {
+    for (const other of MECHANICS) {
+      if (mechanics[other.id] && (other.needs || []).includes(id)) setMechanic(other.id, false);
+    }
+  }
+  // Followers have a second switch of their own up in Game; keep them level.
+  if (id === 'meeple') $('useMeeples').checked = on;
+  // Fog is pure rendering, so it can take effect without a new game.
+  if (id === 'fog' && game) game.options.fog = !!mechanics.fog;
+  if (m.groups?.length) renderGroups();
+  renderMechanics();
+}
+
+function updateMechCount() {
+  const on = MECHANICS.filter((m) => mechanics[m.id]).length;
+  const bolted = MECHANICS.filter((m) => mechanics[m.id] && !m.on).length;
+  $('mechCount').textContent = `${on} on · ${bolted} bolted`;
+  $('mechCount').title = `${MECHANICS.length} rules catalogued, `
+    + `${LIVE_MECHANICS.length} of them implemented.`;
+}
+
+function setRuleset(id) {
+  ruleset = id;
+  const r = RULESET_BY_ID[id];
+  $('rulesetHint').textContent = r ? r.note : '';
+}
+
+$('mechSearch').oninput = renderMechanics;
+$('ruleset').onchange = (e) => setRuleset(e.target.value);
+$('mechReset').onclick = () => { mechanics = defaultMechanics(); renderMechanics(); };
+$('mechClear').onclick = () => { mechanics = Object.fromEntries(
+  MECHANICS.filter((m) => m.on).map((m) => [m.id, false])); renderMechanics(); };
+$('mechAll').onclick = () => {
+  mechanics = defaultMechanics();
+  // In catalogue order, so a rule's prerequisites are already on when it's
+  // reached and nothing gets refused for a dependency that comes later.
+  for (const m of LIVE_MECHANICS) if (!m.on && !blockedBy(m)) mechanics[m.id] = true;
+  renderMechanics();
+};
 
 $('hints').onchange = (e) => { renderer.showHints = e.target.checked; };
 $('effects').checked = !stillness;
@@ -769,6 +903,8 @@ function frame(now = 0) {
 }
 
 showVersion();
+setRuleset(ruleset);
+renderMechanics();
 renderGroups();
 onModeChange();
 game = bind(new Game({ players: 2, groups: [...enabledGroups] }));
@@ -780,5 +916,7 @@ frame();
 window.LAB = {
   get game() { return game; },
   get bots() { return bots; },
-  renderer, newGame, THEME, sfx, fx, MODES, MECHANICS, VERSION,
+  renderer, newGame, THEME, sfx, fx, MODES, MECHANICS, LIVE_MECHANICS, VERSION,
+  get mechanics() { return mechanics; },
+  get ruleset() { return ruleset; },
 };

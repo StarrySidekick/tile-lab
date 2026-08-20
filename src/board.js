@@ -541,9 +541,10 @@ export class Board {
    * distinction, it's simply as big as it is. Lakes and rivers are worth
    * nothing on their own — they pay through the cities beside them.
    */
-  value(d, final = false) {
+  value(d, final = false, { pennants = true } = {}) {
     const n = d.tiles.size;
-    if (d.type === 'city') return final ? n + d.shields : 2 * n + 2 * d.shields;
+    const shields = pennants ? d.shields : 0;
+    if (d.type === 'city') return final ? n + shields : 2 * n + 2 * shields;
     if (d.type === 'road') return n;
     if (d.type === 'monastery') return 1 + this.surroundCount(d.at.x, d.at.y);
     if (d.type === 'forest') return n + d.shields;

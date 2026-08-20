@@ -268,6 +268,21 @@ for (const mode of modes) {
   else console.log(`  ✓ score effects     ${fx.kinds.join(', ')} · ${fx.bumped} row bumped`);
 }
 
+/**
+ * Tick a rule in the workshop. Every layer is folded away by default and the
+ * search box is the fastest way to a specific row, so this types the rule's
+ * name in rather than hunting through <details> for it.
+ */
+async function setMech(page, id, on) {
+  await page.fill('#mechSearch', id);
+  await page.waitForTimeout(30);
+  const box = `#mechanics input[data-mech="${id}"]`;
+  await page.waitForSelector(box, { state: 'attached' });
+  if (on) await page.check(box); else await page.uncheck(box);
+  await page.fill('#mechSearch', '');
+  await page.waitForTimeout(30);
+}
+
 // The rest of the motion, one mode each, because each one is the only place
 // its effect can happen: tiles blowing off the cloud, tiles going under the
 // water, a region lighting up as it's counted, and the endgame paying out one
@@ -278,7 +293,7 @@ for (const [what, mode, mech, kind] of [
 ]) {
   errors.length = 0;
   await page.selectOption('#mode', mode);
-  if (mech) await page.check(`#mechanics input[data-mech="${mech}"]`);
+  if (mech) await setMech(page, mech, true);
   await page.click('#newGame');
   const got = await page.evaluate(async ([kind]) => {
     const g = window.LAB.game;
@@ -310,7 +325,7 @@ for (const [what, mode, mech, kind] of [
     }
     return false;
   }, [kind]);
-  if (mech) await page.uncheck(`#mechanics input[data-mech="${mech}"]`);
+  if (mech) await setMech(page, mech, false);
   if (errors.length || !got) {
     failures++;
     console.log(`  ✗ ${what}: ${errors[0]?.split('\n')[0] || `no "${kind}" effect in ${mode}`}`);
@@ -432,11 +447,15 @@ for (const [what, mode, mech, kind] of [
 
 // Every mechanic touches the UI too — the market row and the extra action
 // buttons especially, and those only exist in a browser.
-const mechanics = await page.evaluate(() => window.LAB.MECHANICS.map((m) => m.id));
+// The catalogue lists rules that aren't built yet; those rows are disabled
+// on purpose, so the sweep is over what the engine actually implements.
+const mechanics = await page.evaluate(
+  () => window.LAB.LIVE_MECHANICS.filter((m) => !m.on).map((m) => m.id),
+);
 for (const mech of mechanics) {
   errors.length = 0;
   await page.selectOption('#mode', 'classic');
-  await page.check(`#mechanics input[data-mech="${mech}"]`);
+  await setMech(page, mech, true);
   await page.click('#newGame');
   await page.waitForTimeout(100);
   await page.evaluate(() => {
@@ -464,7 +483,7 @@ for (const mech of mechanics) {
       break;
     }
   });
-  await page.uncheck(`#mechanics input[data-mech="${mech}"]`);
+  await setMech(page, mech, false);
   if (errors.length) { failures++; console.log(`  ✗ +${mech}: ${errors[0].split('\n')[0]}`); }
   else console.log(`  ✓ +${mech}`);
 }

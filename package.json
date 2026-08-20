@@ -1,10 +1,10 @@
 {
-  "name": "tile-lab",
+  "name": "tilemakers-workshop",
   "private": true,
   "type": "module",
   "description": "Marks src/ as ES modules so the headless harness in tools/ can import them under Node. The game itself still has no build step and no dependencies.",
   "scripts": {
     "test": "node tools/harness.mjs"
   },
-  "version": "0.10.0"
+  "version": "0.11.0"
 }

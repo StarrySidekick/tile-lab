@@ -1,4 +1,4 @@
-# Tile Lab
+# Tilemaker's Workshop
 
 **Play it: <https://starrysidekick.github.io/tile-lab/>**
 · [tile atlas](https://starrysidekick.github.io/tile-lab/atlas.html)
@@ -13,7 +13,7 @@ exists to answer a specific question about what makes tile-laying good;
 
 ## Run it locally
 
-**Double-click `Play Tile Lab.command`.** It starts a local server and opens the
+**Double-click `Play Tilemaker's Workshop.command`.** It starts a local server and opens the
 game. Closing that Terminal window stops it.
 
 Or from a terminal:
@@ -152,13 +152,68 @@ Meeples can be turned off entirely, in which case a completed feature pays
 whoever closed it — the cheapest way to see how much of Carcassonne is the
 meeples.
 
-## Mechanics
+## The workshop
 
-Rules you switch on à la carte, in any mode and any combination. Anything a
-single mode invented that turns out to be interesting on its own lives here
-rather than locked inside that mode — lifting came out of the cloud kingdom,
-building on top came out of Strata, and both are more useful bolted onto
-Classic, or onto each other.
+One panel, every rule the project knows about, stacked in the order they build
+on each other. The organising idea is the one the current Carcassonne rulebook
+states outright:
+
+> You can also choose to use only some elements from an expansion and not
+> others; for instance, you could use only the large meeple from the first
+> expansion and the builder from the second, without using any other elements.
+
+So nothing in the catalogue is bundled. Inns & Cathedrals is not one switch, it
+is three — the big follower, the inn, the cathedral — and each is a row you can
+tick on its own.
+
+That principle is then taken one layer further down than the printed game goes.
+**The base layer is a set of switches too.** Cities, roads, fields, cloisters,
+followers and pennants are rules Carcassonne happens to ship with, not laws of
+physics, and a workshop that can't take the roads out isn't a workshop. They
+default on; turning one off pulls its tiles out of the pool and stops it paying:
+
+| off | what happens |
+|---|---|
+| **Cities** | Every tile carrying a city leaves the deck. 72 tiles become 28 |
+| **Roads** | Same, for roads: 72 become 27 |
+| **Cloisters** | The monastery and temple tiles leave: 72 become 66 |
+| **Pennants** | Coats of arms stop counting; a shield is decoration |
+| **Followers** | No majorities — a feature simply pays whoever closed it |
+
+Take all of them out at once and you get 72 tiles laid, nobody scoring
+anything, which is exactly what it should be: bare tiles.
+
+The panel folds. Seventy-one rules in a 306px column is only readable because
+almost all of it is closed almost all the time — one layer open, the rest a
+summary line, and a search box that cuts across the lot. Each row carries a dot
+saying whether the rule is **playable**, **approximate**, or **catalogued but
+not built yet**, and a `?` linking to the real rule on
+[WikiCarpedia](https://wikicarpedia.com/car/Main_Page). A catalogue that hides
+its gaps is worse than one that admits them, so the unbuilt rules are listed,
+greyed, and honest about it.
+
+Rules are also gated on their own prerequisites: you can't tick the pig with no
+fields for it to stand in, and switching cities off switches the cathedral off
+with them.
+
+### The edition switch
+
+Carcassonne has been revised twice and the revisions are not cosmetic — the
+farm rule in particular has been three different rules. The **Rules** dropdown
+picks which edition's constants the scoring reads: the current (3rd) edition,
+where the River and the Abbot are part of the base box and a field pays 3 per
+completed city touching it; the 2nd; or the original, where a completed city is
+worth 4 to the farmers feeding it, counted city by city rather than field by
+field.
+
+### What's implemented
+
+Of the 71 rules catalogued, 23 are live. The rest are named, described, dated
+and linked, waiting for an implementation.
+
+**Workshop originals** — things this sandbox invented, or lifted out of one of
+its own modes. Lifting came out of the cloud kingdom, building on top came out
+of Strata, and both are more useful bolted onto Classic, or onto each other.
 
 **Play**
 
@@ -168,7 +223,6 @@ Classic, or onto each other.
 | **Lift placed tiles** | Instead of placing, pick up an unclaimed tile that isn't holding the board together, and play it somewhere better |
 | **Build on top of tiles** | Strata's rule, anywhere. Cover a tile that hasn't scored and has nobody on it. Three levels maximum |
 | **Recall a follower** | Instead of claiming, take one of your followers back off the board |
-| **Followers walk on** | Abbey & Mayor's wagon. When a feature scores, your follower steps along the road to the next unclaimed, unfinished thing instead of going home |
 | **Two-faced tiles** | Most tiles have a reverse — a road is a city on the back. Press `F` before you place |
 | **Fog of war** | Tiles far from your figures fade out |
 
@@ -178,18 +232,21 @@ Classic, or onto each other.
 |---|---|
 | **Hidden agendas** | Two secret objectives each, scored at the end. Every placement becomes a tell |
 | **Rising tide** | A waterline climbs the board every three rounds, drowning whatever it reaches. It's a moving bound on the board, so nothing else needed a special case |
-| **King & Robber Baron** | Whoever finished the largest city, and the longest road, each score 1 per completed city / road on the board at the end |
 
-**Carcassonne expansions**, implemented from the published rules:
+**Carcassonne rules**, implemented from the published ones:
 
-| | |
-|---|---|
-| **The River** | The mini-expansion. Laid first, spring to lake, and it may not double back on itself — two curves in a row bending the same way would make a U-turn. Only an *immediate* reversal is illegal, which is the official reading |
-| **Inns & Cathedrals** | An inn doubles its road and a cathedral triples its city — and both pay **nothing at all** if the feature never closes |
-| **Big follower** | One large follower each, counting as two when majorities are worked out |
-| **Abbey tile** | One abbey each, played instead of your tile into a hole surrounded on all four sides. It scores as a monastery, so it's always worth 9 |
-| **Builder** | Extend a feature you already hold and you get another tile this turn, once per turn |
-| **Trade goods** | Wine, grain and cloth go to whoever *closes* the city holding them, follower or not. Most of each at the end is worth 10 |
+| | box | |
+|---|---|---|
+| **The River** | mini (2001) | Laid first, spring to lake, and it may not double back on itself — two curves in a row bending the same way would make a U-turn. Only an *immediate* reversal is illegal, which is the official reading |
+| **Big follower** | Exp. 1 | One large follower each, counting as two when majorities are worked out |
+| **Inns** | Exp. 1 | An inn doubles its road — and pays **nothing at all** if the road never closes |
+| **Cathedrals** | Exp. 1 | The same bargain for a city. Approximate: the multiplier is 1.5 on a city already paying 2 a tile, not a true 3-a-tile rewrite |
+| **Trade goods** | Exp. 2 | Wine, grain and cloth go to whoever *closes* the city holding them, follower or not. Most of each at the end is worth 10 |
+| **Builder** | Exp. 2 | Extend a feature you already hold and you get another tile this turn, once per turn |
+| **Abbey tile** | Exp. 5 | One abbey each, played instead of your tile into a hole surrounded on all four sides. It scores as a monastery, so it's always worth 9 |
+| **Wagon** | Exp. 5 | When a feature scores, your follower steps along the road to the next unclaimed, unfinished thing instead of going home |
+| **The King** | Exp. 6 | Whoever finished the largest city scores 1 per completed city on the board at the end |
+| **The Robber Baron** | Exp. 6 | The same for roads: longest one finished takes 1 per completed road |
 
 Two of these are simplified where the UI can't yet ask a question. The builder
 has no separate figure — any of your followers on the extended feature counts,

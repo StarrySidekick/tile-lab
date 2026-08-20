@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tile Lab — a Carcassonne-style sandbox</title>
+  <title>Tilemaker's Workshop — a Carcassonne-style sandbox</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="./assets/favicon.svg" />
   <link rel="stylesheet" href="./style.css" />
@@ -14,7 +14,7 @@
 
     <aside id="panel">
       <header>
-        <h1>Tile Lab <span id="version" class="ver" title="build">…</span></h1>
+        <h1>Tilemaker&rsquo;s Workshop <span id="version" class="ver" title="build">…</span></h1>
         <p id="phase">—</p>
       </header>
 
@@ -67,10 +67,26 @@
         <p class="hint" id="modeHint"></p>
       </section>
 
-      <section class="tools">
-        <h2>Mechanics</h2>
+      <section class="tools" id="workshop">
+        <h2>The workshop</h2>
+        <label class="row" id="rulesetRow" title="Carcassonne has been revised twice, and the revisions are not cosmetic. This picks which edition’s constants the scoring reads.">Rules
+          <select id="ruleset"></select>
+        </label>
+        <p class="hint" id="rulesetHint"></p>
+        <div class="mech-bar">
+          <input id="mechSearch" type="search" placeholder="Search 70+ rules…" autocomplete="off" />
+          <span class="mech-count" id="mechCount">—</span>
+        </div>
+        <div class="mech-btns">
+          <button id="mechReset" class="ghost" title="Back to the base game and nothing else.">Base only</button>
+          <button id="mechClear" class="ghost" title="Strip everything, including the base layer, down to bare tiles.">Strip it bare</button>
+          <button id="mechAll" class="ghost" title="Every rule that is actually implemented, all at once.">All live</button>
+        </div>
         <div id="mechanics"></div>
-        <p class="hint">Bolt onto any mode, in any combination. Applied on the next new game (except fog).</p>
+        <p class="hint">Bolt onto any mode, in any combination. Applied on the next new game (except fog).
+          <span class="dot live"></span> playable ·
+          <span class="dot partial"></span> approximate ·
+          <span class="dot planned"></span> catalogued, not built yet.</p>
       </section>
 
       <section class="tools">

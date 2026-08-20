@@ -26,7 +26,10 @@ import { PLAYER_NAMES } from './theme.js';
 import { MODES, MODE_BY_ID } from './modes/index.js';
 import { AGENDAS } from './modes/agendas.js';
 import {
-  MECHANICS, MECHANIC_GROUPS, canLift, liftableCells, coverProblem,
+  MECHANICS, MECHANIC_GROUPS, MECHANIC_BY_ID, LAYERS, LIVE_MECHANICS,
+  RULESETS, RULESET_BY_ID, DEFAULT_RULESET, defaultMechanics,
+  disabledFeatures, tileAllowed,
+  canLift, liftableCells, coverProblem,
   claimableFeatures, walkTargets, innsAndCathedrals, goodsOn, crownAndRoad,
   WATER, MAX_STACK,
 } from './mechanics.js';
@@ -41,7 +44,10 @@ export const RULES = {
 };
 
 export const DEFAULT_GROUPS = Object.fromEntries(MODES.map((m) => [m.id, m.groups]));
-export { MODES, GROUPS, MECHANICS, MECHANIC_GROUPS };
+export {
+  MODES, GROUPS, MECHANICS, MECHANIC_GROUPS, MECHANIC_BY_ID, LAYERS,
+  LIVE_MECHANICS, RULESETS, RULESET_BY_ID, DEFAULT_RULESET, defaultMechanics,
+};
 
 const MARKET_SIZE = 4;
 const TIDE_PERIOD = 3;          // rounds between waterline steps
@@ -50,13 +56,22 @@ const GOODS = ['wine', 'grain', 'cloth'];
 export class Game {
   constructor({
     players = 2, seed = null, mode = 'classic', meeples = true,
-    groups = null, options = {}, tilesPerTurn = 1,
+    groups = null, options = {}, tilesPerTurn = 1, ruleset = DEFAULT_RULESET,
   } = {}) {
     const spec = MODE_BY_ID[mode] || MODE_BY_ID.classic;
     this.mode = spec.id;
     this.spec = spec;
     this.options = options;
-    this.useMeeples = spec.meeples ? meeples : false;
+    this.rules = RULESET_BY_ID[ruleset] || RULESET_BY_ID[DEFAULT_RULESET];
+
+    // The base layer that decides which tiles may exist at all. Worked out
+    // once, here, because the deck, the seeds and the art all have to agree
+    // about it and none of them should be re-deriving it.
+    this.offFeatures = disabledFeatures(options);
+
+    // Followers are a base-layer switch now. The old `meeples` argument still
+    // works — a mode that has no followers at all still overrules both.
+    this.useMeeples = spec.meeples ? (options.meeple ?? meeples) !== false : false;
     this.groups = groups && groups.length ? groups : spec.groups;
     if (spec.solo) players = 1;
     else players = Math.max(spec.minPlayers || 1, Math.min(spec.maxPlayers || 5, players));
@@ -103,11 +118,12 @@ export class Game {
     this.crown = { city: null, cityBy: null, road: null, roadBy: null };
 
     this.m = new spec.Mode(this);
-    this.deck = this.m.deck();
+    this.deck = this.cull(this.m.deck());
     this.river = this.has('river') ? this.startRiver() : null;
 
     for (const s of this.seeds()) {
-      this.board.place(s.x, s.y, TILES[s.id], s.rot || 0, { owner: s.owner ?? null });
+      const id = this.legalSeed(s.id);
+      if (id) this.board.place(s.x, s.y, TILES[id], s.rot || 0, { owner: s.owner ?? null });
     }
 
     if (this.has('agendas')) this.dealAgendas();
@@ -118,8 +134,46 @@ export class Game {
     this.startTurn();
   }
 
-  /** Is a mechanic switched on? A mode may force one on for itself. */
-  has(id) { return !!(this.options?.[id] || this.spec?.mechanics?.includes(id)); }
+  /**
+   * Is a mechanic switched on? A mode may force one on for itself, and the
+   * base layer is on unless it has been explicitly switched off — otherwise
+   * every mode that never heard of `cities` would be playing without them.
+   */
+  has(id) {
+    const set = this.options?.[id];
+    if (set !== undefined) return !!set;
+    if (this.spec?.mechanics?.includes(id)) return true;
+    return !!MECHANIC_BY_ID[id]?.on;
+  }
+
+  // --- the base layer -------------------------------------------------------
+
+  /**
+   * Take out of the deck every tile carrying a feature the base layer has
+   * switched off. This is what "turn cities off" actually means: not a city
+   * that scores nothing, but a landscape with no cities in it.
+   */
+  cull(deck) {
+    if (!this.offFeatures.size) return deck;
+    const kept = deck.filter((id) => TILES[id] && tileAllowed(TILES[id], this.offFeatures));
+    // Emptying the pool entirely would be a game with nothing to play, so the
+    // cull gives way rather than deals you nothing.
+    return kept.length ? kept : deck;
+  }
+
+  /**
+   * The opening tile, or a stand-in for it. A mode's start tile is chosen for
+   * its own reasons and may well be a city-and-road crossroads, which is
+   * exactly the tile a base layer without cities has just banned.
+   */
+  legalSeed(id) {
+    const type = TILES[id];
+    if (!type || tileAllowed(type, this.offFeatures)) return id;
+    const swap = this.deck.find((d) => tileAllowed(TILES[d], this.offFeatures));
+    if (!swap) return id;
+    this.deck.splice(this.deck.indexOf(swap), 1);
+    return swap;
+  }
 
   get player() { return this.players[this.current]; }
   get modeName() { return this.spec.name; }
@@ -895,9 +949,15 @@ export class Game {
     // A mode that scores a feature type its own way says so; anything it
     // doesn't have an opinion about falls through to the board's rules.
     const own = this.m.valueOf?.(d, final);
-    let pts = own == null ? this.board.value(d, final) : own;
-    if (this.has('inns')) {
-      const ic = innsAndCathedrals(this.board, d, final);
+    let pts = own == null ? this.board.value(d, final, { pennants: this.has('pennants') }) : own;
+
+    // A feature whose whole layer has been switched off pays nothing, for the
+    // rare case where one exists anyway — a mode's seed tile, mostly.
+    if (this.offFeatures.has(d.type)) return 0;
+
+    const inns = this.has('inns'), cathedrals = this.has('cathedrals');
+    if (inns || cathedrals) {
+      const ic = innsAndCathedrals(this.board, d, final, { inns, cathedrals });
       if (ic.void) return 0;
       pts = Math.round(pts * ic.mult);
     }
@@ -944,11 +1004,11 @@ export class Game {
 
   scoreCrown() {
     const { cities, roads } = crownAndRoad(this.board);
-    if (this.crown.cityBy != null && cities) {
+    if (this.has('king') && this.crown.cityBy != null && cities) {
       this.players[this.crown.cityBy].score += cities;
       this.say(`The King (largest city, ${this.crown.city} tiles) — ${this.players[this.crown.cityBy].name} +${cities}`);
     }
-    if (this.crown.roadBy != null && roads) {
+    if (this.has('robberBaron') && this.crown.roadBy != null && roads) {
       this.players[this.crown.roadBy].score += roads;
       this.say(`The Robber Baron (longest road, ${this.crown.road} tiles) — ${this.players[this.crown.roadBy].name} +${roads}`);
     }
@@ -961,7 +1021,7 @@ export class Game {
     this.market = null;
     this.m.finish();
     if (this.has('goods')) this.scoreGoods();
-    if (this.has('king')) this.scoreCrown();
+    if (this.has('king') || this.has('robberBaron')) this.scoreCrown();
     if (this.has('agendas')) this.scoreAgendas();
     if (!this.spec.solo) {
       const best = Math.max(...this.players.map((p) => p.score));
