@@ -52,25 +52,32 @@ export const RULESETS = [
   {
     id: 'c3',
     name: 'Current (3rd ed.)',
-    note: 'The 2021 edition. The River and the Abbot are part of the base box, '
-      + 'and a field pays 3 per completed city touching it.',
+    note: 'The 2021 edition and its 2024 anniversary revision. The River and '
+      + 'the Abbot are part of the base box, and a field pays 3 per completed '
+      + 'city touching it, from the field outwards.',
     farmPerCity: 3,
+    farmPerField: true,
     baseIncludes: ['river', 'abbot', 'garden'],
   },
   {
     id: 'c2',
     name: '2nd edition',
-    note: 'The 2014 redesign. Fields are scored from the field outwards, 3 per '
-      + 'completed city, but the River is a separate mini-expansion again.',
+    note: 'The 2014 redesign. Same farm rule as now — 3 per completed city, '
+      + 'scored from each field outwards — but the River is a separate '
+      + 'mini-expansion again.',
     farmPerCity: 3,
+    farmPerField: true,
     baseIncludes: [],
   },
   {
     id: 'c1',
-    name: 'Original (1st ed.)',
-    note: 'The 2000 rules. A completed city is worth 4 to the farmers feeding '
-      + 'it, counted city by city rather than field by field.',
+    name: 'Original (2000)',
+    note: 'The award-winning first printing, before the farm rule was rewritten. '
+      + 'A completed city was worth 4, counted once from the city rather than '
+      + 'from each field — so a city feeding two farms paid one of them, not '
+      + 'both. Approximated here at 4 per field.',
     farmPerCity: 4,
+    farmPerField: true,
     baseIncludes: [],
   },
 ];
@@ -207,33 +214,33 @@ export const MECHANICS = [
 
   // --- Exp. 3: The Princess & The Dragon -----------------------------------
   {
-    id: 'dragon', layer: 'exp', pack: 'Exp. 3 — The Princess & The Dragon (2005)',
+    id: 'dragon', layer: 'exp', pack: 'Exp. 3 — Princess & Dragon (2005) · C3.1: Dragon & Fairy',
     name: 'Dragon',
     note: 'Woken by a dragon tile, it walks six tiles chosen by the players in '
       + 'turn and eats every follower it steps on.',
     status: 'planned', wiki: wiki('The_Princess_and_the_Dragon'), since: 'all',
   },
   {
-    id: 'volcano', layer: 'exp', pack: 'Exp. 3 — The Princess & The Dragon (2005)',
+    id: 'volcano', layer: 'exp', pack: 'Exp. 3 — Princess & Dragon (2005) · C3.1: Dragon & Fairy',
     name: 'Volcanoes',
     note: 'A volcano tile takes no follower and summons the dragon to it.',
     status: 'planned', needs: ['dragon'], wiki: wiki('The_Princess_and_the_Dragon'), since: 'all',
   },
   {
-    id: 'fairy', layer: 'exp', pack: 'Exp. 3 — The Princess & The Dragon (2005)',
+    id: 'fairy', layer: 'exp', pack: 'Exp. 3 — Princess & Dragon (2005) · C3.1: Dragon & Fairy',
     name: 'Fairy',
     note: 'Stands beside one of your followers: 1 a turn, 3 when its feature '
       + 'closes, and the dragon will not touch it.',
     status: 'planned', needs: ['meeple'], wiki: wiki('The_Princess_and_the_Dragon'), since: 'all',
   },
   {
-    id: 'princess', layer: 'exp', pack: 'Exp. 3 — The Princess & The Dragon (2005)',
+    id: 'princess', layer: 'exp', pack: 'Exp. 3 — Princess & Dragon (2005) · C3.1: Dragon & Fairy',
     name: 'Princess',
     note: 'Lay the princess into a city and you may send a knight already in it home.',
     status: 'planned', needs: ['cities'], wiki: wiki('The_Princess_and_the_Dragon'), since: 'all',
   },
   {
-    id: 'portal', layer: 'exp', pack: 'Exp. 3 — The Princess & The Dragon (2005)',
+    id: 'portal', layer: 'exp', pack: 'Exp. 3 — Princess & Dragon (2005) · C3.1: Dragon & Fairy',
     name: 'Magic portals',
     note: 'A portal tile lets you place your follower onto any unfinished '
       + 'feature anywhere on the board instead of onto the tile you just laid.',
@@ -242,7 +249,7 @@ export const MECHANICS = [
 
   // --- Exp. 4: The Tower ---------------------------------------------------
   {
-    id: 'tower', layer: 'exp', pack: 'Exp. 4 — The Tower (2006)',
+    id: 'tower', layer: 'exp', pack: 'Exp. 4 — The Tower (2006) · C3.1: Towers & Thieves (new mechanic)',
     name: 'Towers',
     note: 'Stack a storey instead of placing a follower, then capture any '
       + 'follower within the tower\'s new reach and ransom it back.',
@@ -251,28 +258,28 @@ export const MECHANICS = [
 
   // --- Exp. 5: Abbey & Mayor -----------------------------------------------
   {
-    id: 'abbey', layer: 'exp', pack: 'Exp. 5 — Abbey & Mayor (2007)',
+    id: 'abbey', layer: 'exp', pack: 'Exp. 5 — Abbey & Mayor (2007) · C3.1: Messengers & Mayors',
     name: 'Abbey tile',
     note: 'One abbey each, played instead of your tile into a hole surrounded '
       + 'on all four sides. It scores as a monastery, so it is always worth 9.',
     status: 'live', wiki: wiki('Abbey_and_Mayor'), since: 'all',
   },
   {
-    id: 'mayor', layer: 'exp', pack: 'Exp. 5 — Abbey & Mayor (2007)',
+    id: 'mayor', layer: 'exp', pack: 'Exp. 5 — Abbey & Mayor (2007) · C3.1: Messengers & Mayors',
     name: 'Mayor',
     note: 'Goes only into cities, and counts not as one follower but as one per '
       + 'pennant in the city he stands in.',
     status: 'planned', needs: ['cities', 'pennants'], wiki: wiki('Abbey_and_Mayor'), since: 'all',
   },
   {
-    id: 'wagon', layer: 'exp', pack: 'Exp. 5 — Abbey & Mayor (2007)',
+    id: 'wagon', layer: 'exp', pack: 'Exp. 5 — Abbey & Mayor (2007) · C3.1: Messengers & Mayors',
     name: 'Wagon',
     note: 'When a feature scores, a follower on it steps along the road to the '
       + 'next unclaimed, unfinished thing instead of going home.',
     status: 'live', needs: ['meeple'], wiki: wiki('Abbey_and_Mayor'), since: 'all',
   },
   {
-    id: 'barn', layer: 'exp', pack: 'Exp. 5 — Abbey & Mayor (2007)',
+    id: 'barn', layer: 'exp', pack: 'Exp. 5 — Abbey & Mayor (2007) · C3.1: Messengers & Mayors',
     name: 'Barn',
     note: 'Placed on the corner where four tiles meet, it claims that field for '
       + 'good — and throws every farmer already on it off the board, scoring them.',
@@ -281,35 +288,35 @@ export const MECHANICS = [
 
   // --- Exp. 6: Count, King & Robber ----------------------------------------
   {
-    id: 'count', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008)',
+    id: 'count', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008) · C3.1: Jousts & Crests',
     name: 'The Count of Carcassonne',
     note: 'A four-tile city sits off one corner of the board. Followers sent '
       + 'into its quarters can be moved out into whatever just scored nearby.',
     status: 'planned', needs: ['meeple'], wiki: wiki('The_Count_of_Carcassonne'), since: 'all',
   },
   {
-    id: 'king', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008)',
+    id: 'king', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008) · C3.1: Jousts & Crests',
     name: 'The King',
     note: 'Whoever finished the largest city scores 1 for every completed city '
       + 'on the board at the end.',
     status: 'live', needs: ['cities'], wiki: wiki('King_and_Robber_Baron'), since: 'all',
   },
   {
-    id: 'robberBaron', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008)',
+    id: 'robberBaron', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008) · C3.1: Jousts & Crests',
     name: 'The Robber Baron',
     note: 'The same bargain for roads: longest one finished takes 1 per '
       + 'completed road at the end.',
     status: 'live', needs: ['roads'], wiki: wiki('King_and_Robber_Baron'), since: 'all',
   },
   {
-    id: 'cult', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008)',
+    id: 'cult', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008) · C3.1: Jousts & Crests',
     name: 'Cult places (shrines)',
     note: 'A shrine placed within sight of a cloister starts a duel: the first '
       + 'of the two to close takes 9, the other takes nothing.',
     status: 'planned', needs: ['cloisters'], wiki: wiki('The_Cult'), since: 'all',
   },
   {
-    id: 'riverII', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008)',
+    id: 'riverII', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008) · C3.1: Jousts & Crests',
     name: 'The River II',
     note: 'A longer river with a fork, a lake and a volcano in it.',
     status: 'planned', needs: ['river'], wiki: wiki('The_River_II'), since: 'all',
@@ -317,7 +324,7 @@ export const MECHANICS = [
 
   // --- Exp. 7: The Catapult ------------------------------------------------
   {
-    id: 'catapult', layer: 'exp', pack: 'Exp. 7 — The Catapult (2008)',
+    id: 'catapult', layer: 'exp', pack: 'Exp. 7 — The Catapult (2008, C1 only) · C3.1: Siege & Defense',
     name: 'The Catapult',
     note: 'Physically flick wooden discs across the table to knock followers '
       + 'over, catch them, or seduce them. Never reissued after the 1st edition.',
@@ -326,21 +333,21 @@ export const MECHANICS = [
 
   // --- Exp. 8: Bridges, Castles and Bazaars --------------------------------
   {
-    id: 'bridge', layer: 'exp', pack: 'Exp. 8 — Bridges, Castles and Bazaars (2010)',
+    id: 'bridge', layer: 'exp', pack: 'Exp. 8 — Bridges, Castles & Bazaars (2010) · C3.1: Castles & Bridges (barns replace bazaars)',
     name: 'Bridges',
     note: 'Lay a bridge straight across a field tile to carry a road over ground '
       + 'that has no road on it.',
     status: 'planned', needs: ['roads'], wiki: wiki('Bridges,_Castles_and_Bazaars'), since: 'all',
   },
   {
-    id: 'castle', layer: 'exp', pack: 'Exp. 8 — Bridges, Castles and Bazaars (2010)',
+    id: 'castle', layer: 'exp', pack: 'Exp. 8 — Bridges, Castles & Bazaars (2010) · C3.1: Castles & Bridges (barns replace bazaars)',
     name: 'Castles',
     note: 'Convert a completed two-tile city into a castle, and it pays out the '
       + 'value of the next thing that scores anywhere near it.',
     status: 'planned', needs: ['cities'], wiki: wiki('Bridges,_Castles_and_Bazaars'), since: 'all',
   },
   {
-    id: 'bazaar', layer: 'exp', pack: 'Exp. 8 — Bridges, Castles and Bazaars (2010)',
+    id: 'bazaar', layer: 'exp', pack: 'Exp. 8 — Bridges, Castles & Bazaars (2010) · C3.1: Castles & Bridges (barns replace bazaars)',
     name: 'Bazaars',
     note: 'A bazaar tile stops the game for an auction: tiles go under the '
       + 'hammer and the money changes hands between players.',
@@ -349,21 +356,21 @@ export const MECHANICS = [
 
   // --- Exp. 9: Hills & Sheep -----------------------------------------------
   {
-    id: 'hills', layer: 'exp', pack: 'Exp. 9 — Hills & Sheep (2014)',
+    id: 'hills', layer: 'exp', pack: 'Exp. 9 — Hills & Sheep (2014) · C3.1: Sheep & Shepherds (geese replace hills)',
     name: 'Hills',
     note: 'A hill tile hides a face-down tile under it, and breaks ties on the '
       + 'feature above it — high ground wins.',
     status: 'planned', wiki: wiki('Hills_and_Sheep'), since: 'c2',
   },
   {
-    id: 'sheep', layer: 'exp', pack: 'Exp. 9 — Hills & Sheep (2014)',
+    id: 'sheep', layer: 'exp', pack: 'Exp. 9 — Hills & Sheep (2014) · C3.1: Sheep & Shepherds (geese replace hills)',
     name: 'Shepherds & sheep',
     note: 'Put a shepherd in a field and keep drawing tokens: the flock grows '
       + 'until you cash it in, or the wolf arrives and takes the lot.',
     status: 'planned', needs: ['fields'], wiki: wiki('Hills_and_Sheep'), since: 'c2',
   },
   {
-    id: 'vineyards', layer: 'exp', pack: 'Exp. 9 — Hills & Sheep (2014)',
+    id: 'vineyards', layer: 'exp', pack: 'Exp. 9 — Hills & Sheep (2014) · C3.1: Sheep & Shepherds (geese replace hills)',
     name: 'Vineyards',
     note: 'A vineyard beside a cloister adds 3 to it when the cloister closes.',
     status: 'planned', needs: ['cloisters'], wiki: wiki('Hills_and_Sheep'), since: 'c2',
@@ -371,21 +378,21 @@ export const MECHANICS = [
 
   // --- Exp. 10: Under the Big Top ------------------------------------------
   {
-    id: 'circus', layer: 'exp', pack: 'Exp. 10 — Under the Big Top (2017)',
+    id: 'circus', layer: 'exp', pack: 'Exp. 10 — Under the Big Top (2017) · C3.1: Circus & Artists',
     name: 'The big top',
     note: 'The circus moves around the board; followers around the ring when it '
       + 'moves on get paid for being there.',
     status: 'planned', wiki: wiki('Under_the_Big_Top'), since: 'c2',
   },
   {
-    id: 'acrobats', layer: 'exp', pack: 'Exp. 10 — Under the Big Top (2017)',
+    id: 'acrobats', layer: 'exp', pack: 'Exp. 10 — Under the Big Top (2017) · C3.1: Circus & Artists',
     name: 'Acrobats',
     note: 'Followers stack into a human pyramid on an acrobat tile, and the '
       + 'whole troupe scores when the third one climbs on.',
     status: 'planned', needs: ['meeple'], wiki: wiki('Under_the_Big_Top'), since: 'c2',
   },
   {
-    id: 'ringmaster', layer: 'exp', pack: 'Exp. 10 — Under the Big Top (2017)',
+    id: 'ringmaster', layer: 'exp', pack: 'Exp. 10 — Under the Big Top (2017) · C3.1: Circus & Artists',
     name: 'Ringmaster',
     note: 'Scores for every acrobat troupe and circus tile already on the board '
       + 'when he takes the ring.',
@@ -451,7 +458,7 @@ export const MECHANICS = [
     id: 'cropCircles', layer: 'mini', pack: 'The Crop Circles (2016)', name: 'Crop circles',
     note: 'A crop circle tile makes every player either add a follower to a '
       + 'matching feature, or take one back off.',
-    status: 'planned', needs: ['meeple'], wiki: wiki('The_Crop_Circles'), since: 'c2',
+    status: 'planned', needs: ['meeple'], wiki: wiki('The_Crop_Circles'), since: 'all',
   },
   {
     id: 'tunnel', layer: 'mini', pack: 'The Tunnel (2010)', name: 'Tunnels',

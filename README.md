@@ -251,9 +251,16 @@ Carcassonne has been revised twice and the revisions are not cosmetic — the
 farm rule in particular has been three different rules. The **Rules** dropdown
 picks which edition's constants the scoring reads: the current (3rd) edition,
 where the River and the Abbot are part of the base box and a field pays 3 per
-completed city touching it; the 2nd; or the original, where a completed city is
-worth 4 to the farmers feeding it, counted city by city rather than field by
-field.
+completed city touching it; the 2nd; or the original 2000 printing, where a
+completed city was worth 4 to the farmers feeding it, counted once from the city
+rather than from each field.
+
+Where those editions actually differ — including the 2024 anniversary relaunch
+that renamed and re-mechaniced half the big boxes (The Tower became *Towers &
+Thieves*, a completely different game) — is written up in
+[`docs/EDITIONS.md`](docs/EDITIONS.md), which is the reference the catalogue is
+checked against. It's a synthesis of WikiCarpedia's per-edition pages, fetched
+by `tools/wikicarpedia.mjs`.
 
 ### What's implemented
 
