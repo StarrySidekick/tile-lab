@@ -1,0 +1,284 @@
+[
+  {
+    "slug": "carcassonne",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2024/11/Carcassonne-v3_Rulesheet_EN_web.pdf",
+        "text": ".rules-cache/carcassonne-0.txt"
+      },
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2024/11/Carcassonne-v3_Supplement_EN_web.pdf",
+        "text": ".rules-cache/carcassonne-1.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne--inns-and-cathedrals",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne/inns-and-cathedrals/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/06/carcassonne_exp1_rules.pdf",
+        "text": ".rules-cache/carcassonne--inns-and-cathedrals.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne--traders-and-builders",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne/traders-and-builders/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/08/Spielanleitung_Carcassonne_Haendler_und_Baumeister.pdf",
+        "text": ".rules-cache/carcassonne--traders-and-builders-0.txt"
+      },
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/08/traders-builders.pdf",
+        "text": ".rules-cache/carcassonne--traders-and-builders-1.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne--the-princess-and-the-dragon",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne/the-princess-and-the-dragon/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/08/carcassonne-expansion-3-the-princess-the-dragon-rulebook.pdf",
+        "text": ".rules-cache/carcassonne--the-princess-and-the-dragon.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne--the-tower",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne/the-tower/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/carcassonne-ii-ext4-rules.pdf",
+        "text": ".rules-cache/carcassonne--the-tower.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne--count-king-and-robber",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne/count-king-and-robber/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/carc_exp6_eng_rules_lo.pdf",
+        "text": ".rules-cache/carcassonne--count-king-and-robber.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne--bridges-castles-and-bazaars",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne/bridges-castles-and-bazaars/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/carcassonne_exp8_rules.pdf",
+        "text": ".rules-cache/carcassonne--bridges-castles-and-bazaars.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne--hills-and-sheep",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne/hills-and-sheep/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/carc_exp9_rules_web.pdf",
+        "text": ".rules-cache/carcassonne--hills-and-sheep.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-big-box-3--mists-over-carcassonne",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-big-box-3/mists-over-carcassonne/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/06/MoCC_Rules.pdf",
+        "text": ".rules-cache/carcassonne-big-box-3--mists-over-carcassonne-0.txt"
+      },
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/06/MoCC_extrasheet_EN_update_03-23_WEB_low.pdf",
+        "text": ".rules-cache/carcassonne-big-box-3--mists-over-carcassonne-1.txt"
+      },
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/06/FAQ_03-2023_EN.pdf",
+        "text": ".rules-cache/carcassonne-big-box-3--mists-over-carcassonne-2.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-big-box-3--carcassonne-hunters-and-gatherers",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-big-box-3/carcassonne-hunters-and-gatherers/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/06/Carc_HG_Rulebook_EN.pdf",
+        "text": ".rules-cache/carcassonne-big-box-3--carcassonne-hunters-and-gatherers.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--the-wonders-of-humanity-set-1",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/the-wonders-of-humanity-set-1/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/08/CC_Wunder_Regel_EN_web_26-10_V3.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-wonders-of-humanity-set-1.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--the-gifts",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/the-gifts/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/2021_Carcassonne-Spielregeln-EN_Die-Geschenke.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-gifts.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--the-bets",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/the-bets/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/DE-Wetteinsatze-SR-Shop.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-bets-0.txt"
+      },
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/EN-Bets-SR-Shop.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-bets-1.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--the-signposts",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/the-signposts/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/EN-Signposts-rules-final.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-signposts.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--the-peasant-revolts",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/the-peasant-revolts/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Bauernaufstaende-final-_Regel_D_E_11.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-peasant-revolts.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--halflings",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/halflings/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/CC_Halb_Regel-DE-EN-final.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--halflings.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--monestaries-of-germany",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/monestaries-of-germany/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Monasteries_EN-2018_Regel_Web.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--monestaries-of-germany.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--the-barber-surgeons",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/the-barber-surgeons/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Barber_EN-2018_Regel_Web.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-barber-surgeons.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--the-fruit-bearing-trees",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/the-fruit-bearing-trees/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Obstbaeume_DE-EN-Regel_Web.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-fruit-bearing-trees.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--the-festival",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/the-festival/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Fest_II_DE-EN_Web.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-festival.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--the-watchtowers",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/the-watchtowers/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/the-watchtowers-rules.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-watchtowers.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--japanese-buildings",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/japanese-buildings/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Monasteries_EN-2018_Regel_Web.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--japanese-buildings.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--castles-in-germany",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/castles-in-germany/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Burgen_2019_Regel_D-_ow.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--castles-in-germany-0.txt"
+      },
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Castles_2019_Regel_E_low.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--castles-in-germany-1.txt"
+      }
+    ]
+  },
+  {
+    "slug": "carcassonne-anniversary-edition--the-maps",
+    "page": "https://www.hans-im-glueck.de/en/game/carcassonne-anniversary-edition/the-maps/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Maps-rules-EN-All.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-maps-0.txt"
+      },
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Ukraine-rule-DE-EN.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-maps-1.txt"
+      },
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Nordics-rule-DE-EN.pdf",
+        "text": ".rules-cache/carcassonne-anniversary-edition--the-maps-2.txt"
+      }
+    ]
+  },
+  {
+    "slug": "friday-carcassonne-south-seas",
+    "page": "https://www.hans-im-glueck.de/en/game/friday-carcassonne-south-seas/",
+    "rulebooks": [
+      {
+        "url": "https://www.hans-im-glueck.de/wp-content/uploads/2023/07/Suedsee_Regel-DE-web.pdf",
+        "text": ".rules-cache/friday-carcassonne-south-seas.txt"
+      }
+    ]
+  }
+]

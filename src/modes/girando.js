@@ -607,7 +607,7 @@ export class Girando extends Mode {
     const out = [];
     for (const cell of this.flight) {
       if (!board.get(cell.x, cell.y) || cell.meeple || isShip(cell)) continue;
-      for (const { i, f } of claimableFeatures(cell.type)) {
+      for (const { i, f } of claimableFeatures(cell.type, { fields: this.game.has('fields') })) {
         if (!board.featureOf(cell.x, cell.y, i)) continue;
         out.push({ x: cell.x, y: cell.y, i, f, flying: true });
       }

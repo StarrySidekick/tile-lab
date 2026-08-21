@@ -756,8 +756,9 @@ export class Renderer {
       const anchor = cell.meeple.feat == null ? [0.5, 0.5] : cell.type.spots[cell.meeple.feat];
       const spot = rotPoint(anchor || [0.5, 0.5], cell.rot);
       const [sx, sy] = this.toScreen(cell.x + spot[0], cell.y + spot[1]);
+      const holds = cell.meeple.feat == null ? null : cell.type.feats[cell.meeple.feat];
       drawMeeple(this.ctx, sx, sy, this.cam.zoom * 0.42, PLAYER_COLORS[cell.meeple.player],
-        { adrift: cell.meeple.feat == null });
+        { adrift: cell.meeple.feat == null, farmer: holds?.type === 'field' });
     }
   }
 
@@ -786,7 +787,8 @@ export class Renderer {
       ctx.lineWidth = 3;
       ctx.strokeStyle = color;
       ctx.stroke();
-      drawMeeple(ctx, sx, sy, this.cam.zoom * 0.26, PLAYER_COLORS[game.current]);
+      drawMeeple(ctx, sx, sy, this.cam.zoom * 0.26, PLAYER_COLORS[game.current],
+        { farmer: o.f?.type === 'field' });
       this.meepleSpots.push({ i: o.i, x: o.x, y: o.y, sx, sy, r: this.cam.zoom * 0.24, type: o.f.type });
     }
   }

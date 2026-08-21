@@ -18,7 +18,10 @@
 // `scoredParts` as a set of cell-feature keys.
 // ---------------------------------------------------------------------------
 
-import { SIDE_STEP, opposite, CENTRE_FEATURES, CAP, DOCK, edgesMeet } from './tiles.js';
+import {
+  SIDE_STEP, opposite, CENTRE_FEATURES, CAP, DOCK, edgesMeet,
+  HALVES_OF_SIDE, halfPartner,
+} from './tiles.js';
 
 export const keyOf = (x, y) => `${x},${y}`;
 
@@ -50,6 +53,18 @@ export class Board {
   featAt(cell, s) {
     const c = this.canonSide(cell, s);
     const i = cell.type.feats.findIndex((f) => f.sides.includes(c));
+    return i < 0 ? null : i;
+  }
+
+  /**
+   * Index of the field showing at world half-edge h, or null if that half is
+   * city or the tile has no fields. Rotating a tile a quarter-turn clockwise
+   * moves every half-edge two places round the ring, which is the only thing
+   * that has to be undone to ask the tile about itself.
+   */
+  fieldAt(cell, h) {
+    const c = (h - 2 * cell.rot + 8) % 8;
+    const i = cell.type.feats.findIndex((f) => f.type === 'field' && f.halves.includes(c));
     return i < 0 ? null : i;
   }
 
@@ -217,6 +232,33 @@ export class Board {
       if (!wired) continue;
       const root = this.union(`${k}#${mine}`, id);
       this.data.get(root).open -= 2; // both halves of the seam are now closed
+    }
+
+    this.linkFields(cell);
+  }
+
+  /**
+   * Join this tile's fields to its neighbours'. Separate from the pass above
+   * because fields meet along HALF an edge, not a whole one: the two halves of
+   * one seam can belong to two different fields on each side, which is exactly
+   * what a road running out to the tile edge does.
+   *
+   * Nothing here touches `open`. A field is never finished and never scores
+   * during play — the farmers on it stay where they are until the game ends.
+   */
+  linkFields(cell) {
+    const k = keyOf(cell.x, cell.y);
+    for (let s = 0; s < 4; s++) {
+      const nb = this.neighbor(cell.x, cell.y, s);
+      if (!nb || nb === cell) continue;
+      for (const h of HALVES_OF_SIDE[s]) {
+        const mine = this.fieldAt(cell, h);
+        const theirs = this.fieldAt(nb, halfPartner(h));
+        if (mine == null || theirs == null) continue;
+        const id = `${keyOf(nb.x, nb.y)}#${theirs}`;
+        if (!this.parent.has(id)) continue;      // replayed later; it'll join from its side
+        this.union(`${k}#${mine}`, id);
+      }
     }
   }
 
@@ -501,7 +543,10 @@ export class Board {
     });
     for (const r of roots) {
       const d = this.data.get(r);
-      if (d && !d.scored && d.open === 0) { this.markScored(d); done.push(d); }
+      // A field reaches no side, so its `open` is 0 from the moment it is
+      // laid. That is not a completed feature — it is a feature that never
+      // completes, and only the final scoring ever looks at it.
+      if (d && d.type !== 'field' && !d.scored && d.open === 0) { this.markScored(d); done.push(d); }
     }
     // A tile can complete a monastery anywhere in its 3x3 neighborhood.
     for (let dx = -1; dx <= 1; dx++) {

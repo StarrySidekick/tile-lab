@@ -1705,10 +1705,18 @@ export function drawMeeple(ctx, x, y, size, color, opts = {}) {
     ctx.stroke();
   }
 
+  // A farmer is the same piece laid on its side, which is exactly how the
+  // printed game distinguishes him — and the distinction carries the rule: a
+  // follower lying down is one that will not be coming back this game.
+  if (opts.farmer) {
+    ctx.rotate(-Math.PI / 2);
+    ctx.translate(0, -0.08);
+  }
+
   // A follower is a standing piece, so it throws the longest shadow of
   // anything on the board — that shadow is most of what makes it look like it
   // is on the tile rather than printed into it.
-  shadow(ctx, LIGHT, 0.12, 0.20, 'rgba(9,7,13,0.60)');
+  shadow(ctx, LIGHT, opts.farmer ? 0.06 : 0.12, opts.farmer ? 0.10 : 0.20, 'rgba(9,7,13,0.60)');
   meeplePath(ctx);
   ctx.fillStyle = color;
   ctx.fill();

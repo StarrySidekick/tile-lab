@@ -134,9 +134,9 @@ export const MECHANICS = [
   {
     id: 'fields', layer: 'base', name: 'Fields',
     note: 'Farmers, lying down, scored only at the very end: 3 for every '
-      + 'completed city their field touches (4 under the original rules). '
-      + 'Not modelled yet — the tiles carry no field graph.',
-    on: false, status: 'planned', needs: ['meeple'], wiki: wiki('Farmers'), since: 'all',
+      + 'completed city their field touches — 4 under the original rules. '
+      + 'A farmer never comes home.',
+    on: true, status: 'live', needs: ['meeple'], wiki: wiki('Farmers'), since: 'all',
   },
   {
     id: 'cloisters', layer: 'base', name: 'Cloisters',
@@ -514,8 +514,8 @@ export const MECHANICS = [
   },
   {
     id: 'monasteries', layer: 'mini', pack: 'Monasteries of the world (2013–)', name: 'Regional monasteries',
-    note: 'German, Dutch & Belgian, Japanese and Spanish monastery tiles — each '
-      + 'set with its own local completion rule.',
+    note: 'German, Dutch & Belgian and Spanish monastery tiles — each set with '
+      + 'its own local completion rule.',
     status: 'planned', needs: ['cloisters'], wiki: wiki('German_Monasteries'), since: 'all',
   },
   {
@@ -529,6 +529,59 @@ export const MECHANICS = [
     note: 'Road tiles that point somewhere, and pay for whatever is found in '
       + 'that direction.',
     status: 'planned', needs: ['roads'], wiki: wiki('The_Signposts'), since: 'c3',
+  },
+
+  {
+    id: 'gifts', layer: 'mini', pack: 'The Gifts (2020)', name: 'The Gifts',
+    note: 'Extend somebody else’s road or city and you are handed a face-down '
+      + 'gift card, to be opened before a later placement.',
+    status: 'planned', wiki: wiki('The_Gifts'), since: 'c2',
+  },
+  {
+    id: 'bets', layer: 'mini', pack: 'The Bets (2020)', name: 'The Bets',
+    note: 'Everyone bets, in secret, on what the final scores will look like.',
+    status: 'planned', wiki: wiki('The_Bets'), since: 'c2',
+  },
+  {
+    id: 'peasantRevolts', layer: 'mini', pack: 'The Peasant Revolts (2020)',
+    name: 'Peasant revolts',
+    note: 'A revolt tile names a feature type. Your unprotected followers '
+      + 'standing in one come straight home; your protected ones pay 2 each.',
+    status: 'planned', needs: ['meeple'], wiki: wiki('The_Peasant_Revolts'), since: 'c2',
+  },
+  {
+    id: 'wonders', layer: 'mini', pack: 'The Wonders of Humanity (2020)',
+    name: 'Wonders of humanity',
+    note: 'Pairs of followers wait along the score track; pass one and you take '
+      + 'a wonder tile to lay and score later.',
+    status: 'planned', wiki: wiki('The_Wonders_of_Humanity'), since: 'c2',
+  },
+  {
+    id: 'maps', layer: 'mini', pack: 'The Maps (2020)', name: 'The Maps',
+    note: 'Play on a printed map with several start squares and a hard border, '
+      + 'instead of out across an open table.',
+    status: 'planned', wiki: wiki('The_Maps'), since: 'c2',
+  },
+  {
+    id: 'castlesGermany', layer: 'mini', pack: 'Castles in Germany (2020)',
+    name: 'Castles in Germany',
+    note: 'Six double-width castle tiles, one or two owned by each player, laid '
+      + 'from your own supply rather than drawn.',
+    status: 'planned', wiki: wiki('Castles_in_Germany'), since: 'c2',
+  },
+  {
+    id: 'japanese', layer: 'mini', pack: 'Japanese Buildings (2017)',
+    name: 'Japanese buildings',
+    note: 'Regional buildings with their own completion rule, from the Japanese '
+      + 'edition.',
+    status: 'planned', wiki: wiki('Japanese_Buildings'), since: 'c2',
+  },
+  {
+    id: 'mists', layer: 'exp', pack: 'Mists over Carcassonne (2023)',
+    name: 'Mists & ghosts',
+    note: 'The co-operative one. Mist tiles raise ghosts that have to be laid to '
+      + 'rest by the players together, against the board rather than each other.',
+    status: 'planned', wiki: wiki('Mists_over_Carcassonne'), since: 'c3',
   },
 
   // --- promos & alternative base games -------------------------------------
@@ -709,11 +762,18 @@ export function coverProblem(board, x, y) {
   return null;
 }
 
-/** Features on a tile that a follower may be put on. */
-export function claimableFeatures(type) {
+/**
+ * Features on a tile that a follower may be put on.
+ *
+ * Fields are only among them when the farm rule is switched on. They exist as
+ * components either way — the board wires them up from the moment a tile is
+ * laid — but with the rule off they are scenery, and offering them would put a
+ * follower somewhere that can never pay.
+ */
+export function claimableFeatures(type, { fields = false } = {}) {
   return type.feats
     .map((f, i) => ({ i, f }))
-    .filter(({ f }) => !NO_MEEPLE.has(f.type));
+    .filter(({ f }) => !NO_MEEPLE.has(f.type) && (fields || f.type !== 'field'));
 }
 
 // ---------------------------------------------------------------------------
@@ -734,7 +794,8 @@ export function walkTargets(board, x, y, from) {
   const consider = (cell) => {
     if (!cell || cell.meeple) return;
     cell.type.feats.forEach((f, i) => {
-      if (NO_MEEPLE.has(f.type)) return;
+      // A wagon walks the roads; it does not take up farming.
+      if (NO_MEEPLE.has(f.type) || f.type === 'field') return;
       const d = board.featureOf(cell.x, cell.y, i);
       if (!d || d.scored || d === from) return;
       if (d.meeples.length) return;
@@ -749,6 +810,63 @@ export function walkTargets(board, x, y, from) {
     if (board.edgeAt(here, s) !== 'r') continue;
     const [dx, dy] = SIDE_STEP[s];
     consider(board.get(x + dx, y + dy));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Farms.
+//
+// The one feature in the base game that is not scored when it finishes,
+// because it never finishes. A field pays at the very end, and it pays for the
+// COMPLETED cities standing on it — three points each in the current rules,
+// four in the original, which is what the edition switch is for.
+// ---------------------------------------------------------------------------
+
+/**
+ * The completed cities a field feeds, as components rather than tile features:
+ * one city sprawling over six of the field's tiles is one city, and must be
+ * counted once.
+ */
+export function citiesTouching(board, field) {
+  const out = new Set();
+  for (const cell of board.cellsOf(field)) {
+    cell.type.feats.forEach((f, i) => {
+      if (f.type !== 'field') return;
+      // Only the field we are actually scoring, and only the cities that this
+      // particular field on this particular tile lies against.
+      if (board.featureOf(cell.x, cell.y, i) !== field) return;
+      for (const ci of f.touches) {
+        const city = board.featureOf(cell.x, cell.y, ci);
+        if (city) out.add(city);
+      }
+    });
+  }
+  return out;
+}
+
+/** …and only the ones that actually closed, which are the only ones that pay. */
+export function citiesFed(board, field) {
+  return new Set([...citiesTouching(board, field)].filter((c) => c.open === 0));
+}
+
+/** Every distinct field component on the board. */
+export function allFields(board) {
+  return board.allComponents().filter((d) => d.type === 'field');
+}
+
+/**
+ * What each player takes from the farms. Returns a list of payouts rather than
+ * mutating anyone, so the caller can log and animate them one at a time.
+ */
+export function farmPayouts(board, perCity = 3) {
+  const out = [];
+  for (const field of allFields(board)) {
+    if (!field.meeples.length) continue;
+    const cities = citiesFed(board, field);
+    if (!cities.size) continue;
+    const points = cities.size * perCity;
+    for (const player of board.majority(field)) out.push({ field, player, points, cities: cities.size });
   }
   return out;
 }

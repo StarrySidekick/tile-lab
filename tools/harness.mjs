@@ -19,7 +19,7 @@ import { Bot, BOT_LEVELS } from '../src/ai.js';
 import { makePiece, rotatePiece, validatePiece } from '../src/pieces.js';
 import { Board } from '../src/board.js';
 import { TILES } from '../src/tiles.js';
-import { liftableCells, BASE_LAYER } from '../src/mechanics.js';
+import { liftableCells, BASE_LAYER, allFields, citiesFed } from '../src/mechanics.js';
 import { gust, storm } from '../src/wind.js';
 import { GROUPS } from '../src/tiles.js';
 
@@ -747,6 +747,57 @@ function runMode(spec, games, extraOpts = {}, label = '') {
  * something. Random legal play is a low bar, but it is a real one: a bot that
  * can't clear it is broken rather than gentle.
  */
+/**
+ * The field graph, which is the one piece of connectivity that isn't edge-based
+ * and so gets none of the coverage the rest of the board does. Every case here
+ * is a shape whose answer can be read straight off the printed tile, including
+ * the two that a naive implementation gets wrong: a road running out to a tile
+ * edge splits the field either side of it without changing the edge letter, and
+ * a completed two-tile city keeps the fields on its two flanks apart.
+ */
+function checkFields() {
+  console.log('\nthe field graph');
+  const fieldsOn = (place) => {
+    const b = new Board({});
+    place(b);
+    return allFields(b).length;
+  };
+  const cases = [
+    ['a lone crossroads has four corners', () => fieldsOn((b) => b.place(0, 0, TILES.X, 0)), 4],
+    ['a straight road splits its tile in two', () => fieldsOn((b) => b.place(0, 0, TILES.U, 0)), 2],
+    ['two roads side by side share their middle', () => fieldsOn((b) => {
+      b.place(0, 0, TILES.U, 0); b.place(1, 0, TILES.U, 0);
+    }), 3],
+    ['…and the same when both are turned', () => fieldsOn((b) => {
+      b.place(0, 0, TILES.U, 1); b.place(0, 1, TILES.U, 1);
+    }), 3],
+    ['fields wrap behind a city that faces away', () => fieldsOn((b) => {
+      b.place(0, 0, TILES.E, 0); b.place(0, 1, TILES.E, 2);
+    }), 1],
+    ['a closed city keeps its two flanks apart', () => fieldsOn((b) => {
+      b.place(0, 0, TILES.E, 0); b.place(0, -1, TILES.E, 2);
+    }), 2],
+    ['the city-and-road tile has a strip and a field', () => fieldsOn((b) => b.place(0, 0, TILES.D, 0)), 2],
+    ['a three-way junction under a city makes three', () => fieldsOn((b) => b.place(0, 0, TILES.L, 0)), 3],
+  ];
+  for (const [what, run, want] of cases) {
+    let got;
+    try { got = run(); } catch (e) { got = e.message; }
+    if (got === want) console.log(`  ✓ ${what.padEnd(46)} ${got}`);
+    else { failures++; console.log(`  ✗ ${what}: got ${got}, expected ${want}`); }
+  }
+
+  // And the rule the whole feature exists for: only COMPLETED cities pay, and
+  // they pay per field rather than per city.
+  const b = new Board({});
+  b.place(0, 0, TILES.E, 0);
+  b.place(0, -1, TILES.E, 2);            // the two halves close one city
+  const field = allFields(b)[0];
+  const fed = citiesFed(b, field);
+  if (fed.size === 1) console.log(`  ✓ ${'a closed city feeds the field beside it'.padEnd(46)} 1`);
+  else { failures++; console.log(`  ✗ a closed city feeds the field beside it: got ${fed.size}`); }
+}
+
 function checkBots(games) {
   console.log('\nthe computer player, driving every seat');
   for (const spec of MODES) runMode(spec, games, { bots: 'all' }, ' +bots');
@@ -800,6 +851,7 @@ function main() {
     if (MODE_OF(only)) runMode(MODE_OF(only), games, { bots: 'all' }, ' +bots');
     else console.log(`  ? no mode called "${only}"`);
   } else {
+    checkFields();
     checkBots(Math.max(4, games / 2));
     botVsRandom(Math.max(10, games * 2));
     // Classic is the plain case, Girando moves tiles around under you, and

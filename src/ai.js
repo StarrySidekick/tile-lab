@@ -37,7 +37,7 @@
 import { TILES, BACKS, NO_MEEPLE, SIDE_STEP } from './tiles.js';
 import { keyOf } from './board.js';
 import { rotatePiece } from './pieces.js';
-import { liftableCells } from './mechanics.js';
+import { liftableCells, citiesTouching } from './mechanics.js';
 import { mulberry32 } from './game.js';
 
 /**
@@ -56,6 +56,7 @@ export const BOT_LEVEL_BY_ID = Object.fromEntries(BOT_LEVELS.map((l) => [l.id, l
 
 const MAX_TRIALS = 160;      // candidate placements actually evaluated per turn
 const CLAIM_BASE = 2.2;      // what an unplaced follower is worth, in points
+const FARMER_COST = 1.9;     // …and how much dearer it is when it never comes back
 const CLAIM_SCARCITY = 9;    // …divided by how many are left, so the last ones hurt
 const GIFT = 0.35;           // penalty for leaving a feature one tile from closing
 const CONTACT = 0.15;        // mild preference for a tight board over a sprawling one
@@ -388,6 +389,18 @@ export class Bot {
       return odds * 9 + (1 - odds) * (1 + filled);
     }
 
+    // A farm pays once, at the very end, for the completed cities standing on
+    // it — so what it is worth now is what its cities will have become by then.
+    // An open city on the farm is worth something, but only the part of it that
+    // is likely to close.
+    if (d.type === 'field') {
+      let pts = 0;
+      for (const city of citiesTouching(board, d)) {
+        pts += city.open === 0 ? 1 : room * 0.75 ** city.open;
+      }
+      return pts * (g.rules?.farmPerCity ?? 3);
+    }
+
     const now = g.valueOf(d, false);
     if (closed) return now;
     const odds = room * 0.75 ** d.open;
@@ -417,7 +430,10 @@ export class Bot {
     for (const o of options) {
       const d = g.board.featureOf(o.x, o.y, o.i);
       if (!d) continue;
-      const value = this.positionValue(g.board.find(d.parts[0])) - cost + this.jitter() * 0.4;
+      // A follower laid in a field is gone for the rest of the game, so it has
+      // to be worth more than one that will be back in a few turns.
+      const spend = cost * (d.type === 'field' ? FARMER_COST : 1);
+      const value = this.positionValue(g.board.find(d.parts[0])) - spend + this.jitter() * 0.4;
       if (!best || value > best.value) best = { ...o, value, gain: value + cost - base };
     }
 

@@ -32,6 +32,43 @@ export const SIDE_MID = [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]];
 /** Neighbour offset when stepping across side s. */
 export const SIDE_STEP = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 
+// --- half-edges, which is how fields are described ---------------------------
+//
+// A field is not an edge feature: two tiles' fields meet along HALF an edge,
+// which is why a road running out to a tile's edge splits the field either
+// side of it without the edge letter changing at all. So the tile perimeter is
+// cut into eight half-edges, numbered clockwise from the top-left:
+//
+//        0   1
+//      +---+---+
+//    7 |       | 2
+//      +       +
+//    6 |       | 3
+//      +---+---+
+//        5   4
+//
+// Side s owns halves 2s and 2s+1, in clockwise order. Crossing a seam the
+// clockwise order reverses, so half 2s meets the neighbour's 2·opp+1 and half
+// 2s+1 meets its 2·opp — which is the whole of the joining rule.
+
+export const HALVES_OF_SIDE = [[0, 1], [2, 3], [4, 5], [6, 7]];
+
+/** The half-edge on the far side of a seam, seen from half `h`. */
+export const halfPartner = (h) => {
+  const s = h >> 1;
+  const opp = (s + 2) % 4;
+  return h % 2 === 0 ? 2 * opp + 1 : 2 * opp;
+};
+
+/** Midpoint of half-edge h in unit tile space. */
+export const HALF_MID = [
+  [0.25, 0], [0.75, 0], [1, 0.25], [1, 0.75],
+  [0.75, 1], [0.25, 1], [0, 0.75], [0, 0.25],
+];
+
+/** Which side a half-edge belongs to. */
+export const sideOfHalf = (h) => h >> 1;
+
 const city = (sides, shield = false) => ({ type: 'city', sides, shield });
 const road = (sides) => ({ type: 'road', sides });
 const abbey = () => ({ type: 'monastery', sides: [] });
@@ -143,33 +180,33 @@ export const GROUPS = [
 
 export const TILE_TYPES = [
   // --- base: the original 72 ------------------------------------------------
-  { id: 'A', n: 2, group: 'base', name: 'Monastery + road',        feats: [abbey(), road([S])] },
-  { id: 'B', n: 4, group: 'base', name: 'Monastery',               feats: [abbey()] },
-  { id: 'C', n: 1, group: 'base', name: 'City all round',          feats: [city([N, E, S, W], true)] },
-  { id: 'D', n: 4, group: 'base', name: 'City + road through',     feats: [city([N]), road([E, W])] },
-  { id: 'E', n: 5, group: 'base', name: 'City edge',               feats: [city([N])] },
-  { id: 'F', n: 2, group: 'base', name: 'City across (shield)',    feats: [city([E, W], true)] },
-  { id: 'G', n: 1, group: 'base', name: 'City across',             feats: [city([E, W])] },
-  { id: 'H', n: 3, group: 'base', name: 'Two cities opposite',     feats: [city([E]), city([W])] },
-  { id: 'I', n: 2, group: 'base', name: 'Two cities adjacent',     feats: [city([E]), city([S])] },
-  { id: 'J', n: 3, group: 'base', name: 'City + road bend E-S',    feats: [city([N]), road([E, S])] },
-  { id: 'K', n: 3, group: 'base', name: 'City + road bend W-S',    feats: [city([N]), road([W, S])] },
-  { id: 'L', n: 3, group: 'base', name: 'City + 3-way road',       feats: [city([N]), road([E]), road([S]), road([W])] },
-  { id: 'M', n: 2, group: 'base', name: 'City corner (shield)',    feats: [city([N, W], true)] },
-  { id: 'N', n: 3, group: 'base', name: 'City corner',             feats: [city([N, W])] },
-  { id: 'O', n: 2, group: 'base', name: 'City corner + road (sh)', feats: [city([N, W], true), road([E, S])] },
-  { id: 'P', n: 3, group: 'base', name: 'City corner + road',      feats: [city([N, W]), road([E, S])] },
-  { id: 'Q', n: 1, group: 'base', name: 'City 3-sided (shield)',   feats: [city([N, E, W], true)] },
-  { id: 'R', n: 3, group: 'base', name: 'City 3-sided',            feats: [city([N, E, W])] },
-  { id: 'S', n: 2, group: 'base', name: 'City 3-sided + road (sh)',feats: [city([N, E, W], true), road([S])] },
-  { id: 'T', n: 1, group: 'base', name: 'City 3-sided + road',     feats: [city([N, E, W]), road([S])] },
+  { id: 'A', n: 2, group: 'base', name: 'Monastery + road',        feats: [abbey(), road([S])], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'B', n: 4, group: 'base', name: 'Monastery',               feats: [abbey()], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'C', n: 1, group: 'base', name: 'City all round',          feats: [city([N, E, S, W], true)], fields: [] },
+  { id: 'D', n: 4, group: 'base', name: 'City + road through',     feats: [city([N]), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
+  { id: 'E', n: 5, group: 'base', name: 'City edge',               feats: [city([N])], fields: [[2, 3, 4, 5, 6, 7]] },
+  { id: 'F', n: 2, group: 'base', name: 'City across (shield)',    feats: [city([E, W], true)], fields: [[0, 1], [4, 5]] },
+  { id: 'G', n: 1, group: 'base', name: 'City across',             feats: [city([E, W])], fields: [[0, 1], [4, 5]] },
+  { id: 'H', n: 3, group: 'base', name: 'Two cities opposite',     feats: [city([E]), city([W])], fields: [[0, 1, 4, 5]] },
+  { id: 'I', n: 2, group: 'base', name: 'Two cities adjacent',     feats: [city([E]), city([S])], fields: [[0, 1, 6, 7]] },
+  { id: 'J', n: 3, group: 'base', name: 'City + road bend E-S',    feats: [city([N]), road([E, S])], fields: [[3, 4], [2, 5, 6, 7]] },
+  { id: 'K', n: 3, group: 'base', name: 'City + road bend W-S',    feats: [city([N]), road([W, S])], fields: [[5, 6], [2, 3, 4, 7]] },
+  { id: 'L', n: 3, group: 'base', name: 'City + 3-way road',       feats: [city([N]), road([E]), road([S]), road([W])], fields: [[3, 4], [5, 6], [2, 7]] },
+  { id: 'M', n: 2, group: 'base', name: 'City corner (shield)',    feats: [city([N, W], true)], fields: [[2, 3, 4, 5]] },
+  { id: 'N', n: 3, group: 'base', name: 'City corner',             feats: [city([N, W])], fields: [[2, 3, 4, 5]] },
+  { id: 'O', n: 2, group: 'base', name: 'City corner + road (sh)', feats: [city([N, W], true), road([E, S])], fields: [[3, 4], [2, 5]] },
+  { id: 'P', n: 3, group: 'base', name: 'City corner + road',      feats: [city([N, W]), road([E, S])], fields: [[3, 4], [2, 5]] },
+  { id: 'Q', n: 1, group: 'base', name: 'City 3-sided (shield)',   feats: [city([N, E, W], true)], fields: [[4, 5]] },
+  { id: 'R', n: 3, group: 'base', name: 'City 3-sided',            feats: [city([N, E, W])], fields: [[4, 5]] },
+  { id: 'S', n: 2, group: 'base', name: 'City 3-sided + road (sh)',feats: [city([N, E, W], true), road([S])], fields: [[4], [5]] },
+  { id: 'T', n: 1, group: 'base', name: 'City 3-sided + road',     feats: [city([N, E, W]), road([S])], fields: [[4], [5]] },
   // A straight road lies along whatever wind is blowing through it: hit side
   // on, it swings onto the wind's axis. `align` is the quiet half of `swing` —
   // same behaviour in the weather, none of the vane's art.
-  { id: 'U', n: 8, group: 'base', name: 'Road straight',           feats: [road([N, S])], align: true },
-  { id: 'V', n: 9, group: 'base', name: 'Road bend',               feats: [road([W, S])] },
-  { id: 'W', n: 4, group: 'base', name: 'Road 3-way',              feats: [road([E]), road([S]), road([W])] },
-  { id: 'X', n: 1, group: 'base', name: 'Road 4-way',              feats: [road([N]), road([E]), road([S]), road([W])] },
+  { id: 'U', n: 8, group: 'base', name: 'Road straight',           feats: [road([N, S])], align: true , fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'V', n: 9, group: 'base', name: 'Road bend',               feats: [road([W, S])], fields: [[5, 6], [0, 1, 2, 3, 4, 7]] },
+  { id: 'W', n: 4, group: 'base', name: 'Road 3-way',              feats: [road([E]), road([S]), road([W])], fields: [[3, 4], [5, 6], [0, 1, 2, 7]] },
+  { id: 'X', n: 1, group: 'base', name: 'Road 4-way',              feats: [road([N]), road([E]), road([S]), road([W])], fields: [[1, 2], [3, 4], [5, 6], [0, 7]] },
 
   // --- roads: not in the original -------------------------------------------
   // Two through-roads that cross without meeting. Neither road ends here, so a
@@ -546,6 +583,18 @@ function prepare(list) {
       if (t.wild || t.dock) continue;          // an Abbazia or a ship takes anything
       for (const s of f.sides) t.edges[s] = EDGE_LETTER[f.type] || 'r';
     }
+
+    // Fields become real features, appended AFTER the edge letters are worked
+    // out — a field reaches no side, presents no letter, and must not disturb
+    // the indices anything else already refers to. `touches` is the set of city
+    // features this field lies against, which is the only thing a farm needs
+    // to know at the end of the game.
+    t.fieldCount = 0;
+    for (const halves of t.fields || []) {
+      t.feats.push({ type: 'field', sides: [], halves, touches: citiesBeside(t, halves) });
+      t.fieldCount++;
+    }
+
     t.spots = t.feats.map(featureSpot);
     // A mark anchored to a feature borrows that feature's spot, pulled in from
     // the rim so a tall landmark can't hang off the edge of its tile.
@@ -583,8 +632,41 @@ export function buildRiverDeck(rng = Math.random) {
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 /** Meeple anchor point for a feature, in unit tile space (0..1). */
+/**
+ * Which cities a field lies against.
+ *
+ * Walking the eight half-edges as a ring, a field touches a city when one of
+ * its halves sits immediately beside a half the city owns. That is exactly the
+ * distinction the artwork makes and a simpler "same tile" test misses: on the
+ * city-and-road-through tile both fields share the tile with the city, but only
+ * the strip above the road actually runs up against its walls.
+ */
+function citiesBeside(t, halves) {
+  const out = new Set();
+  const owner = new Map();                       // half-edge -> feature index
+  t.feats.forEach((f, i) => {
+    if (f.type !== 'city') return;
+    for (const s of f.sides) for (const h of HALVES_OF_SIDE[s]) owner.set(h, i);
+  });
+  for (const h of halves) {
+    for (const n of [(h + 7) % 8, (h + 1) % 8]) {
+      if (owner.has(n)) out.add(owner.get(n));
+    }
+  }
+  return [...out];
+}
+
 function featureSpot(f) {
   if (f.type === 'monastery') return [0.5, 0.5];
+  // A farmer lies in the middle of his own ground: the average of the field's
+  // half-edges, pulled off the rim so he isn't standing in the seam.
+  if (f.type === 'field') {
+    if (!f.halves.length) return [0.5, 0.5];
+    let fx = 0, fy = 0;
+    for (const h of f.halves) { fx += HALF_MID[h][0]; fy += HALF_MID[h][1]; }
+    fx /= f.halves.length; fy /= f.halves.length;
+    return [0.5 + (fx - 0.5) * 0.54, 0.5 + (fy - 0.5) * 0.54];
+  }
   let vx = 0, vy = 0;
   for (const s of f.sides) { vx += SIDE_VEC[s][0]; vy += SIDE_VEC[s][1]; }
   const len = Math.hypot(vx, vy);

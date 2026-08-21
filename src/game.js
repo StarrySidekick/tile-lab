@@ -31,6 +31,7 @@ import {
   disabledFeatures, tileAllowed,
   canLift, liftableCells, coverProblem,
   claimableFeatures, walkTargets, innsAndCathedrals, goodsOn, crownAndRoad,
+  farmPayouts,
   WATER, MAX_STACK,
 } from './mechanics.js';
 
@@ -591,7 +592,7 @@ export class Game {
     if (this.phase !== 'meeple' || !this.lastPlaced || !this.useMeeples) return [];
     if (this.player.meeples <= 0) return [];
     const { x, y, type } = this.lastPlaced;
-    const here = claimableFeatures(type)
+    const here = claimableFeatures(type, { fields: this.has('fields') })
       .filter(({ i }) => {
         const d = this.board.featureOf(x, y, i);
         return d && d.meeples.length === 0;
@@ -992,6 +993,22 @@ export class Game {
     }
   }
 
+  /**
+   * The farms, once, at the very end. A field pays for the completed cities
+   * standing on it — three each now, four under the original rules — to
+   * whoever has the most farmers lying in it, ties included.
+   */
+  scoreFarms() {
+    const per = this.rules.farmPerCity;
+    for (const { field, player, points, cities } of farmPayouts(this.board, per)) {
+      this.players[player].score += points;
+      this.say(`Farm of ${field.tiles.size} feeding ${cities} cit${cities === 1 ? 'y' : 'ies'}`
+        + ` → ${this.players[player].name} +${points}`);
+      const spot = this.spotOf(field);
+      if (spot) this.emit('score', { points, players: [player], ...spot });
+    }
+  }
+
   scoreGoods() {
     for (const g of GOODS) {
       const best = Math.max(...this.players.map((p) => p.goods[g]));
@@ -1020,6 +1037,7 @@ export class Game {
     this.tile = null;
     this.market = null;
     this.m.finish();
+    if (this.has('fields')) this.scoreFarms();
     if (this.has('goods')) this.scoreGoods();
     if (this.has('king') || this.has('robberBaron')) this.scoreCrown();
     if (this.has('agendas')) this.scoreAgendas();

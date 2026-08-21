@@ -177,13 +177,14 @@ default on; turning one off pulls its tiles out of the pool and stops it paying:
 | **Cities** | Every tile carrying a city leaves the deck. 72 tiles become 28 |
 | **Roads** | Same, for roads: 72 become 27 |
 | **Cloisters** | The monastery and temple tiles leave: 72 become 66 |
+| **Fields** | Farmers can't be laid, and no farm pays out |
 | **Pennants** | Coats of arms stop counting; a shield is decoration |
 | **Followers** | No majorities — a feature simply pays whoever closed it |
 
 Take all of them out at once and you get 72 tiles laid, nobody scoring
 anything, which is exactly what it should be: bare tiles.
 
-The panel folds. Seventy-one rules in a 306px column is only readable because
+The panel folds. Seventy-nine rules in a 306px column is only readable because
 almost all of it is closed almost all the time — one layer open, the rest a
 summary line, and a search box that cuts across the lot. Each row carries a dot
 saying whether the rule is **playable**, **approximate**, or **catalogued but
@@ -195,6 +196,54 @@ greyed, and honest about it.
 Rules are also gated on their own prerequisites: you can't tick the pig with no
 fields for it to stand in, and switching cities off switches the cathedral off
 with them.
+
+### Farms
+
+The one base-game feature that isn't an edge feature, and the reason the board
+carries a second kind of connectivity.
+
+Cities and roads meet along a whole tile edge, so joining them is a matter of
+comparing one letter per side. Fields don't: two tiles' fields meet along
+*half* an edge, which is exactly why a road running out to the tile edge splits
+the field either side of it without the edge letter changing at all. So each
+tile's perimeter is cut into eight half-edges, numbered clockwise from the
+top-left, and a field is the list of halves it occupies:
+
+```
+    0   1
+  +---+---+
+7 |       | 2
+  +       +
+6 |       | 3
+  +---+---+
+    5   4
+```
+
+Crossing a seam the clockwise order reverses, so half `2s` meets the
+neighbour's `2·opp+1` and half `2s+1` meets its `2·opp`. That is the whole
+joining rule.
+
+The field layout of each of the 24 base tiles is written down rather than
+derived, because the derivation gets the interesting tiles wrong: on the
+city-and-road-through tile the field between the city and the road wraps
+*behind* the city, and on the three-way-junction tile the three roads out of
+one junction make three separate fields. Both are read straight off the printed
+artwork.
+
+Which cities a field feeds **is** derived, from that same ring: a field touches
+a city when one of its halves sits immediately beside a half the city owns.
+That distinction matters and a simpler "same tile" test misses it — on the
+city-and-road tile both fields share a tile with the city, but only the strip
+above the road actually runs up against its walls.
+
+A farm never closes and never scores during play, so its farmers never come
+home. At the end, each field pays **3 points per completed city touching it** —
+4 under the original rules, which is what the edition switch changes — to
+whoever has the most farmers lying in it, ties included.
+
+The computer player values a farm at what its cities will probably be worth by
+the end, and treats a farmer as costing about twice an ordinary follower, since
+it is spent for the rest of the game.
 
 ### The edition switch
 
@@ -208,7 +257,7 @@ field.
 
 ### What's implemented
 
-Of the 71 rules catalogued, 23 are live. The rest are named, described, dated
+Of the 79 rules catalogued, 24 are live. The rest are named, described, dated
 and linked, waiting for an implementation.
 
 **Workshop originals** — things this sandbox invented, or lifted out of one of
