@@ -94,18 +94,16 @@ const temple = (face = N) => ({ type: 'temple', sides: [], face });
 /**
  * Half of a sphere, on one edge — and a COLOUR, because a sphere is what tells
  * the harvest what to look for. A sfera edge meets nothing but another sfera
- * edge OF ITS OWN COLOUR: half a green ball does not fit half a red one, so
- * joining two is a doubly deliberate act and the sphere it makes is
- * unambiguously one thing.
+ * edge, so joining two is a deliberate act rather than an accident; but ANY
+ * half fits any other half, whatever colour it is. Two greens make a whole
+ * green ball, a green and a red make a ball that is half of each, and every
+ * one of them closes.
  *
- * That is why the colour lives on the EDGE LETTER rather than beside it. Edge
- * matching is the whole of the board's join rule, so making green edges a
- * different letter from red ones is all it takes — nothing downstream needs to
- * know that sferas have colours at all.
+ * The colour is therefore a property of the HALF rather than of the sphere,
+ * and both halves of a closed sphere fire their own effect on the harvest. A
+ * matched pair doubles one thing; a mixed pair does two things once each.
  */
-const SFERA_EDGE = { green: 'o', blue: 'p', red: 'q' };
-const sfera = (side = N, hue = 'green') =>
-  ({ type: 'sfera', sides: [side], hue, edge: SFERA_EDGE[hue] });
+const sfera = (side = N, hue = 'green') => ({ type: 'sfera', sides: [side], hue });
 
 /**
  * `dir` is a cardinal direction carried by a mark, rotated with its tile the
@@ -158,12 +156,7 @@ export const DOCK = '~';
 export const edgesMeet = (a, b) => a === b || a === CAP || b === CAP
   || a === DOCK || b === DOCK;
 
-/**
- * Edge letter per feature type. Two edges match only if their letters do — so
- * a feature that wants sub-kinds that don't meet each other says so with its
- * own letter, which is what the sfera's `edge` does (o/p/q for green, blue and
- * red). This table is the fallback for everything that doesn't.
- */
+/** Edge letter per feature type. Two edges match only if their letters do. */
 export const EDGE_LETTER = {
   city: 'c', road: 'r', monastery: 'f', temple: 'f', garden: 'f',
   forest: 'w', mountain: 'm', lake: 'l', river: 'v', sfera: 'o',
@@ -356,17 +349,16 @@ export const TILE_TYPES = [
   { id: 'Ktb', n: 3, group: 'cloud', name: 'Tower turbine',  feats: [city([N])],    marks: [mark('turbine', 0)], fields: [[2, 3, 4, 5, 6, 7]] },
   { id: 'Ktc', n: 2, group: 'cloud', name: 'Turbine corner', feats: [city([N, W])], marks: [mark('turbine', 0)], fields: [[2, 3, 4, 5]] },
 
-  // The sfera: one edge is half a sphere and meets nothing but its other half,
-  // in its own colour. Joining two closes a sphere, and the sphere calls in the
-  // harvest on the field it is lying in — the COLOUR deciding what that harvest
-  // counts. Green counts the ground itself, blue the cities it feeds, red the
-  // temples standing on it, so which sfera you are holding changes which farm
-  // is worth planting.
+  // The sfera: one edge is half a sphere and meets nothing but another sfera's.
+  // ANY two halves close a sphere, whatever colours they are, and the sphere
+  // calls in the harvest on the field it is lying in — with BOTH halves firing
+  // their own effect. Green counts the ground itself, blue the cities it feeds,
+  // red the temples standing on it.
   //
-  // Five shapes in each colour, one of each, so a colour is five halves and two
-  // spheres with one left over. The odd half is the point: you cannot pair
-  // everything, and the half you never place still tells the endgame harvest
-  // what to look for on the field it is lying in.
+  // So the pairing is the decision. Two greens double the ground; a green and a
+  // blue take a smaller field and the cities on it; and the half you are
+  // holding is worth different amounts depending on what you can find to put it
+  // against. Five shapes in each colour, one of each.
   { id: 'Kso', n: 1, group: 'cloud', name: 'Green sfera',       feats: [sfera(N, 'green')], fields: [[2, 3, 4, 5, 6, 7]] },
   { id: 'Ksr', n: 1, group: 'cloud', name: 'Green sfera road',  feats: [sfera(N, 'green'), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
   { id: 'Ksc', n: 1, group: 'cloud', name: 'Green sfera wall',  feats: [sfera(N, 'green'), city([S])], fields: [[2, 3], [6, 7]] },
@@ -807,7 +799,7 @@ function prepare(list) {
     for (const f of t.feats) {
       if (f.shield) t.shields++;
       if (t.wild || t.dock) continue;          // an Abbazia or a ship takes anything
-      for (const s of f.sides) t.edges[s] = f.edge || EDGE_LETTER[f.type] || 'r';
+      for (const s of f.sides) t.edges[s] = EDGE_LETTER[f.type] || 'r';
     }
 
     // Fields become real features, appended AFTER the edge letters are worked

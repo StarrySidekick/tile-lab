@@ -44,11 +44,14 @@
 //     pays you 1 a tile. What makes a road worth building is what it ARRIVES
 //     at: every city or temple it runs into pays 2 to whoever holds that city
 //     or temple — which is very often not you. Roads are the mode's diplomacy.
-//   A FARM is harvested when a SPHERE CLOSES, and the COLOUR of the sphere
-//     decides what the harvest counts on the field it is lying in. GREEN pays
-//     1 a tile of farmland, BLUE 2 a finished city the field feeds, RED 2 a
-//     temple standing on it. The farmers then walk home — the only figures in
-//     the mode that ever leave a scored feature under their own steam.
+//   A FARM is harvested when a SPHERE CLOSES, and the COLOURS of the sphere's
+//     two halves decide what the harvest counts on the field it is lying in.
+//     GREEN pays 1 a tile of farmland, BLUE 2 a finished city the field feeds,
+//     RED 2 a temple standing on it — and BOTH HALVES FIRE. Any half fits any
+//     other, so pairing is the decision: two greens double the ground, a green
+//     against a blue takes a smaller field and the cities on it. The farmers
+//     then walk home — the only figures in the mode that ever leave a scored
+//     feature under their own steam.
 //   AN ISLAND pays more of everything. Roads 2 a tile, cities 3, farms double
 //     — and at the end of the game a flat 10 to whoever has a follower
 //     standing on more separate islands than anybody else.
@@ -57,8 +60,11 @@
 //
 // AT THE END the sky settles up, the way Carcassonne does, bent to a board
 // that never settled. The islands are counted off the board exactly as play
-// left it. Every farm still being worked is harvested once more, taking its
-// colour from any sfera lying in the field and falling back to blue. And a
+// left it. Every farm still being worked is harvested once more, with every
+// UNPAIRED half lying in the field firing as though you had found it a
+// partner — so a sfera you could never place against another is a standing
+// instruction rather than a wasted tile. A field with no loose half on it is
+// counted blue, the ordinary Carcassonne farm. And a
 // city that never finished at all pays 1 a tile — while one that finished and
 // was blown open pays nothing more, because it was already paid in full and
 // already gave a point a tile back. That is the whole of its account.
@@ -158,9 +164,26 @@ const RATE = {
 const CITY_AGAIN = 1;           // per tile, every closure after the first
 const CITY_BACK = 1;            // per tile, every time it is blown open again
 
-/** Which colour a sphere is, read off any of its halves. */
+/** The colour of the half-sphere on a tile, if there is one. */
 const sferaHue = (cell) =>
-  cell?.type.feats.find((f) => f.type === 'sfera')?.hue || 'green';
+  cell?.type.feats.find((f) => f.type === 'sfera')?.hue || null;
+
+/** "green and blue", "green, blue and red" — for the log. */
+const listOf = (words) => (words.length < 2 ? words.join('')
+  : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`);
+
+/**
+ * The same list with repeats folded into a count. A matched pair fires the
+ * same effect twice, and "2 a finished city and 2 a finished city" is a
+ * sentence nobody should have to read.
+ */
+const tallyOf = (things) => {
+  const seen = new Map();
+  for (const t of things) seen.set(t, (seen.get(t) || 0) + 1);
+  return [...seen];
+};
+const listTally = (things, label = (t) => t) =>
+  listOf(tallyOf(things).map(([t, n]) => `${label(t)}${n > 1 ? ` ×${n}` : ''}`));
 
 /**
  * What Girando plays instead of parts of the base set. The three-way junctions
@@ -427,18 +450,23 @@ export class Girando extends Mode {
       const cells = board.cellsOf(d);
       if (cells.every((c) => c.sphered)) continue;          // an old one
       for (const c of cells) c.sphered = true;
-      const hue = sferaHue(cells[0]);
+      // BOTH halves fire. Two greens is the green harvest twice over; a green
+      // against a blue is one of each. The pairing is the decision, and it is
+      // why any half fits any other — a colour you have no partner for is
+      // still worth playing against whatever you can reach.
+      const hues = cells.map(sferaHue).filter(Boolean);
       this.spheres++;
-      this.hues[hue] = (this.hues[hue] || 0) + 1;
-      this.game.say(`A ${hue} sphere closes, and calls in the harvest on the field beneath it — `
-        + `${RATE.farm[hue].main} a ${RATE.farm[hue].what}.`);
+      for (const h of hues) this.hues[h] = (this.hues[h] || 0) + 1;
+      const names = tallyOf(hues).map(([h]) => h);
+      this.game.say(`A ${listOf(names)} sphere closes, and calls in the harvest on the field `
+        + `beneath it — ${listTally(hues, (h) => `${RATE.farm[h].main} a ${RATE.farm[h].what}`)}.`);
       this.game.emit('landmark');
-      this.harvest(cells, hue);
+      this.harvest(cells, hues);
     }
   }
 
   /** Score every field the closing sphere's own tiles are lying in. */
-  harvest(cells, hue) {
+  harvest(cells, hues) {
     const board = this.game.board;
     const done = new Set();
     let paid = 0;
@@ -448,15 +476,16 @@ export class Girando extends Mode {
         const field = board.featureOf(cell.x, cell.y, i);
         if (!field || done.has(field)) return;
         done.add(field);
-        if (this.scoreFarm(field, hue)) paid++;
+        if (this.scoreFarm(field, hues)) paid++;
       });
     }
     if (!paid) this.game.say('…and there is nobody farming it.');
   }
 
   /**
-   * What a field is worth under a given sphere. The colour picks what gets
-   * counted, and the field it is counted over is the same field either way:
+   * What a field is worth under ONE half-sphere. A closed sphere calls this
+   * twice, once per half; the colour picks what gets counted, and the field it
+   * is counted over is the same field either way:
    *
    *   GREEN counts the GROUND — a point a tile, so the sprawling field nobody
    *     built anything on is suddenly the valuable one.
@@ -481,26 +510,31 @@ export class Girando extends Mode {
   }
 
   /**
-   * A farm pays whoever has the most farmers lying in it, by the colour of the
-   * sphere that called the harvest in. Unlike every other figure in the mode,
-   * a farmer that has been paid walks home.
+   * A farm pays whoever has the most farmers lying in it, once for EVERY half
+   * of the sphere that called the harvest in. Unlike every other figure in the
+   * mode, a farmer that has been paid walks home.
    */
-  scoreFarm(field, hue) {
+  scoreFarm(field, hues) {
     const g = this.game;
     const board = g.board;
     if (!field.meeples.length) return false;
-    const { pts, n, per, rule, cells } = this.farmValue(field, hue);
     const winners = board.majority(field);
+    const parts = hues.map((h) => this.farmValue(field, h));
+    const pts = parts.reduce((n, v) => n + v.pts, 0);
+    const cells = parts[0].cells;
     if (pts > 0 && winners.length) {
+      const how = parts.filter((v) => v.pts).map((v) =>
+        `${v.n} ${v.rule.what}${v.n === 1 ? '' : 's'} at ${v.per}`);
       for (const p of winners) {
         this.pay(p, pts,
-          `Farm of ${field.tiles.size} — ${n} ${rule.what}${n === 1 ? '' : 's'} at ${per}`
-          + `${per > rule.main ? ' out on an island' : ''} — ${g.players[p].name}`,
+          `Farm of ${field.tiles.size} — ${listTally(how)}`
+          + `${parts.some((v) => v.per > v.rule.main) ? ' out on an island' : ''}`
+          + ` — ${g.players[p].name}`,
           cells.map((c) => ({ x: c.x, y: c.y })));
       }
     } else {
       g.say(winners.length
-        ? `A farm is harvested, and there is no ${rule.what} on it to count.`
+        ? `A farm is harvested, and there is nothing on it the ${listOf(tallyOf(hues).map(([h]) => h))} sphere counts.`
         : 'A farm is harvested with nobody holding it.');
     }
     // Home they go — the only figures in Girando that ever leave a scored
@@ -1078,10 +1112,14 @@ export class Girando extends Mode {
 
   /**
    * Every field still being farmed, harvested as though a sphere had closed on
-   * it. WHICH sphere is the question, and the field answers it: if a sfera is
-   * lying in the field — one you never managed to pair, most likely — its
-   * colour decides what the harvest counts. A field with no sfera in it is
-   * counted BLUE, the ordinary Carcassonne farm, per finished city it feeds.
+   * it. WHICH sphere is the question, and the field answers it: every UNPAIRED
+   * half lying in the field fires its own effect, exactly as it would have if
+   * you had found it a partner. A field with no loose sfera on it is counted
+   * BLUE, the ordinary Carcassonne farm, per finished city it feeds.
+   *
+   * That is what the halves you never managed to pair are for. A sfera you
+   * could not place against another is not a wasted tile — it is a standing
+   * instruction to the last harvest about the ground it is lying on.
    *
    * Fields already harvested are skipped for free: harvesting sends the
    * farmers home, so an empty field is a field that has been paid.
@@ -1093,13 +1131,11 @@ export class Girando extends Mode {
     if (!fields.length) return;
     g.say('The season turns, and every farm still standing is harvested.');
     for (const field of fields) {
-      let hue = 'blue';
-      for (const cell of board.cellsOf(field)) {
-        if (!cell.type.feats.some((f) => f.type === 'sfera')) continue;
-        hue = sferaHue(cell);
-        break;
-      }
-      this.scoreFarm(field, hue);
+      const hues = board.cellsOf(field)
+        .filter((c) => !c.sphered)                  // a closed sphere already paid
+        .map(sferaHue)
+        .filter(Boolean);
+      this.scoreFarm(field, hues.length ? hues : ['blue']);
     }
   }
 
@@ -1368,7 +1404,7 @@ Girando.spec = {
   hint: 'A zephyr blows its whole lane and wakes every other zephyr it reaches. '
     + 'Cities pay 2 a tile to whoever stands in them the first time they close, then 1 a tile up and down as the wind opens and shuts them. '
     + 'Roads are nobody’s: finish one for 1 a tile, and every city or temple it reaches pays its holder 2. '
-    + 'Farms are harvested when a sphere closes, by its colour — green 1 a tile of field, blue 2 a finished city, red 2 a temple. '
+    + 'Farms are harvested when a sphere closes, and BOTH its halves fire — green 1 a tile of field, blue 2 a finished city, red 2 a temple. Any half fits any other, so the pairing is the decision. '
     + 'You may only build onto the Palazzo’s mainland; everything adrift is an island, and islands pay more. '
     + 'Instead of a follower, send the Balena — nothing under the whale can be moved by any wind.',
 };

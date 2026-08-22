@@ -744,48 +744,54 @@ function checkGirando() {
     }
   }
 
-  // The three sferas. One board, three colours, three different numbers: the
-  // field is three tiles, it feeds one finished city, and two temples stand on
-  // it — so green pays 3, blue pays 2 and red pays 4 for exactly the same
-  // ground. That is the whole of what the colours are for.
+  // The three sferas, on one board: the field is three tiles, it feeds one
+  // finished city, and two temples stand on it. So a green half is worth 3
+  // there, a blue one 2 and a red one 4 — and BOTH halves of a sphere fire, so
+  // a matched pair doubles one of those and a mixed pair does two of them once
+  // each. Any half fits any other, which is what makes that a decision.
   {
-    const cases = [
-      { hue: 'green', span: 'Ksx', half: 'Kso', want: 3 },   // 1 a tile, over 3
-      { hue: 'blue', span: 'Kbx', half: 'Kbo', want: 2 },    // 2 a finished city, over 1
-      { hue: 'red', span: 'Krx', half: 'Kro', want: 4 },     // 2 a temple, over 2
+    const worth = { green: 3, blue: 2, red: 4 };
+    const span = { green: 'Ksx', blue: 'Kbx', red: 'Krx' };
+    const half = { green: 'Kso', blue: 'Kbo', red: 'Kro' };
+    const pairs = [
+      ['green', 'green'], ['blue', 'blue'], ['red', 'red'],   // doubled
+      ['green', 'blue'], ['red', 'green'],                    // one of each
     ];
-    for (const { hue, span, half, want } of cases) {
-      const h = fresh(20 + want);
-      const b = h.board;
-      lay(b, 0, 0, span);                     // sfera north, cities east and west
-      lay(b, 0, -1, half, 2);                 // …meeting its other half
-      lay(b, 1, 0, 'Kce', 3);                 // the city, capped both ways
-      lay(b, -1, 0, 'Kce', 1);
-      lay(b, 0, 1, 'Kt');                     // two temples out on the same field
-      lay(b, 0, 2, 'Kt');
-      const field = TILES[span].feats.findIndex((f) => f.type === 'field');
-      b.addMeeple(0, 0, field, 0);
-      b.rebuild();
+    const before = failures;
+    pairs.forEach(([a, b], n) => {
+      const want = worth[a] + worth[b];
+      const h = fresh(20 + n);
+      const bd = h.board;
+      lay(bd, 0, 0, span[a]);                 // sfera north, cities east and west
+      lay(bd, 0, -1, half[b], 2);             // …meeting a half of the other colour
+      lay(bd, 1, 0, 'Kce', 3);                // the city, capped both ways
+      lay(bd, -1, 0, 'Kce', 1);
+      lay(bd, 0, 1, 'Kt');                    // two temples out on the same field
+      lay(bd, 0, 2, 'Kt');
+      const field = TILES[span[a]].feats.findIndex((f) => f.type === 'field');
+      bd.addMeeple(0, 0, field, 0);
+      bd.rebuild();
       h.players[0].meeples = 6;
       h.m.joinSferas();
       if (h.players[0].score !== want) {
-        return fail(`a ${hue} sphere harvests its own way`,
-          `paid ${h.players[0].score}, expected ${want}`);
+        return fail(`a ${a}+${b} sphere fires both its halves`,
+          `paid ${h.players[0].score}, expected ${worth[a]} + ${worth[b]}`);
       }
       if (h.players[0].meeples !== 7) {
-        return fail('a harvested farmer walks home whatever the colour', `${h.players[0].meeples} in hand`);
+        return fail('a harvested farmer walks home whatever the colours', `${h.players[0].meeples} in hand`);
       }
-    }
+    });
+    if (failures > before) return;
   }
 
-  // …and a colour only ever meets its own. Half a green ball does not fit half
-  // a red one, which is what makes a sphere unambiguously one thing.
+  // …and any half fits any other. Colour is what the half DOES, not what it
+  // will meet: a green ball and a red one make a sphere that is half of each.
   {
     const h = fresh(24);
     const b = h.board;
     lay(b, 0, 0, 'Kso', 2);                   // green, facing south
-    if (b.canPlace(0, 1, TILES.Kro, 0, {})) {
-      return fail('a green sfera does not meet a red one', 'the seam was legal');
+    if (!b.canPlace(0, 1, TILES.Kro, 0, {})) {
+      return fail('a green sfera meets a red one', 'the seam was refused');
     }
     if (!b.canPlace(0, 1, TILES.Kso, 0, {})) {
       return fail('a green sfera meets a green one', 'the seam was refused');
@@ -799,14 +805,16 @@ function checkGirando() {
     const h = fresh(25);
     const b = h.board;
     lay(b, 0, 0, 'Kro');                      // an unpaired RED half, in the field
-    lay(b, -1, 0, 'Kt');                      // one temple on that field
+    lay(b, 2, 0, 'Kso');                      // …and an unpaired GREEN one
+    lay(b, 1, 0, 'Kt');                       // one temple, on the same field
     const field = TILES.Kro.feats.findIndex((f) => f.type === 'field');
     b.addMeeple(0, 0, field, 0);
     b.rebuild();
     h.m.lastHarvest();
-    if (h.players[0].score !== 2) {
-      return fail('the last harvest takes the colour of a sfera lying in the field',
-        `paid ${h.players[0].score}, expected 2 for one temple under red`);
+    // Red pays 2 for the one temple; green pays 1 for each of the three tiles.
+    if (h.players[0].score !== 5) {
+      return fail('every unpaired sfera fires at the last harvest',
+        `paid ${h.players[0].score}, expected 2 (red, one temple) + 3 (green, three tiles)`);
     }
     // …and a field with no sfera in it is counted BLUE, per finished city.
     const k = fresh(26);
@@ -954,8 +962,8 @@ function checkGirando() {
   }
 
   console.log('  ✓ mainland and islands, city pay/clawback/reclose, unfinished cities, windmills,'
-    + ' road tolls, three sfera colours, the last harvest, island rates, the Balena, towed islands,'
-    + ' long flights, the archipelago');
+    + ' road tolls, sfera colours matched and mixed, the last harvest, island rates, the Balena,'
+    + ' towed islands, long flights, the archipelago');
 }
 
 // --- runs -------------------------------------------------------------------
