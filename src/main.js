@@ -743,6 +743,8 @@ function renderActions() {
       }
     }
     if (game.canRetireAbbot()) add('Call the abbot home', '', () => game.retireAbbot());
+    if (game.canSendKnightHome()) add('Send a knight home (princess)', '', () => game.sendKnightHome());
+    if (game.canCallHome()) add('Festival — take one back', '', () => game.beginFestival());
     if (game.canPlacePig()) add('Turn out the pig', '', () => game.placePig());
     if (game.canRecall()) add('Recall a follower', '', () => game.beginRecall());
   }

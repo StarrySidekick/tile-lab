@@ -74,6 +74,13 @@ const road = (sides) => ({ type: 'road', sides });
 const abbey = () => ({ type: 'monastery', sides: [] });
 
 /**
+ * A garden. It closes and pays exactly as a monastery does — surrounded on all
+ * eight, worth 9 — but only an abbot may keep one, which is the whole reason
+ * it is its own type rather than another cloister.
+ */
+const garden = () => ({ type: 'garden', sides: [] });
+
+/**
  * A temple is a monastery that pays as it goes rather than when it closes. It
  * has no sides and completes the same way — surrounded on all eight — but the
  * points come from the arrivals: its keeper takes an offering for every tile
@@ -144,7 +151,7 @@ export const edgesMeet = (a, b) => a === b || a === CAP || b === CAP
 
 /** Edge letter per feature type. Two edges match only if their letters do. */
 export const EDGE_LETTER = {
-  city: 'c', road: 'r', monastery: 'f', temple: 'f',
+  city: 'c', road: 'r', monastery: 'f', temple: 'f', garden: 'f',
   forest: 'w', mountain: 'm', lake: 'l', river: 'v', sfera: 'o',
 };
 
@@ -155,7 +162,7 @@ export const NO_MEEPLE = new Set(['mountain', 'lake', 'river', 'sfera']);
  * Features that reach no edge and are completed by being surrounded, rather
  * than by running out of open sides. The board checks the 3x3 around them.
  */
-export const CENTRE_FEATURES = new Set(['monastery', 'temple']);
+export const CENTRE_FEATURES = new Set(['monastery', 'temple', 'garden']);
 
 // ---------------------------------------------------------------------------
 // Tile groups. Toggle these on and off to change what's in the draw pile.
@@ -176,6 +183,10 @@ export const GROUPS = [
   { id: 'lakes', name: 'Lakes', note: 'Shores and corners, never all four sides. A city beside water is worth more.', classic: false, expedition: false, adventure: false },
   { id: 'innscath', name: 'Inns & cathedrals', note: 'Carcassonne expansion 1. Doubles a finished road, triples a finished city — and pays nothing if they never finish.', classic: false, expedition: false, adventure: false },
   { id: 'traders', name: 'Trade goods', note: 'Carcassonne expansion 2. Wine, grain and cloth, to whoever closes the city holding them.', classic: false, expedition: false, adventure: false },
+  { id: 'gardens', name: 'Gardens', note: 'The Abbot’s little walled gardens — a second place he may sit.', classic: false, expedition: false, adventure: false },
+  { id: 'vineyards', name: 'Vineyards', note: 'Hills & Sheep. A vineyard beside a monastery adds 3 when it closes.', classic: false, expedition: false, adventure: false },
+  { id: 'dragonset', name: 'Portals & princesses', note: 'The Princess & the Dragon. Portals deploy anywhere; a princess evicts a knight.', classic: false, expedition: false, adventure: false },
+  { id: 'festivals', name: 'Festivals', note: 'The Festival. Take one of your own followers back instead of claiming.', classic: false, expedition: false, adventure: false },
 ];
 
 export const TILE_TYPES = [
@@ -387,6 +398,27 @@ export const TILE_TYPES = [
   { id: 'Td', n: 2, group: 'traders', name: 'City road + wine',  feats: [city([N]), road([E, W])], marks: [mark('wine', 0)] },
   { id: 'Te', n: 2, group: 'traders', name: 'City road + grain', feats: [city([N]), road([S])],    marks: [mark('grain', 0)] },
 
+  // --- gardens: the Abbot's second seat -------------------------------------
+  { id: 'Ga', n: 3, group: 'gardens', name: 'Garden',            feats: [garden()], marks: [mark('garden')] },
+  { id: 'Gb', n: 2, group: 'gardens', name: 'Garden + road',     feats: [garden(), road([N, S])], marks: [mark('garden')] },
+  { id: 'Gc', n: 2, group: 'gardens', name: 'Garden + city',     feats: [garden(), city([N])], marks: [mark('garden')] },
+
+  // --- vineyards: 3 more for the monastery next door ------------------------
+  { id: 'Va', n: 3, group: 'vineyards', name: 'Vineyard',        feats: [], marks: [mark('vineyard')] },
+  { id: 'Vb', n: 2, group: 'vineyards', name: 'Vineyard + road', feats: [road([W, E])], marks: [mark('vineyard')] },
+  { id: 'Vc', n: 2, group: 'vineyards', name: 'Vineyard + city', feats: [city([N])], marks: [mark('vineyard')] },
+
+  // --- the Princess & the Dragon, the parts that need no dragon -------------
+  { id: 'Pa', n: 3, group: 'dragonset', name: 'Magic portal',        feats: [road([N, S])], marks: [mark('portal')] },
+  { id: 'Pb', n: 2, group: 'dragonset', name: 'Magic portal + city', feats: [city([N])],    marks: [mark('portal')] },
+  { id: 'Pc', n: 3, group: 'dragonset', name: 'City + princess',     feats: [city([N, E])], marks: [mark('princess', 0)] },
+  { id: 'Pd', n: 2, group: 'dragonset', name: 'City across + princess', feats: [city([E, W])], marks: [mark('princess', 0)] },
+
+  // --- the Festival ----------------------------------------------------------
+  { id: 'Fa', n: 3, group: 'festivals', name: 'Festival',        feats: [road([N, S])], marks: [mark('festival')] },
+  { id: 'Fb', n: 2, group: 'festivals', name: 'Festival + city', feats: [city([N])],    marks: [mark('festival')] },
+  { id: 'Fc', n: 2, group: 'festivals', name: 'Festival + bend', feats: [road([W, S])], marks: [mark('festival')] },
+
   { id: 'La', n: 2, group: 'citylife', name: 'Market',   feats: [city([N, W])],           marks: [mark('market', 0)] },
   { id: 'Lb', n: 2, group: 'citylife', name: 'Keep',     feats: [city([N, E, W], true)],  marks: [mark('keep', 0)] },
   { id: 'Lc', n: 2, group: 'citylife', name: 'Library',  feats: [city([E, W])],           marks: [mark('library', 0)] },
@@ -535,6 +567,13 @@ export const MARKS = {
   cloth:     { label: 'Cloth',     score: 0, goods: 'cloth' },
   spring:    { label: 'Spring',    score: 0, note: 'Where the river starts.' },
   mouth:     { label: 'The lake',  score: 0, note: 'Where the river ends.' },
+
+  // expansions: the ones that ride on a tile symbol
+  garden:    { label: 'Garden',    score: 0, note: 'An abbot may keep a garden as well as a cloister.' },
+  vineyard:  { label: 'Vineyard',  score: 0, note: 'Adds 3 to a monastery beside it when that monastery closes.' },
+  portal:    { label: 'Magic portal', score: 0, note: 'Claim anything unfinished anywhere on the board instead of this tile.' },
+  princess:  { label: 'Princess',  score: 0, note: 'Lay it into a city and you may send a knight already there home.' },
+  festival:  { label: 'Festival',  score: 0, note: 'Take one of your own followers back off the board instead of claiming.' },
 
   // cloud
   turbine: { label: 'Tower turbine', score: 0, note: 'Pays 1 to whoever holds its city every time a gust runs through it.' },

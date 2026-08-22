@@ -32,6 +32,7 @@ import {
   canLift, liftableCells, coverProblem,
   claimableFeatures, walkTargets, innsAndCathedrals, goodsOn, crownAndRoad,
   farmPayouts, pigsByField, FIGURES, FIGURE_BY_ID,
+  hasMark, vineyardBonus, portalTargets,
   WATER, MAX_STACK,
 } from './mechanics.js';
 
@@ -602,14 +603,25 @@ export class Game {
     const fig = this.useKind ? FIGURE_BY_ID[this.useKind] : null;
     const here = claimableFeatures(type, { fields: this.has('fields') })
       .filter(({ i, f }) => {
+        // Only the abbot keeps a garden, so it is offered only when he is the
+        // piece in hand.
+        if (f.type === 'garden' && this.useKind !== 'abbot') return false;
         // A chosen figure narrows where you may go: the mayor only into
-        // cities, the abbot only onto a monastery.
+        // cities, the abbot only onto a monastery or a garden.
         if (fig && !fig.allows(f)) return false;
         const d = this.board.featureOf(x, y, i);
         return d && d.meeples.length === 0;
       })
       .map((o) => ({ ...o, x, y }));
-    return [...here, ...(this.m.flightTargets?.() || [])];
+
+    // A magic portal on the tile you just laid lets the follower go anywhere
+    // unfinished instead — the tile itself is only the ticket.
+    const portal = this.has('portal') && hasMark(this.board.get(x, y), 'portal')
+      ? portalTargets(this.board, { fields: this.has('fields') })
+        .filter(({ f }) => (!fig || fig.allows(f)) && f.type !== 'garden')
+      : [];
+
+    return [...here, ...portal, ...(this.m.flightTargets?.() || [])];
   }
 
   /** Which special followers this player could spend right now. */
@@ -688,6 +700,64 @@ export class Game {
   set useBig(v) {
     if (v) this.useKind = 'big';
     else if (this.useKind === 'big') this.useKind = null;
+  }
+
+  // --- the princess -----------------------------------------------------------
+
+  /**
+   * A princess laid into a city sends a knight already standing in it home.
+   * Offered rather than forced, and only against a city that has someone in it.
+   */
+  princessTargets() {
+    if (!this.has('princess') || this.phase !== 'meeple' || !this.lastPlaced) return [];
+    const { x, y } = this.lastPlaced;
+    const cell = this.board.get(x, y);
+    if (!cell || !hasMark(cell, 'princess')) return [];
+    const out = [];
+    cell.type.feats.forEach((f, i) => {
+      if (f.type !== 'city') return;
+      const d = this.board.featureOf(x, y, i);
+      if (!d) return;
+      for (const m of d.meeples) out.push({ ...m, d });
+    });
+    return out;
+  }
+
+  canSendKnightHome() { return this.princessTargets().length > 0; }
+
+  sendKnightHome(at = null) {
+    const targets = this.princessTargets();
+    const m = at ? targets.find((t) => t.x === at.x && t.y === at.y) : targets[0];
+    if (!m) return false;
+    const cell = this.board.get(m.x, m.y);
+    if (cell) cell.meeple = null;
+    m.d.meeples = m.d.meeples.filter((o) => !(o.x === m.x && o.y === m.y));
+    const owner = this.players[m.player];
+    if (m.kind === 'phantom') owner.phantoms++; else owner.meeples++;
+    if (m.big) owner.big++;
+    if (m.kind === 'mayor') owner.mayors++;
+    if (m.kind === 'abbot') owner.abbots++;
+    this.say(`The princess sends ${owner.name}'s knight out of the city.`);
+    this.endTurn();
+    return true;
+  }
+
+  // --- the festival -----------------------------------------------------------
+
+  /**
+   * A festival tile lets you take one of your own followers back off the board
+   * instead of claiming — anywhere, from anything, however well it was placed.
+   */
+  canCallHome() {
+    if (!this.has('festival') || this.phase !== 'meeple' || !this.lastPlaced) return false;
+    return hasMark(this.board.get(this.lastPlaced.x, this.lastPlaced.y), 'festival')
+      && this.myMeeples().length > 0;
+  }
+
+  beginFestival() {
+    if (!this.canCallHome()) return false;
+    this.phase = 'recall';
+    return true;
   }
 
   // --- the abbot --------------------------------------------------------------
@@ -1100,6 +1170,7 @@ export class Game {
       const { lakes, rivers } = this.board.adjacentWater(d);
       pts += lakes * WATER.lake + rivers * WATER.river;
     }
+    if (this.has('vineyards')) pts += vineyardBonus(this.board, d);
     return pts;
   }
 

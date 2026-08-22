@@ -585,6 +585,79 @@ const MARK_ART = {
     ctx.strokeStyle = THEME.timber;
     ctx.lineWidth = 0.055;
   },
+  garden(ctx) {                                 // a low wall with beds inside it
+    ctx.fillStyle = '#6f7a46';
+    ctx.beginPath(); ctx.rect(-0.34, -0.24, 0.68, 0.56); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#8d9a58';
+    for (const y of [-0.12, 0.06, 0.22]) {
+      ctx.beginPath(); ctx.rect(-0.24, y, 0.48, 0.09); ctx.fill();
+    }
+    ctx.fillStyle = THEME.roof;                 // one flowering bed, for colour
+    ctx.beginPath(); ctx.arc(0.16, -0.07, 0.05, 0, Math.PI * 2); ctx.fill();
+  },
+  vineyard(ctx) {                               // rows on stakes, with fruit
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.06;
+    for (const x of [-0.22, 0.02, 0.26]) {
+      ctx.beginPath(); ctx.moveTo(x, 0.34); ctx.lineTo(x, -0.24); ctx.stroke();
+    }
+    ctx.lineWidth = 0.045;
+    for (const y of [-0.14, 0.06]) {
+      ctx.beginPath(); ctx.moveTo(-0.30, y); ctx.lineTo(0.34, y); ctx.stroke();
+    }
+    ctx.fillStyle = '#6d2f45';
+    for (const [x, y] of [[-0.22, -0.02], [0.02, 0.18], [0.26, -0.02]]) {
+      ctx.beginPath(); ctx.arc(x, y, 0.075, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.lineWidth = 0.055;
+  },
+  portal(ctx) {                                 // a standing arch, lit from within
+    ctx.fillStyle = THEME.rockDark;
+    ctx.beginPath();
+    ctx.moveTo(-0.30, 0.34); ctx.lineTo(-0.30, -0.06);
+    ctx.arc(0, -0.06, 0.30, Math.PI, 0);
+    ctx.lineTo(0.30, 0.34);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.teal;                 // the gate itself
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.moveTo(-0.17, 0.34); ctx.lineTo(-0.17, -0.06);
+    ctx.arc(0, -0.06, 0.17, Math.PI, 0);
+    ctx.lineTo(0.17, 0.34);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+  },
+  princess(ctx) {                               // a tower with a pennant
+    ctx.fillStyle = THEME.plaster;
+    ctx.beginPath(); ctx.rect(-0.17, -0.16, 0.34, 0.50); ctx.fill(); ctx.stroke();
+    roofTri(ctx, 0, -0.16, 0.42, 0.26, THEME.roofDark);
+    ctx.strokeStyle = THEME.timber;
+    ctx.beginPath(); ctx.moveTo(0, -0.42); ctx.lineTo(0, -0.60); ctx.stroke();
+    ctx.fillStyle = THEME.shield;
+    ctx.beginPath();
+    ctx.moveTo(0, -0.60); ctx.lineTo(0.26, -0.53); ctx.lineTo(0, -0.46);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  },
+  festival(ctx) {                               // bunting between two poles
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.06;
+    for (const x of [-0.32, 0.32]) {
+      ctx.beginPath(); ctx.moveTo(x, 0.34); ctx.lineTo(x, -0.26); ctx.stroke();
+    }
+    ctx.lineWidth = 0.04;
+    ctx.beginPath();
+    ctx.moveTo(-0.32, -0.26);
+    ctx.quadraticCurveTo(0, 0.02, 0.32, -0.26);
+    ctx.stroke();
+    const flags = [[-0.19, -0.12, THEME.roof], [0, -0.02, THEME.gold], [0.19, -0.12, THEME.shield]];
+    for (const [x, y, c] of flags) {
+      ctx.fillStyle = c;
+      ctx.beginPath();
+      ctx.moveTo(x - 0.07, y); ctx.lineTo(x + 0.07, y); ctx.lineTo(x, y + 0.16);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.lineWidth = 0.055;
+  },
   spring(ctx) {
     ctx.fillStyle = THEME.rockDark;             // rocks around the source
     for (const [x, y, r] of [[-0.30, 0.18, 0.16], [0.30, 0.14, 0.14], [0.02, -0.28, 0.13]]) {

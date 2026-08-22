@@ -272,8 +272,20 @@ for (const mode of modes) {
  * Tick a rule in the workshop. Every layer is folded away by default and the
  * search box is the fastest way to a specific row, so this types the rule's
  * name in rather than hunting through <details> for it.
+ *
+ * A rule whose prerequisites aren't met is deliberately disabled by the panel —
+ * you can't have a garden with no abbot — so switching one on means switching
+ * on what it stands upon first. Turning off unwinds in the same order.
  */
 async function setMech(page, id, on) {
+  const needs = await page.evaluate(
+    (m) => (window.LAB.MECHANICS.find((x) => x.id === m)?.needs || []).filter(
+      (n) => !window.LAB.MECHANICS.find((x) => x.id === n)?.on,
+    ),
+    id,
+  );
+  if (on) for (const n of needs) await setMech(page, n, true);
+
   await page.fill('#mechSearch', id);
   await page.waitForTimeout(30);
   const box = `#mechanics input[data-mech="${id}"]`;
@@ -281,6 +293,10 @@ async function setMech(page, id, on) {
   if (on) await page.check(box); else await page.uncheck(box);
   await page.fill('#mechSearch', '');
   await page.waitForTimeout(30);
+
+  // Switching a prerequisite off already cascades its dependants off in the
+  // panel, so unwinding only has to deal with what's left.
+  if (!on) for (const n of needs) await setMech(page, n, false);
 }
 
 // The rest of the motion, one mode each, because each one is the only place

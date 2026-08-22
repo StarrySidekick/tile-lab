@@ -7,7 +7,7 @@ A sandbox for experimenting with tile mechanics and game modes, built to be
 **fast to iterate on**. No build step, no dependencies, no image assets — plain
 ES modules and a canvas. Edit a file, hit refresh, keep playing.
 
-Twelve modes and a catalogue of 79 Carcassonne rules — 28 of them playable —
+Twelve modes and a catalogue of 79 Carcassonne rules — 33 of them playable —
 all sharing one board engine. Each mode exists to answer a specific question
 about what makes tile-laying good; [MODES.md](MODES.md) is where that
 reasoning lives, and [docs/EDITIONS.md](docs/EDITIONS.md) is where the printed
@@ -293,7 +293,7 @@ by `tools/wikicarpedia.mjs`.
 
 ### What's implemented
 
-Of the 79 rules catalogued, 28 are live. The rest are named, described, dated
+Of the 79 rules catalogued, 33 are live. The rest are named, described, dated
 and linked, waiting for an implementation.
 
 **Workshop originals** — things this sandbox invented, or lifted out of one of
@@ -334,6 +334,11 @@ of Strata, and both are more useful bolted onto Classic, or onto each other.
 | **Abbot** | mini (2016) | A follower for monasteries who can be called home on your turn instead of placing, scoring his cloister as it stands. Gardens aren't modelled yet |
 | **Pig** | Exp. 2 | Joins a farm you already hold and makes every completed city beside it worth 4 instead of 3 |
 | **Phantom** | mini (2011) | A second follower, placed in the same turn as your first, on a different feature of the same tile |
+| **Gardens** | mini (2016) | The abbot's second seat, and nobody else may take one. Closes and pays exactly as a cloister does |
+| **Vineyards** | Exp. 9 | Adds 3 to any monastery it neighbours, when that monastery closes |
+| **Magic portals** | Exp. 3 | Claim any unfinished, unclaimed feature *anywhere on the board* instead of the tile you just laid |
+| **Princess** | Exp. 3 | Lay her into a city and send a knight already standing there home |
+| **Festival** | mini (2011) | Take one of your own followers straight back off the board, instead of claiming |
 | **The King** | Exp. 6 | Whoever finished the largest city scores 1 per completed city on the board at the end |
 | **The Robber Baron** | Exp. 6 | The same for roads: longest one finished takes 1 per completed road |
 

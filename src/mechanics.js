@@ -237,15 +237,17 @@ export const MECHANICS = [
   {
     id: 'princess', layer: 'exp', pack: 'Exp. 3 — Princess & Dragon (2005) · C3.1: Dragon & Fairy',
     name: 'Princess',
-    note: 'Lay the princess into a city and you may send a knight already in it home.',
-    status: 'planned', needs: ['cities'], wiki: wiki('The_Princess_and_the_Dragon'), since: 'all',
+    note: 'Lay the princess into a city and you may send a knight already in it '
+      + 'home — instead of claiming anything yourself.',
+    status: 'live', needs: ['cities'], groups: ['dragonset'], wiki: wiki('The_Princess_and_the_Dragon'), since: 'all',
   },
   {
     id: 'portal', layer: 'exp', pack: 'Exp. 3 — Princess & Dragon (2005) · C3.1: Dragon & Fairy',
     name: 'Magic portals',
-    note: 'A portal tile lets you place your follower onto any unfinished '
-      + 'feature anywhere on the board instead of onto the tile you just laid.',
-    status: 'planned', needs: ['meeple'], wiki: wiki('The_Princess_and_the_Dragon'), since: 'all',
+    note: 'A portal tile lets you place your follower onto any unfinished, '
+      + 'unclaimed feature anywhere on the board instead of onto the tile you '
+      + 'just laid.',
+    status: 'live', needs: ['meeple'], groups: ['dragonset'], wiki: wiki('The_Princess_and_the_Dragon'), since: 'all',
   },
 
   // --- Exp. 4: The Tower ---------------------------------------------------
@@ -374,8 +376,9 @@ export const MECHANICS = [
   {
     id: 'vineyards', layer: 'exp', pack: 'Exp. 9 — Hills & Sheep (2014) · C3.1: Sheep & Shepherds (geese replace hills)',
     name: 'Vineyards',
-    note: 'A vineyard beside a cloister adds 3 to it when the cloister closes.',
-    status: 'planned', needs: ['cloisters'], wiki: wiki('Hills_and_Sheep'), since: 'c2',
+    note: 'A vineyard adds 3 to any monastery it neighbours, when that monastery '
+      + 'closes. The C3.1 rules extend it to gardens too.',
+    status: 'live', needs: ['cloisters'], groups: ['vineyards'], wiki: wiki('Hills_and_Sheep'), since: 'c2',
   },
 
   // --- Exp. 10: Under the Big Top ------------------------------------------
@@ -417,9 +420,10 @@ export const MECHANICS = [
   },
   {
     id: 'garden', layer: 'mini', pack: 'The Abbot (2016)', name: 'Gardens',
-    note: 'The little walled gardens the abbot can also sit in. Part of the base '
-      + 'box since the current edition.',
-    status: 'planned', needs: ['abbot'], wiki: wiki('The_Abbot'), since: 'c3',
+    note: 'The little walled gardens the abbot can also sit in — and nobody '
+      + 'else may. They close and pay exactly as a cloister does.',
+    status: 'live', needs: ['abbot'], groups: ['gardens'],
+    wiki: wiki('The_Abbot'), since: 'c3',
   },
   {
     id: 'flier', layer: 'mini', pack: 'The Flying Machines (2012)', name: 'Flying machines',
@@ -484,8 +488,8 @@ export const MECHANICS = [
   {
     id: 'festival', layer: 'mini', pack: 'The Festival (2011)', name: 'The Festival',
     note: 'A festival tile lets you take any one of your followers straight back '
-      + 'off the board.',
-    status: 'planned', needs: ['meeple'], wiki: wiki('The_Festival'), since: 'all',
+      + 'off the board, instead of claiming.',
+    status: 'live', needs: ['meeple'], groups: ['festivals'], wiki: wiki('The_Festival'), since: 'all',
   },
   {
     id: 'halflings', layer: 'mini', pack: 'The Halflings (2018)', name: 'Halflings',
@@ -765,9 +769,53 @@ export const FIGURES = [
   {
     id: 'abbot', mech: 'abbot', supply: 'abbots', key: 'A',
     name: 'abbot', label: 'Send the abbot', using: 'Sending the ABBOT',
-    allows: (f) => f.type === 'monastery',
+    // The abbot is the only figure who may keep a garden, and the only reason
+    // a garden is its own feature type rather than another cloister.
+    allows: (f) => f.type === 'monastery' || f.type === 'garden',
   },
 ];
+
+/** Does this tile carry a mark of the given kind? */
+export function hasMark(cell, kind) {
+  return !!cell?.type.marks.some((m) => m.kind === kind);
+}
+
+/**
+ * Vineyards. A monastery is worth 3 more for every vineyard in the eight
+ * tiles around it — the same neighbourhood the cloister itself counts.
+ */
+export function vineyardBonus(board, d) {
+  if (d.type !== 'monastery') return 0;
+  let n = 0;
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      if (!dx && !dy) continue;
+      if (hasMark(board.get(d.at.x + dx, d.at.y + dy), 'vineyard')) n++;
+    }
+  }
+  return n * 3;
+}
+
+/**
+ * Every unfinished feature on the board that nobody is standing on — where a
+ * magic portal lets you put a follower instead of onto the tile you just laid.
+ */
+export function portalTargets(board, { fields = false } = {}) {
+  const out = [];
+  const seen = new Set();
+  for (const cell of board.cells.values()) {
+    claimableFeatures(cell.type, { fields }).forEach(({ i, f }) => {
+      const d = board.featureOf(cell.x, cell.y, i);
+      if (!d || d.scored || d.meeples.length) return;
+      // A component reaches many tiles; offer it once, at the first tile seen.
+      const root = board.find(d.parts[0]);
+      if (seen.has(root)) return;
+      seen.add(root);
+      out.push({ x: cell.x, y: cell.y, i, f, portal: true });
+    });
+  }
+  return out;
+}
 
 export const FIGURE_BY_ID = Object.fromEntries(FIGURES.map((f) => [f.id, f]));
 

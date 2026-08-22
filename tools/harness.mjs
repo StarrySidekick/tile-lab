@@ -762,6 +762,95 @@ function runMode(spec, games, extraOpts = {}, label = '') {
  * asking the BOARD what happened, rather than reading the log — the log is a
  * fixed-size window and a piece that goes out early scrolls off it.
  */
+/**
+ * The rules that hang off a tile symbol: a garden, a vineyard, a portal, a
+ * princess, a festival. Each is checked on a board built by hand, because the
+ * tile that carries the symbol has to meet a specific situation and waiting for
+ * a shuffle to produce one is not a test.
+ */
+function checkMarkRules() {
+  console.log('\ntile-symbol rules');
+  const ok = (what, cond, detail = '') => {
+    if (cond) console.log(`  ✓ ${what.padEnd(44)} ${detail}`);
+    else { failures++; console.log(`  ✗ ${what}${detail ? `: ${detail}` : ''}`); }
+  };
+
+  // --- the garden: the abbot's, and nobody else's --------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'gardens'], options: { abbot: true, garden: true } });
+    g.board.place(30, 30, TILES.Ga, 0);
+    g.lastPlaced = { x: 30, y: 30, type: TILES.Ga };
+    g.phase = 'meeple';
+    const plain = g.meepleOptions().filter((o) => o.f.type === 'garden').length;
+    g.useFigure('abbot');
+    const abbot = g.meepleOptions().filter((o) => o.f.type === 'garden');
+    ok('a plain follower cannot take a garden', plain === 0);
+    ok('…but the abbot can', abbot.length === 1);
+    if (abbot.length) {
+      g.placeMeeple(abbot[0].i, abbot[0]);
+      ok('…and that is what ends up standing there',
+        g.board.get(30, 30).meeple?.kind === 'abbot');
+    }
+  }
+
+  // --- the vineyard: three more for the monastery next door ----------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'vineyards'], options: { vineyards: true } });
+    g.board.place(20, 20, TILES.B, 0);
+    const alone = g.valueOf(g.board.featureOf(20, 20, 0), true);
+    g.board.place(21, 20, TILES.Va, 0);
+    const beside = g.valueOf(g.board.featureOf(20, 20, 0), true);
+    // +1 for the neighbouring tile the cloister now counts, +3 for the vineyard.
+    ok('a vineyard adds 3 to the monastery beside it', beside === alone + 4,
+      `${alone} -> ${beside}`);
+  }
+
+  // --- the magic portal: claim anything, anywhere ---------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'dragonset'], options: { portal: true } });
+    g.board.place(50, 50, TILES.E, 0);              // an unclaimed city, far away
+    g.board.place(0, 5, TILES.Pa, 0);               // the portal tile just laid
+    g.lastPlaced = { x: 0, y: 5, type: TILES.Pa };
+    g.phase = 'meeple';
+    const far = g.meepleOptions().filter((o) => o.portal && o.x === 50 && o.y === 50);
+    ok('a portal reaches a feature across the board', far.length > 0,
+      `${g.meepleOptions().length} options in all`);
+  }
+
+  // --- the princess: a knight is shown the gate ----------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'dragonset'], options: { princess: true } });
+    g.board.place(40, 40, TILES.E, 0);
+    g.board.addMeeple(40, 40, 0, 1);
+    g.board.place(40, 39, TILES.Pc, 2);
+    g.lastPlaced = { x: 40, y: 39, type: TILES.Pc };
+    g.phase = 'meeple';
+    const targets = g.princessTargets();
+    ok('the princess finds the knight in her city', targets.length === 1);
+    if (targets.length) {
+      const had = g.players[1].meeples;
+      g.sendKnightHome();
+      ok('…sends him home, and he goes back to supply',
+        g.players[1].meeples === had + 1 && !g.board.get(40, 40).meeple);
+    }
+  }
+
+  // --- the festival: take one of your own back -----------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'festivals'], options: { festival: true } });
+    g.board.place(60, 60, TILES.E, 0);
+    g.board.addMeeple(60, 60, 0, 0);                 // one of the current player's
+    g.board.place(0, 5, TILES.Fa, 0);
+    g.lastPlaced = { x: 0, y: 5, type: TILES.Fa };
+    g.phase = 'meeple';
+    ok('a festival offers to call a follower home', g.canCallHome());
+    ok('…and without a festival tile it does not', (() => {
+      g.lastPlaced = { x: 60, y: 60, type: TILES.E };
+      return !g.canCallHome();
+    })());
+  }
+}
+
 function checkFigures() {
   console.log('\nspecial followers');
 
@@ -980,6 +1069,7 @@ function main() {
   } else {
     checkFields();
     checkFigures();
+    checkMarkRules();
     checkBots(Math.max(4, games / 2));
     botVsRandom(Math.max(10, games * 2));
     // Classic is the plain case, Girando moves tiles around under you, and
