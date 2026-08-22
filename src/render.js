@@ -6,7 +6,7 @@
 // its own fixed camera — same Board, same tile art, different transform.
 // ---------------------------------------------------------------------------
 
-import { drawTile, drawMeeple, PLAYER_COLORS } from './art.js';
+import { drawTile, drawMeeple, drawPig, PLAYER_COLORS } from './art.js';
 import { tileSprite } from './sprites.js';
 import { LIGHT } from './light.js';
 import { THEME, applyDusk } from './theme.js';
@@ -745,6 +745,7 @@ export class Renderer {
   // --- classic meeples ------------------------------------------------------
 
   drawMeeples(game) {
+    this.drawPigs(game);
     for (const cell of game.board.cells.values()) {
       if (!cell.meeple || !this.onScreen(cell.x, cell.y)) continue;
       if (this.fx?.veiled(`meeple:${cell.x},${cell.y}`)) continue;   // on its way
@@ -758,7 +759,24 @@ export class Renderer {
       const [sx, sy] = this.toScreen(cell.x + spot[0], cell.y + spot[1]);
       const holds = cell.meeple.feat == null ? null : cell.type.feats[cell.meeple.feat];
       drawMeeple(this.ctx, sx, sy, this.cam.zoom * 0.42, PLAYER_COLORS[cell.meeple.player],
-        { adrift: cell.meeple.feat == null, farmer: holds?.type === 'field' });
+        {
+          adrift: cell.meeple.feat == null,
+          farmer: holds?.type === 'field',
+          kind: cell.meeple.kind,
+          big: cell.meeple.big,
+        });
+    }
+  }
+
+  /** Pigs, drawn under the followers so a farmer is never hidden by one. */
+  drawPigs(game) {
+    for (const cell of game.board.cells.values()) {
+      if (!cell.pig || !this.onScreen(cell.x, cell.y)) continue;
+      const anchor = cell.type.spots[cell.pig.feat] || [0.5, 0.5];
+      const spot = rotPoint(anchor, cell.rot);
+      const [sx, sy] = this.toScreen(cell.x + spot[0], cell.y + spot[1]);
+      drawPig(this.ctx, sx + this.cam.zoom * 0.16, sy + this.cam.zoom * 0.10,
+        this.cam.zoom * 0.26, PLAYER_COLORS[cell.pig.player]);
     }
   }
 

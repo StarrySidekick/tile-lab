@@ -31,7 +31,7 @@ import {
   disabledFeatures, tileAllowed,
   canLift, liftableCells, coverProblem,
   claimableFeatures, walkTargets, innsAndCathedrals, goodsOn, crownAndRoad,
-  farmPayouts,
+  farmPayouts, pigsByField, FIGURES, FIGURE_BY_ID,
   WATER, MAX_STACK,
 } from './mechanics.js';
 
@@ -89,6 +89,10 @@ export class Game {
       score: 0,
       meeples: RULES.meeplesPerPlayer,
       big: this.has('bigMeeple') ? 1 : 0,
+      mayors: this.has('mayor') ? 1 : 0,
+      abbots: this.has('abbot') ? 1 : 0,
+      phantoms: this.has('phantom') ? 1 : 0,
+      pigs: this.has('pig') ? 1 : 0,
       abbeys: this.has('abbey') ? 1 : 0,
       goods: { wine: 0, grain: 0, cloth: 0 },
     }));
@@ -112,7 +116,8 @@ export class Game {
     // place-and-act sequence, so in a walking mode it's N tiles and N moves.
     this.tilesPerTurn = Math.max(1, Math.min(5, tilesPerTurn));
     this.tilesLeft = 0;
-    this.useBig = false;
+    this.useKind = null;          // which special follower the next claim spends
+    this.usingPhantom = false;    // the free second placement, mid-flight
     this.usingAbbey = false;
     this.builderUsed = false;
     this.pendingWalk = null;
@@ -590,15 +595,26 @@ export class Game {
    */
   meepleOptions() {
     if (this.phase !== 'meeple' || !this.lastPlaced || !this.useMeeples) return [];
-    if (this.player.meeples <= 0) return [];
+    // The phantom is a second body, not a second follower — it costs nothing
+    // from the ordinary supply, so an empty supply doesn't stop it.
+    if (this.player.meeples <= 0 && !this.usingPhantom) return [];
     const { x, y, type } = this.lastPlaced;
+    const fig = this.useKind ? FIGURE_BY_ID[this.useKind] : null;
     const here = claimableFeatures(type, { fields: this.has('fields') })
-      .filter(({ i }) => {
+      .filter(({ i, f }) => {
+        // A chosen figure narrows where you may go: the mayor only into
+        // cities, the abbot only onto a monastery.
+        if (fig && !fig.allows(f)) return false;
         const d = this.board.featureOf(x, y, i);
         return d && d.meeples.length === 0;
       })
       .map((o) => ({ ...o, x, y }));
     return [...here, ...(this.m.flightTargets?.() || [])];
+  }
+
+  /** Which special followers this player could spend right now. */
+  figuresAvailable() {
+    return FIGURES.filter((f) => this.has(f.mech) && this.player[f.supply] > 0);
   }
 
   placeMeeple(featIdx, at = null) {
@@ -608,25 +624,143 @@ export class Game {
     if (!spot) return false;
     const cell = this.board.get(spot.x, spot.y);
     if (!cell) return false;
-    const big = this.useBig && this.player.big > 0;
-    this.board.addMeeple(spot.x, spot.y, featIdx, this.current, big);
-    this.player.meeples--;
-    if (big) this.player.big--;
-    this.useBig = false;
+
+    const fig = this.useKind ? FIGURE_BY_ID[this.useKind] : null;
+    const spend = fig && this.player[fig.supply] > 0 ? fig : null;
+    const phantom = this.usingPhantom;
+
+    this.board.addMeeple(spot.x, spot.y, featIdx, this.current, {
+      big: spend?.id === 'big',
+      kind: phantom ? 'phantom' : (spend?.id || null),
+    });
+    // The phantom comes out of its own supply of one and leaves the ordinary
+    // followers untouched; everything else costs a follower.
+    if (phantom) this.player.phantoms--;
+    else this.player.meeples--;
+    if (spend) this.player[spend.supply]--;
+    this.useKind = null;
+
     const what = cell.type.feats[featIdx].type;
+    const who = phantom ? 'their phantom' : (spend ? `their ${spend.name}` : null);
     this.say(spot.flying
       ? `${this.player.name} flies a follower out to the ${what} at (${spot.x}, ${spot.y}).`
-      : `${this.player.name} claimed the ${what}${big ? ' with their big follower' : ''}.`);
+      : `${this.player.name} claimed the ${what}${who ? ` with ${who}` : ''}.`);
     this.emit('meeple', { feat: featIdx, player: this.current, at: { x: spot.x + 0.5, y: spot.y + 0.5 } });
+
+    // The phantom follows your ordinary follower in the same turn, onto a
+    // different feature of the same tile. Offered rather than forced.
+    if (!phantom && this.has('phantom') && this.player.phantoms > 0) {
+      this.usingPhantom = true;
+      if (this.meepleOptions().length) return true;   // stay in the meeple phase
+      this.usingPhantom = false;
+    } else {
+      this.usingPhantom = false;
+    }
+
     this.endTurn();
     return true;
   }
 
-  skipMeeple() { if (this.phase === 'meeple') this.endTurn(); }
+  skipMeeple() {
+    if (this.phase !== 'meeple') return;
+    this.usingPhantom = false;
+    this.useKind = null;
+    this.endTurn();
+  }
 
-  toggleBig() {
-    if (!this.has('bigMeeple') || this.player.big <= 0) return false;
-    this.useBig = !this.useBig;
+  /**
+   * Choose which follower the next claim spends, or clear the choice. The
+   * plain follower is `null`.
+   */
+  useFigure(id) {
+    const fig = FIGURE_BY_ID[id];
+    if (!fig || !this.has(fig.mech) || this.player[fig.supply] <= 0) return false;
+    if (this.usingPhantom) return false;          // the phantom is its own piece
+    this.useKind = this.useKind === id ? null : id;
+    return true;
+  }
+
+  toggleBig() { return this.useFigure('big'); }
+
+  // The big follower had its own flag before there were others; keep the name
+  // working, because the modes, the bot and the tests all still say it.
+  get useBig() { return this.useKind === 'big'; }
+  set useBig(v) {
+    if (v) this.useKind = 'big';
+    else if (this.useKind === 'big') this.useKind = null;
+  }
+
+  // --- the abbot --------------------------------------------------------------
+
+  /**
+   * The abbot may be called home on your turn INSTEAD of placing a follower,
+   * and his monastery pays out as it stands rather than waiting to be
+   * surrounded. That is the whole point of the piece: a cloister that is never
+   * going to close still pays something.
+   */
+  myAbbots() {
+    return [...this.board.cells.values()]
+      .filter((c) => c.meeple && c.meeple.player === this.current && c.meeple.kind === 'abbot');
+  }
+
+  canRetireAbbot() {
+    return this.has('abbot') && this.phase === 'meeple' && !this.usingPhantom
+      && this.myAbbots().length > 0;
+  }
+
+  retireAbbot(at = null) {
+    if (!this.canRetireAbbot()) return false;
+    const cell = at
+      ? this.myAbbots().find((c) => c.x === at.x && c.y === at.y)
+      : this.myAbbots()[0];
+    if (!cell) return false;
+    const d = this.board.featureOf(cell.x, cell.y, cell.meeple.feat);
+    if (!d) return false;
+
+    const pts = 1 + this.board.surroundCount(cell.x, cell.y);
+    this.player.score += pts;
+    this.player.meeples++;
+    this.player.abbots++;
+    cell.meeple = null;
+    d.meeples = d.meeples.filter((m) => !(m.x === cell.x && m.y === cell.y));
+    this.say(`${this.player.name} calls the abbot home — the monastery pays ${pts}.`);
+    this.emit('score', { points: pts, players: [this.current], at: { x: cell.x + 0.5, y: cell.y + 0.5 } });
+    this.endTurn();
+    return true;
+  }
+
+  // --- the pig ----------------------------------------------------------------
+
+  /**
+   * The pig joins a field you are already farming and fattens it: every
+   * completed city touching that field is worth one more, to you, provided you
+   * still hold the majority when the game ends.
+   */
+  pigSpots() {
+    if (!this.has('pig') || this.player.pigs <= 0) return [];
+    const out = [];
+    for (const cell of this.board.cells.values()) {
+      if (cell.pig) continue;
+      if (!cell.meeple || cell.meeple.player !== this.current) continue;
+      const f = cell.type.feats[cell.meeple.feat];
+      if (!f || f.type !== 'field') continue;
+      out.push({ x: cell.x, y: cell.y, feat: cell.meeple.feat });
+    }
+    return out;
+  }
+
+  canPlacePig() { return this.phase === 'meeple' && this.pigSpots().length > 0; }
+
+  placePig(at = null) {
+    const spots = this.pigSpots();
+    if (!spots.length) return false;
+    const spot = at ? spots.find((s) => s.x === at.x && s.y === at.y) : spots[0];
+    if (!spot) return false;
+    this.board.get(spot.x, spot.y).pig = { player: this.current, feat: spot.feat };
+    this.player.pigs--;
+    this.say(`${this.player.name} turns a pig out onto the farm.`);
+    this.emit('meeple', { player: this.current, at: { x: spot.x + 0.5, y: spot.y + 0.5 } });
+    this.endTurn();
     return true;
   }
 
@@ -987,8 +1121,13 @@ export class Game {
     }
     if (!final && this.useMeeples) {
       for (const m of this.board.reclaim(d)) {
-        this.players[m.player].meeples++;
+        // A phantom goes back to being a phantom; everything else gives back a
+        // follower, plus whatever piece of office it was carrying.
+        if (m.kind === 'phantom') this.players[m.player].phantoms++;
+        else this.players[m.player].meeples++;
         if (m.big) this.players[m.player].big++;
+        if (m.kind === 'mayor') this.players[m.player].mayors++;
+        if (m.kind === 'abbot') this.players[m.player].abbots++;
       }
     }
   }
@@ -1000,9 +1139,11 @@ export class Game {
    */
   scoreFarms() {
     const per = this.rules.farmPerCity;
-    for (const { field, player, points, cities } of farmPayouts(this.board, per)) {
+    const pigs = this.has('pig') ? pigsByField(this.board) : null;
+    for (const { field, player, points, cities, per: rate } of farmPayouts(this.board, per, pigs)) {
       this.players[player].score += points;
       this.say(`Farm of ${field.tiles.size} feeding ${cities} cit${cities === 1 ? 'y' : 'ies'}`
+        + `${rate > per ? ' (pig)' : ''}`
         + ` → ${this.players[player].name} +${points}`);
       const spot = this.spotOf(field);
       if (spot) this.emit('score', { points, players: [player], ...spot });

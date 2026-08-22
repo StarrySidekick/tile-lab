@@ -25,6 +25,21 @@ import {
 
 export const keyOf = (x, y) => `${x},${y}`;
 
+/**
+ * What one follower counts for when a majority is worked out.
+ *
+ * Lives here rather than in mechanics.js because the board is the thing that
+ * counts majorities and mechanics.js already imports the board — the arrow has
+ * to point one way. The mayor is the interesting case: he is worth a follower
+ * per coat of arms in the city he stands in, which means he is worth nothing
+ * at all in a city that has none.
+ */
+export function meepleWeight(m, d) {
+  if (m.big) return 2;
+  if (m.kind === 'mayor') return d.shields || 0;
+  return 1;
+}
+
 export class Board {
   constructor({ bounds = null } = {}) {
     this.cells = new Map();       // "x,y" -> cell (the TOP cell, if stacked)
@@ -664,16 +679,28 @@ export class Board {
    */
   majority(d) {
     const counts = new Map();
-    for (const m of d.meeples) counts.set(m.player, (counts.get(m.player) || 0) + (m.big ? 2 : 1));
+    for (const m of d.meeples) {
+      counts.set(m.player, (counts.get(m.player) || 0) + meepleWeight(m, d));
+    }
     let best = 0;
     for (const c of counts.values()) best = Math.max(best, c);
+    // A figure can be worth nothing — a mayor in a city with no coat of arms
+    // is the whole gamble of the piece — and nobody wins a majority with 0.
+    if (best <= 0) return [];
     return [...counts.entries()].filter(([, c]) => c === best).map(([p]) => p);
   }
 
-  addMeeple(x, y, featIdx, player, big = false) {
+  /**
+   * A follower placed on a feature. `kind` is which piece it is; the plain
+   * ones have no kind at all.
+   */
+  addMeeple(x, y, featIdx, player, opts = false) {
+    // The old signature took a bare `big` boolean, and modes still call it.
+    const o = typeof opts === 'object' && opts !== null ? opts : { big: !!opts };
+    const m = { player, feat: featIdx, big: !!o.big, kind: o.kind || null };
     const cell = this.get(x, y);
-    cell.meeple = { player, feat: featIdx, big };
-    this.featureOf(x, y, featIdx).meeples.push({ player, x, y, feat: featIdx, big });
+    cell.meeple = m;
+    this.featureOf(x, y, featIdx).meeples.push({ ...m, x, y });
   }
 
   /** Pull followers off a scored component and hand them back to their owners. */

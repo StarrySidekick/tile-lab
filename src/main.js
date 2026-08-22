@@ -398,7 +398,10 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'e' || e.key === 'E') game.enterCity();
   if (e.key === 'l' || e.key === 'L') game.beginLift();
-  if (e.key === 'b' || e.key === 'B') game.toggleBig();
+  // Each special follower answers to its own letter.
+  for (const f of game.figuresAvailable?.() || []) {
+    if (e.key.toLowerCase() === f.key.toLowerCase()) game.useFigure(f.id);
+  }
   if (e.key >= '1' && e.key <= '9' && game.phase === 'market') {
     game.takeFromMarket(Number(e.key) - 1);
   }
@@ -731,10 +734,16 @@ function renderActions() {
   if (game.canLiftNow()) add('Lift a placed tile', 'L', () => game.beginLift());
   if (game.phase === 'lift') add('Cancel lift', '', () => game.cancelLift());
   if (game.phase === 'meeple') {
-    add('Skip meeple', 'Space', () => game.skipMeeple());
-    if (game.has('bigMeeple') && game.player.big > 0) {
-      add(game.useBig ? 'Using the BIG follower' : 'Use the big follower', 'B', () => game.toggleBig());
+    add(game.usingPhantom ? 'Skip the phantom' : 'Skip meeple', 'Space', () => game.skipMeeple());
+    // One button per special follower this player still has in hand. The
+    // phantom is its own second placement, so it isn't offered as a choice.
+    if (!game.usingPhantom) {
+      for (const f of game.figuresAvailable()) {
+        add(game.useKind === f.id ? f.using : f.label, f.key, () => game.useFigure(f.id));
+      }
     }
+    if (game.canRetireAbbot()) add('Call the abbot home', '', () => game.retireAbbot());
+    if (game.canPlacePig()) add('Turn out the pig', '', () => game.placePig());
     if (game.canRecall()) add('Recall a follower', '', () => game.beginRecall());
   }
   if (game.phase === 'walk') add('Send it home instead', 'Space', () => game.declineWalk());
@@ -871,7 +880,9 @@ function signature() {
     inv ? `${inv.deck.length}/${inv.rot}/${inv.board.size}/${inv.pos.x},${inv.pos.y}` : '-',
     game.walker ? (game.walker.selected?.id ?? '-') : '-',
     game.m.piece ? game.m.piece.cells.map((c) => `${c.dx}${c.dy}${c.rot}`).join('') : '-',
-    game.tilesLeft, game.useBig ? 'B' : '-', game.usingAbbey ? 'A' : '-', bots.size,
+    game.tilesLeft, game.useKind || '-', game.usingPhantom ? 'P' : '-',
+    game.usingAbbey ? 'A' : '-', bots.size,
+    game.players.map((p) => `${p.big}${p.mayors}${p.abbots}${p.phantoms}${p.pigs}`).join(''),
     game.pendingWalk ? game.pendingWalk.targets.length : '-',
     game.players.map((p) => `${p.score}/${p.meeples}`).join(','),
   ].join('|');

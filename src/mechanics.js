@@ -182,9 +182,10 @@ export const MECHANICS = [
   {
     id: 'cathedrals', layer: 'exp', pack: 'Exp. 1 — Inns & Cathedrals (2002)',
     name: 'Cathedrals',
-    note: 'A cathedral makes its city 3 a tile when it closes, and nothing at '
-      + 'all if it never does.',
-    status: 'partial', needs: ['cities'], groups: ['innscath'],
+    note: 'A cathedral makes its city 3 a tile — and per coat of arms — when it '
+      + 'closes, and nothing at all if it never does. (The C3.1 rules dropped '
+      + 'that penalty; this is the C1–C3 reading.)',
+    status: 'live', needs: ['cities'], groups: ['innscath'],
     wiki: wiki('Inns_and_Cathedrals'), since: 'all',
   },
 
@@ -209,7 +210,7 @@ export const MECHANICS = [
     name: 'Pig',
     note: 'A pig joins one of your farms and makes every completed city beside '
       + 'it worth 4 instead of 3 — but only if you hold the majority there.',
-    status: 'planned', needs: ['fields'], wiki: wiki('Traders_and_Builders'), since: 'all',
+    status: 'live', needs: ['fields'], wiki: wiki('Traders_and_Builders'), since: 'all',
   },
 
   // --- Exp. 3: The Princess & The Dragon -----------------------------------
@@ -268,8 +269,9 @@ export const MECHANICS = [
     id: 'mayor', layer: 'exp', pack: 'Exp. 5 — Abbey & Mayor (2007) · C3.1: Messengers & Mayors',
     name: 'Mayor',
     note: 'Goes only into cities, and counts not as one follower but as one per '
-      + 'pennant in the city he stands in.',
-    status: 'planned', needs: ['cities', 'pennants'], wiki: wiki('Abbey_and_Mayor'), since: 'all',
+      + 'pennant in the city he stands in — so he is worth nothing in a city '
+      + 'that has none.',
+    status: 'live', needs: ['cities', 'pennants'], wiki: wiki('Abbey_and_Mayor'), since: 'all',
   },
   {
     id: 'wagon', layer: 'exp', pack: 'Exp. 5 — Abbey & Mayor (2007) · C3.1: Messengers & Mayors',
@@ -408,9 +410,10 @@ export const MECHANICS = [
   },
   {
     id: 'abbot', layer: 'mini', pack: 'The Abbot (2016)', name: 'The Abbot',
-    note: 'A second kind of follower for cloisters and gardens, who can be '
-      + 'called home early to score his monastery as it stands.',
-    status: 'planned', needs: ['cloisters'], wiki: wiki('The_Abbot'), since: 'c2',
+    note: 'A second kind of follower for cloisters, who can be called home on '
+      + 'your turn instead of placing, scoring his monastery as it stands. '
+      + 'Gardens aren’t modelled yet, so he keeps to monasteries.',
+    status: 'live', needs: ['cloisters'], wiki: wiki('The_Abbot'), since: 'c2',
   },
   {
     id: 'garden', layer: 'mini', pack: 'The Abbot (2016)', name: 'Gardens',
@@ -474,8 +477,9 @@ export const MECHANICS = [
   },
   {
     id: 'phantom', layer: 'mini', pack: 'The Phantom (2011)', name: 'The Phantom',
-    note: 'A second follower you may place in the same turn as your first.',
-    status: 'planned', needs: ['meeple'], wiki: wiki('The_Phantom'), since: 'all',
+    note: 'A second follower you may place in the same turn as your first, on a '
+      + 'different feature of the tile you just laid.',
+    status: 'live', needs: ['meeple'], wiki: wiki('The_Phantom'), since: 'all',
   },
   {
     id: 'festival', layer: 'mini', pack: 'The Festival (2011)', name: 'The Festival',
@@ -733,6 +737,40 @@ export function tileAllowed(type, off) {
 
 export const MAX_STACK = 2;          // 0-indexed, so three levels
 
+// ---------------------------------------------------------------------------
+// Special followers.
+//
+// Every expansion that adds a figure adds the same three things: a supply of
+// one, a rule about where it may stand, and a rule about what it counts for.
+// So they are one table rather than one branch each, and `game.useKind` picks
+// which of them the next placement spends.
+//
+// The weight itself lives in board.js, next to the majority count that reads
+// it. This table is about the UI and the supply.
+// ---------------------------------------------------------------------------
+
+export const FIGURES = [
+  {
+    id: 'big', mech: 'bigMeeple', supply: 'big', key: 'B',
+    name: 'big follower', label: 'Use the big follower', using: 'Using the BIG follower',
+    allows: () => true,
+  },
+  {
+    id: 'mayor', mech: 'mayor', supply: 'mayors', key: 'M',
+    name: 'mayor', label: 'Send the mayor', using: 'Sending the MAYOR',
+    // Cities only, and worth one follower per coat of arms in the city — so a
+    // mayor in a city with no pennant is worth nothing at all.
+    allows: (f) => f.type === 'city',
+  },
+  {
+    id: 'abbot', mech: 'abbot', supply: 'abbots', key: 'A',
+    name: 'abbot', label: 'Send the abbot', using: 'Sending the ABBOT',
+    allows: (f) => f.type === 'monastery',
+  },
+];
+
+export const FIGURE_BY_ID = Object.fromEntries(FIGURES.map((f) => [f.id, f]));
+
 /** Is any feature on this cell part of something that already paid out? */
 export function partOfScored(board, cell) {
   return cell.type.feats.some((f, i) => {
@@ -866,14 +904,35 @@ export function allFields(board) {
  * What each player takes from the farms. Returns a list of payouts rather than
  * mutating anyone, so the caller can log and animate them one at a time.
  */
-export function farmPayouts(board, perCity = 3) {
+export function farmPayouts(board, perCity = 3, pigs = null) {
   const out = [];
   for (const field of allFields(board)) {
     if (!field.meeples.length) continue;
     const cities = citiesFed(board, field);
     if (!cities.size) continue;
-    const points = cities.size * perCity;
-    for (const player of board.majority(field)) out.push({ field, player, points, cities: cities.size });
+    for (const player of board.majority(field)) {
+      // A pig only pays the player who owns it, and only where that player
+      // already holds the field — it raises their rate, nobody else's.
+      const per = pigs?.get(field)?.has(player) ? perCity + 1 : perCity;
+      out.push({ field, player, points: cities.size * per, cities: cities.size, per });
+    }
+  }
+  return out;
+}
+
+/**
+ * Where each player's pig is standing, as field component -> set of players.
+ * Pigs live on the cell like a follower does, so they survive a rebuild the
+ * same way, and this resolves them to whatever component that cell is in now.
+ */
+export function pigsByField(board) {
+  const out = new Map();
+  for (const cell of board.cells.values()) {
+    if (!cell.pig) continue;
+    const d = board.featureOf(cell.x, cell.y, cell.pig.feat);
+    if (!d || d.type !== 'field') continue;
+    if (!out.has(d)) out.set(d, new Set());
+    out.get(d).add(cell.pig.player);
   }
   return out;
 }

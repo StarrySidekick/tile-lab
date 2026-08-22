@@ -755,6 +755,133 @@ function runMode(spec, games, extraOpts = {}, label = '') {
  * edge splits the field either side of it without changing the edge letter, and
  * a completed two-tile city keeps the fields on its two flanks apart.
  */
+/**
+ * The special followers, and the two rules that ride on them.
+ *
+ * Each is checked by playing a whole game that prefers that piece and then
+ * asking the BOARD what happened, rather than reading the log — the log is a
+ * fixed-size window and a piece that goes out early scrolls off it.
+ */
+function checkFigures() {
+  console.log('\nspecial followers');
+
+  const legal = (g) => {
+    const out = []; const saved = g.rot;
+    for (const { x, y } of g.board.candidates(g.placeOpts())) {
+      for (let r = 0; r < 4; r++) { g.rot = r; if (g.canPlaceAt(x, y)) out.push({ x, y, rot: r }); }
+    }
+    g.rot = saved; return out;
+  };
+
+  /** Play to the end, letting `claim` decide what to do in the meeple phase. */
+  const play = (opts, claim) => {
+    const g = new Game(opts);
+    const said = [];
+    const say = g.say.bind(g);
+    g.say = (m) => { said.push(m); say(m); };      // the log truncates; this doesn't
+    for (let i = 0; i < 600 && g.phase !== 'over'; i++) {
+      if (g.phase === 'place') {
+        const s = legal(g)[0]; if (!s) break;
+        g.rot = s.rot; g.cellClick(s.x, s.y);
+      } else if (g.phase === 'meeple') claim(g);
+      else break;
+    }
+    return { g, said };
+  };
+
+  /** Every follower of a given kind currently on the board. */
+  const kinds = (g, kind) => [...g.board.cells.values()]
+    .filter((c) => c.meeple && c.meeple.kind === kind);
+
+  const ok = (what, cond, detail = '') => {
+    if (cond) console.log(`  ✓ ${what.padEnd(40)} ${detail}`);
+    else { failures++; console.log(`  ✗ ${what}${detail ? `: ${detail}` : ''}`); }
+  };
+
+  // --- the mayor: cities only, worth a follower per coat of arms ------------
+  {
+    const { g, said } = play({ players: 2, seed: 5, options: { mayor: true } }, (x) => {
+      if (!x.useKind && x.figuresAvailable().some((f) => f.id === 'mayor')) x.useFigure('mayor');
+      const o = x.meepleOptions();
+      if (o.length) return void x.placeMeeple(o[0].i, o[0]);
+      x.useKind = null;
+      const p = x.meepleOptions();
+      if (p.length) x.placeMeeple(p[0].i, p[0]); else x.skipMeeple();
+    });
+    const sent = said.filter((l) => /mayor/i.test(l)).length;
+    ok('the mayor goes out', sent > 0, `${sent} sent`);
+    const astray = kinds(g, 'mayor').filter((c) => c.type.feats[c.meeple.feat].type !== 'city');
+    ok('…and only ever into a city', astray.length === 0);
+  }
+
+  // --- the abbot: monasteries only, and callable home early -----------------
+  {
+    const { g, said } = play({ players: 2, seed: 5, options: { abbot: true } }, (x) => {
+      if (x.canRetireAbbot() && x.turn % 4 === 0) return void x.retireAbbot();
+      if (!x.useKind && x.figuresAvailable().some((f) => f.id === 'abbot')) x.useFigure('abbot');
+      const o = x.meepleOptions();
+      if (o.length) return void x.placeMeeple(o[0].i, o[0]);
+      x.useKind = null;
+      const p = x.meepleOptions();
+      if (p.length) x.placeMeeple(p[0].i, p[0]); else x.skipMeeple();
+    });
+    ok('the abbot goes out', said.some((l) => /with their abbot/i.test(l)));
+    ok('…and is called home to score', said.some((l) => /calls the abbot home/i.test(l)));
+    const astray = kinds(g, 'abbot').filter((c) => c.type.feats[c.meeple.feat].type !== 'monastery');
+    ok('…and only ever onto a monastery', astray.length === 0);
+  }
+
+  // --- the phantom: a second body in the same turn --------------------------
+  {
+    const { said } = play({ players: 2, seed: 5, options: { phantom: true } }, (x) => {
+      const o = x.meepleOptions();
+      if (o.length) x.placeMeeple(o[0].i, o[0]); else x.skipMeeple();
+    });
+    ok('the phantom follows the follower', said.some((l) => /with their phantom/i.test(l)));
+  }
+
+  // --- the pig: fattens a farm its owner holds ------------------------------
+  {
+    const { said } = play({ players: 2, seed: 11, options: { pig: true } }, (x) => {
+      if (x.canPlacePig()) return void x.placePig();
+      const o = x.meepleOptions();
+      const farm = o.find((z) => z.f.type === 'field');
+      if (farm) x.placeMeeple(farm.i, farm);
+      else if (o.length) x.placeMeeple(o[0].i, o[0]);
+      else x.skipMeeple();
+    });
+    ok('the pig goes out', said.some((l) => /pig/i.test(l)));
+    ok('…and raises the farm it stands on', said.some((l) => /\(pig\)/.test(l)));
+  }
+
+  // --- a mayor is worth nothing in a city with no pennant -------------------
+  {
+    const g = new Game({ players: 2, seed: 1, options: { mayor: true } });
+    const b = g.board;
+    b.place(5, 5, TILES.E, 0);                       // a plain city edge, no shield
+    b.addMeeple(5, 5, 0, 0, { kind: 'mayor' });
+    const city = b.featureOf(5, 5, 0);
+    ok('a mayor holds nothing without a pennant', b.majority(city).length === 0,
+      `majority=[${b.majority(city)}]`);
+    b.addMeeple(5, 5, 0, 1);                         // a plain follower alongside
+    ok('…and a plain follower beats him there', b.majority(city).join() === '1');
+  }
+
+  // --- the cathedral: three a tile, and per coat of arms --------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'innscath'], options: { cathedrals: true } });
+    const b = g.board;
+    b.place(9, 9, TILES.Ie, 0);                      // city across, with a cathedral
+    b.place(8, 9, TILES.E, 1);
+    b.place(10, 9, TILES.E, 3);                      // caps both ends -> closed
+    const city = b.featureOf(9, 9, 0);
+    const plain = b.value(city, false);
+    const paid = g.valueOf(city, false);
+    ok('a cathedral makes its city 3 a tile', city.open === 0 && paid === plain * 1.5,
+      `${plain} -> ${paid} over ${city.tiles.size} tiles`);
+  }
+}
+
 function checkFields() {
   console.log('\nthe field graph');
   const fieldsOn = (place) => {
@@ -852,6 +979,7 @@ function main() {
     else console.log(`  ? no mode called "${only}"`);
   } else {
     checkFields();
+    checkFigures();
     checkBots(Math.max(4, games / 2));
     botVsRandom(Math.max(10, games * 2));
     // Classic is the plain case, Girando moves tiles around under you, and

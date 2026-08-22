@@ -7,9 +7,11 @@ A sandbox for experimenting with tile mechanics and game modes, built to be
 **fast to iterate on**. No build step, no dependencies, no image assets — plain
 ES modules and a canvas. Edit a file, hit refresh, keep playing.
 
-Twelve modes and sixteen mechanics, all sharing one board engine. Each mode
-exists to answer a specific question about what makes tile-laying good;
-[MODES.md](MODES.md) is where that reasoning lives.
+Twelve modes and a catalogue of 79 Carcassonne rules — 28 of them playable —
+all sharing one board engine. Each mode exists to answer a specific question
+about what makes tile-laying good; [MODES.md](MODES.md) is where that
+reasoning lives, and [docs/EDITIONS.md](docs/EDITIONS.md) is where the printed
+game's own edition history is kept.
 
 ## Run it locally
 
@@ -197,6 +199,33 @@ Rules are also gated on their own prerequisites: you can't tick the pig with no
 fields for it to stand in, and switching cities off switches the cathedral off
 with them.
 
+### Special followers
+
+Every expansion that adds a figure adds the same three things: a supply of one,
+a rule about where it may stand, and a rule about what it counts for. So they
+are one table in `src/mechanics.js` rather than one branch each, and the panel
+grows a button per figure you still hold.
+
+The weight lives next to the majority count that reads it, in `board.js`,
+because that is the only thing that needs it:
+
+| figure | may stand | counts for |
+|---|---|---|
+| follower | anything claimable | 1 |
+| big follower | anything claimable | 2 |
+| mayor | cities only | one per coat of arms in that city |
+| abbot | monasteries only | 1 |
+| phantom | anything claimable | 1 |
+
+The mayor is the interesting one, and the reason `majority()` had to learn that
+**nobody wins with zero**: a mayor in a city with no pennant is worth nothing,
+so a single plain follower beats him outright. That is the whole gamble of the
+piece, and it is checked in the harness.
+
+The phantom isn't a choice of piece but a second placement: claim normally, and
+if you still hold your phantom and the tile has another free feature, the turn
+stays in the meeple phase to offer it.
+
 ### Farms
 
 The one base-game feature that isn't an edge feature, and the reason the board
@@ -264,7 +293,7 @@ by `tools/wikicarpedia.mjs`.
 
 ### What's implemented
 
-Of the 79 rules catalogued, 24 are live. The rest are named, described, dated
+Of the 79 rules catalogued, 28 are live. The rest are named, described, dated
 and linked, waiting for an implementation.
 
 **Workshop originals** — things this sandbox invented, or lifted out of one of
@@ -301,6 +330,10 @@ of Strata, and both are more useful bolted onto Classic, or onto each other.
 | **Builder** | Exp. 2 | Extend a feature you already hold and you get another tile this turn, once per turn |
 | **Abbey tile** | Exp. 5 | One abbey each, played instead of your tile into a hole surrounded on all four sides. It scores as a monastery, so it's always worth 9 |
 | **Wagon** | Exp. 5 | When a feature scores, your follower steps along the road to the next unclaimed, unfinished thing instead of going home |
+| **Mayor** | Exp. 5 | Cities only, and worth one follower per coat of arms — so he holds nothing at all in a city with no pennant |
+| **Abbot** | mini (2016) | A follower for monasteries who can be called home on your turn instead of placing, scoring his cloister as it stands. Gardens aren't modelled yet |
+| **Pig** | Exp. 2 | Joins a farm you already hold and makes every completed city beside it worth 4 instead of 3 |
+| **Phantom** | mini (2011) | A second follower, placed in the same turn as your first, on a different feature of the same tile |
 | **The King** | Exp. 6 | Whoever finished the largest city scores 1 per completed city on the board at the end |
 | **The Robber Baron** | Exp. 6 | The same for roads: longest one finished takes 1 per completed road |
 

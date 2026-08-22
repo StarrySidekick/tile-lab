@@ -1737,6 +1737,28 @@ export function drawMeeple(ctx, x, y, size, color, opts = {}) {
   ctx.fillRect(-1, -1, 2, 2);
   ctx.restore();
 
+  // A special follower is the same body with a mark of office on its chest —
+  // colour already means "whose", so it can't also mean "which", and a shape
+  // reads at this size where a second colour would not.
+  if (opts.kind && opts.kind !== 'phantom') {
+    ctx.fillStyle = 'rgba(255,244,222,0.92)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = 0.05;
+    ctx.beginPath();
+    if (opts.kind === 'mayor') {                 // a chain of office
+      ctx.moveTo(-0.20, -0.02); ctx.lineTo(0, 0.22); ctx.lineTo(0.20, -0.02);
+    } else if (opts.kind === 'abbot') {          // a tonsure ring
+      ctx.arc(0, 0.02, 0.15, 0, Math.PI * 2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  // The phantom is the same piece, half there.
+  if (opts.kind === 'phantom') {
+    ctx.globalAlpha = 0.55;
+  }
+
   // The hero is the one piece you always need to find at a glance: gold trim
   // and a plume, rather than a different colour that would clash with players.
   if (opts.hero) {
@@ -1752,5 +1774,40 @@ export function drawMeeple(ctx, x, y, size, color, opts = {}) {
     ctx.closePath();
     ctx.fill();
   }
+  ctx.restore();
+}
+
+
+/**
+ * A pig, standing in its owner's field. Small, low and unmistakably not a
+ * follower — it sits beside the farmer rather than replacing him, so the tile
+ * still reads as "this player farms here, and has a pig on it".
+ */
+export function drawPig(ctx, x, y, size, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size, size);
+
+  shadow(ctx, LIGHT, 0.05, 0.08, 'rgba(9,7,13,0.50)');
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 0.52, 0.34, 0, 0, Math.PI * 2);      // body
+  ctx.fill();
+  noShadow(ctx);
+
+  ctx.beginPath();
+  ctx.ellipse(0.46, -0.06, 0.22, 0.20, 0, 0, Math.PI * 2); // head
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.lineWidth = 0.07;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 0.52, 0.34, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  ctx.ellipse(0.64, -0.04, 0.07, 0.06, 0, 0, Math.PI * 2); // snout
+  ctx.fill();
+
   ctx.restore();
 }
