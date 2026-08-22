@@ -573,6 +573,18 @@ collapses the drawer the same way.
 Panel settings — mechanics, tile groups, mode, bots, sound, motion, and the two
 switches above — are remembered in `localStorage` between visits.
 
+### On a touch screen
+
+Safari keeps a ~300ms window open after every tap to see whether a second one
+follows, and reads that second tap as zoom-in. Turning a tile is the one thing
+you press twice in a row on purpose, so rotating in a hurry used to zoom the
+whole app. Everything now carries `touch-action: manipulation`, which drops
+that window — panning and pinch-zoom still work, the browser just stops
+watching for a double tap — and the board, the draggable tile and the claim
+canvas keep `touch-action: none` because they run their own gestures. Safari's
+separate `gesture*` pinch (two fingers, or a trackpad on a Mac) is refused over
+the play area for the same reason: the board zooms, not the page.
+
 ## The tile pool
 
 Tiles are grouped, and each group toggles on and off independently:

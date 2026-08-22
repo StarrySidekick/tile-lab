@@ -162,6 +162,31 @@ for (const mode of modes) {
   else console.log(`  ✓ build stamp       ${v.badge}`);
 }
 
+// Safari treats a second tap inside ~300ms as zoom-in, which made turning a
+// tile twice in a hurry scale the whole app. `touch-action: manipulation` is
+// the fix, and it has to stay off the elements that run their own gestures.
+{
+  const touch = await page.evaluate(() => {
+    const of = (sel) => getComputedStyle(document.querySelector(sel)).touchAction;
+    const btn = [...document.querySelectorAll('#actions button, #panel button')][0];
+    return {
+      button: btn ? getComputedStyle(btn).touchAction : null,
+      body: of('body'),
+      board: of('#board'),
+      hudTile: of('#hudTile'),
+      claimTile: of('#claimTile'),
+    };
+  });
+  const problems = [];
+  if (touch.button !== 'manipulation') problems.push(`buttons are "${touch.button}"`);
+  if (touch.body !== 'manipulation') problems.push(`body is "${touch.body}"`);
+  for (const own of ['board', 'hudTile', 'claimTile']) {
+    if (touch[own] !== 'none') problems.push(`${own} lost its own gestures ("${touch[own]}")`);
+  }
+  if (problems.length) { failures++; console.log(`  ✗ double-tap zoom: ${problems.join(' · ')}`); }
+  else console.log('  ✓ double-tap zoom    buttons "manipulation" · board keeps "none"');
+}
+
 // The input layer itself, through real pointer events rather than by calling
 // the game — everything else in this file drives the rules directly, so a tap
 // that stopped placing tiles would sail straight past it. Two passes: once with

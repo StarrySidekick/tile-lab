@@ -453,6 +453,22 @@ canvas.addEventListener('pointerup', (e) => {
   }
 });
 
+// Safari has its own pinch, outside the pointer events: a two-finger pinch (or
+// a trackpad pinch on a Mac) fires `gesture*` and zooms the PAGE, which fights
+// the board's own zoom and leaves the whole app scaled up. The board and the
+// overlays run their gestures themselves, so refuse Safari's over the stage and
+// let the pointer handlers do the work. Unknown everywhere else, and ignored.
+for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+  $('stage').addEventListener(type, (e) => e.preventDefault(), { passive: false });
+}
+
+// Belt and braces for the tap-tap-zoom: `touch-action: manipulation` in the
+// stylesheet is what actually stops it, but a double click on a button (fast
+// mouse, or a stylus) has no meaning here either, so swallow it.
+document.addEventListener('dblclick', (e) => {
+  if (e.target.closest('button, label, select, #panel')) e.preventDefault();
+});
+
 canvas.addEventListener('contextmenu', (e) => {
   e.preventDefault();
   if (botTurn()) return;

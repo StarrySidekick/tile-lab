@@ -13,6 +13,24 @@
 
 * { box-sizing: border-box; }
 
+/* Safari (and Chrome on Android) reserve a ~300ms window after any tap to see
+   whether a second one is coming, and treat that second tap as zoom-in. Turning
+   a tile is the one thing you press twice in a row on purpose, so the whole app
+   asked to be zoomed every time you rotated in a hurry. `manipulation` means
+   panning and pinch-zoom still work — the browser just stops watching for a
+   double tap, which also drops the 300ms delay on every button in the app.
+   Elements that drive their own gestures (the board, the draggable tile, the
+   claim canvas) set `touch-action: none` further down and keep it. */
+* { touch-action: manipulation; }
+
+button, select, input, label, summary {
+  -webkit-tap-highlight-color: transparent;
+}
+button, label, summary {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 html, body {
   margin: 0;
   height: 100%;
