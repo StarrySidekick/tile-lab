@@ -383,6 +383,7 @@ const SFERA_GLAZE = {
   green: { lit: '#d8ecd2', body: '#7cb079', shade: '#335b3c', rim: '#24422c' },
   blue:  { lit: '#cfe0f2', body: '#6d94c9', shade: '#334a75', rim: '#243554' },
   red:   { lit: '#f2d6cd', body: '#c1786a', shade: '#6f3730', rim: '#4d2622' },
+  yellow:{ lit: '#f6ecc6', body: '#d3ae55', shade: '#6d5622', rim: '#4a3a17' },
 };
 
 /**
@@ -1192,6 +1193,21 @@ const MARK_ART = {
   },
 
   /**
+   * A DOUBLE zephyr: the same wind with a second arrowhead stacked behind the
+   * first. It opens at two squares rather than one, and the difference has to
+   * be visible from across the table — two chevrons is the shorthand every map
+   * uses for "and again", and it survives being shrunk to a quarter tile when
+   * a multi-way zephyr draws four of them.
+   */
+  zephyr2(ctx) {
+    MARK_ART.zephyr(ctx);
+    ctx.fillStyle = 'rgba(228,240,248,0.9)';
+    ctx.beginPath();
+    ctx.moveTo(0, -0.16); ctx.lineTo(0.22, 0.22); ctx.lineTo(-0.22, 0.22);
+    ctx.closePath(); ctx.fill();
+  },
+
+  /**
    * An Abbazia: a walled house that everything stops at. Drawn big and squared
    * off, against the temple's open ring — one of them ends what it touches,
    * the other blows it about, and you have to tell them apart at a glance.
@@ -1781,7 +1797,7 @@ function drawRiver(ctx, f) {
  * a shaft of daylight has nothing to cast a shadow with, and giving them one
  * turns a spring into a coin sitting on the grass.
  */
-const FLAT_MARKS = new Set(['mouth', 'spring', 'ford', 'shaft', 'hill', 'zephyr', 'ship']);
+const FLAT_MARKS = new Set(['mouth', 'spring', 'ford', 'shaft', 'hill', 'zephyr', 'zephyr2', 'ship']);
 
 /**
  * Draw a landmark centred at (x, y) in unit tile space.
@@ -2014,14 +2030,17 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     // A zephyr that blows more than one way is drawn as one gust per quarter,
     // pushed out toward its own edge and shrunk so four of them fit without
     // running into each other. One drawing, four facings, same as always.
+    // A double zephyr borrows a drawing of its own — same wind, second
+    // arrowhead — so "this one pushes twice" is legible on the tile.
+    const kind = m.kind === 'zephyr' && m.push > 1 ? 'zephyr2' : m.kind;
     if (m.dirs && m.dirs.length > 1) {
       for (const d of m.dirs) {
         const [vx, vy] = SIDE_VEC[d];
-        drawMark(ctx, m.kind, [0.5 + vx * 0.24, 0.5 + vy * 0.24], 0.32, L, d);
+        drawMark(ctx, kind, [0.5 + vx * 0.24, 0.5 + vy * 0.24], 0.32, L, d);
       }
       return;
     }
-    drawMark(ctx, m.kind, type.markSpots[i], 0.46, L, m.dir);
+    drawMark(ctx, kind, type.markSpots[i], 0.46, L, m.dir);
   });
 
   ctx.lineWidth = 0.02;

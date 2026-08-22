@@ -1119,6 +1119,7 @@ const PHASE_TEXT = {
   crop: 'A crop circle — choose what everyone does',
   rob: 'Post your robber on an opponent',
   balena: 'Send the Balena — click a tile within three squares',
+  flight: 'Click one of your followers on the flight to pick it up',
   'interior-place': 'Lay the next piece',
   'interior-move': 'Move, or hold',
   over: 'Game over',

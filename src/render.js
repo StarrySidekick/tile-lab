@@ -193,6 +193,7 @@ export class Renderer {
 
     if (game.phase === 'lift') this.drawCellTargets(game.m.allLiftable ? game.m.allLiftable() : liftableCells(game.board), THEME.violet, '107,90,140');
     if (game.phase === 'balena') this.drawCellTargets(game.m.balenaTargets(), THEME.teal, '95,191,174');
+    if (game.phase === 'flight') this.drawCellTargets(game.m.flightLifts(), THEME.teal, '95,191,174');
     if (game.phase === 'recall') this.drawCellTargets(game.myMeeples(), MOVE_COSTLY.line, MOVE_COSTLY.rgb);
     if (game.phase === 'walk') this.drawCellTargets(game.pendingWalk?.targets || [], MOVE_OK.line, MOVE_OK.rgb);
     if (game.phase === 'place') this.drawPlacementHints(game);

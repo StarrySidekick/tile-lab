@@ -117,7 +117,7 @@ const mark = (kind, on = null, dir = null) => ({ kind, on, dir });
  * carries a LIST of directions and `dir` is just the first of them, kept so
  * that everything which only knows about single-facing marks still works.
  */
-const zephyr = (dirs = [N]) => ({ kind: 'zephyr', on: null, dir: dirs[0], dirs });
+const zephyr = (dirs = [N], push = 1) => ({ kind: 'zephyr', on: null, dir: dirs[0], dirs, push });
 
 // --- World features ---------------------------------------------------------
 // Each spans tiles and merges like a city does, but scores its own way.
@@ -184,7 +184,7 @@ export const GROUPS = [
   { id: 'adventure', name: 'Adventure sites', note: 'Wayshrines, ruins, campsites, merchants.', classic: false, expedition: false, adventure: true },
   { id: 'marches', name: 'War terrain', note: 'Keeps, forts, hills, fords, beacons.', classic: false, expedition: false, adventure: false },
   { id: 'descent', name: 'Dangers', note: 'Stairs down, bandits, wolves, barrows.', classic: false, expedition: false, adventure: false },
-  { id: 'cloud', name: 'Cloud kingdom', note: 'Zephyrs, sferas in three colours, temples, windmill turbines, Abbazias, flying machines and windvanes.', classic: false, expedition: false, adventure: false },
+  { id: 'cloud', name: 'Cloud kingdom', note: 'Zephyrs, sferas in four colours, temples, windmill turbines, Abbazias, flying machines and windvanes.', classic: false, expedition: false, adventure: false },
   { id: 'mountains', name: 'Mountains', note: 'Pay the moment the chain grows, scaling with its size. Nothing can be claimed on them.', classic: false, expedition: false, adventure: false },
   { id: 'forests', name: 'Forests', note: '1 per tile, +1 per log. No complete/incomplete distinction — a forest is just as big as it is.', classic: false, expedition: false, adventure: false },
   { id: 'lakes', name: 'Lakes', note: 'Shores and corners, never all four sides. A city beside water is worth more.', classic: false, expedition: false, adventure: false },
@@ -334,6 +334,13 @@ export const TILE_TYPES = [
   { id: 'Kzw', n: 1, group: 'cloud', name: 'Trident wind',  feats: [], marks: [zephyr([N, E, W])], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
   { id: 'Kzq', n: 1, group: 'cloud', name: 'Compass rose',  feats: [], marks: [zephyr([N, E, S, W])], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
 
+  // The double zephyr: a gust that opens at TWO squares rather than one, and
+  // hardens from there like any other. Two of them, because a wind that starts
+  // where an ordinary one has to be helped to get is a thing that should
+  // happen twice a game rather than every other turn.
+  { id: 'Kzz',  n: 1, group: 'cloud', name: 'Double zephyr',      feats: [],             marks: [zephyr([N], 2)], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Kzzr', n: 1, group: 'cloud', name: 'Double zephyr road', feats: [road([E, W])], marks: [zephyr([N], 2)], fields: [[7, 0, 1, 2], [3, 4, 5, 6]] },
+
   // The Palazzo: the founding stone of the kingdom, and the only tile on the
   // board that was there before anybody played. Same connections as the base
   // set's start tile — a city gate with the road running under it — and no more
@@ -350,15 +357,18 @@ export const TILE_TYPES = [
   { id: 'Ktc', n: 2, group: 'cloud', name: 'Turbine corner', feats: [city([N, W])], marks: [mark('turbine', 0)], fields: [[2, 3, 4, 5]] },
 
   // The sfera: one edge is half a sphere and meets nothing but another sfera's.
-  // ANY two halves close a sphere, whatever colours they are, and the sphere
-  // calls in the harvest on the field it is lying in — with BOTH halves firing
-  // their own effect. Green counts the ground itself, blue the cities it feeds,
-  // red the temples standing on it.
+  // ANY two halves close a sphere, whatever colours they are — and closing one
+  // is how the kingdom is scored at all. Each half fires a scoring pass over
+  // one kind of thing, everywhere on the board:
   //
-  // So the pairing is the decision. Two greens double the ground; a green and a
-  // blue take a smaller field and the cities on it; and the half you are
-  // holding is worth different amounts depending on what you can find to put it
-  // against. Five shapes in each colour, one of each.
+  //   GREEN  the farms — a point for every two tiles of field
+  //   BLUE   the cities — 1 a tile unfinished, 2 a tile finished
+  //   RED    the temples — 1 for every tile standing around one
+  //   YELLOW the roads — 1 a tile, plus what each city it reaches is worth
+  //
+  // BOTH halves fire, so the pairing is the decision: two yellows score the
+  // roads twice, a yellow against a blue scores the roads and the cities once
+  // each. Five shapes in each colour, one of each.
   { id: 'Kso', n: 1, group: 'cloud', name: 'Green sfera',       feats: [sfera(N, 'green')], fields: [[2, 3, 4, 5, 6, 7]] },
   { id: 'Ksr', n: 1, group: 'cloud', name: 'Green sfera road',  feats: [sfera(N, 'green'), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
   { id: 'Ksc', n: 1, group: 'cloud', name: 'Green sfera wall',  feats: [sfera(N, 'green'), city([S])], fields: [[2, 3], [6, 7]] },
@@ -376,6 +386,12 @@ export const TILE_TYPES = [
   { id: 'Krc', n: 1, group: 'cloud', name: 'Red sfera wall',    feats: [sfera(N, 'red'), city([S])], fields: [[2, 3], [6, 7]] },
   { id: 'Krb', n: 1, group: 'cloud', name: 'Red sfera lane',    feats: [sfera(N, 'red'), road([S])], fields: [[2, 3, 4], [5, 6, 7]] },
   { id: 'Krx', n: 1, group: 'cloud', name: 'Red sfera span',    feats: [sfera(N, 'red'), city([E, W])], fields: [[4, 5]] },
+
+  { id: 'Kyo', n: 1, group: 'cloud', name: 'Yellow sfera',      feats: [sfera(N, 'yellow')], fields: [[2, 3, 4, 5, 6, 7]] },
+  { id: 'Kyr', n: 1, group: 'cloud', name: 'Yellow sfera road', feats: [sfera(N, 'yellow'), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
+  { id: 'Kyc', n: 1, group: 'cloud', name: 'Yellow sfera wall', feats: [sfera(N, 'yellow'), city([S])], fields: [[2, 3], [6, 7]] },
+  { id: 'Kyb', n: 1, group: 'cloud', name: 'Yellow sfera lane', feats: [sfera(N, 'yellow'), road([S])], fields: [[2, 3, 4], [5, 6, 7]] },
+  { id: 'Kyx', n: 1, group: 'cloud', name: 'Yellow sfera span', feats: [sfera(N, 'yellow'), city([E, W])], fields: [[4, 5]] },
 
   // End caps. A city has to be able to stop somewhere, and in a country that
   // keeps being rearranged it needs to be able to stop more often than the

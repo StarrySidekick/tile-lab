@@ -6,68 +6,66 @@
 // every tile on the board can be pushed, finished or not, and the only thing
 // that has ever stopped one is the whale lying on top of it.
 //
-// THE ZEPHYR is the engine — twenty of them in a seventy-two tile deck. Play
-// one and it blows down its lane: everything in that row or column, downwind,
-// slides along. A gust that runs over a zephyr blowing the SAME way absorbs it
-// and blows a square harder beyond it, up to three — never harder upon it, so
-// a zephyr is never shoved along by its own breath. A zephyr pointing ANY
+// THE ZEPHYR is the engine — twenty-two of them in the deck. Play one and it
+// blows down its lane: everything in that row or column, downwind, slides
+// along, and THE ZEPHYR GOES WITH IT, one square into the hole it just opened.
+// Without that it was a permanent hole-maker, shoving the country away from
+// itself and then sitting in the gap. Two DOUBLE ZEPHYRS open at two squares
+// rather than one; a gust that runs over a zephyr blowing the SAME way absorbs
+// it and blows a square harder beyond it, up to three — never harder upon it,
+// so a zephyr is never shoved along by its own breath. A zephyr pointing ANY
 // OTHER way is woken rather than absorbed: the storm turns and carries on down
 // the new zephyr's lane, in the new zephyr's direction. Across the wind, back
 // into it, it makes no difference — a line of zephyrs is a chain reaction that
 // turns corners. What keeps it finite is that no zephyr contributes the same
-// direction to the same storm twice.
+// direction to the same storm twice. The ones that blow several ways at once
+// don't travel: there is no answer to which way a compass rose would go, so it
+// stands still in the hole it makes of its own neighbourhood, and usually falls
+// through it.
 //
-// A TILE THAT LANDS TOUCHING NOTHING ORTHOGONALLY falls out of the sky, back
-// to the bottom of the deck — and whoever set the wind off may catch one and
-// throw it straight back down, taking a second placement while the hole the
+// A TILE TOUCHING NOTHING ORTHOGONALLY falls out of the sky, back to the bottom
+// of the deck — and that is asked of every tile after a gust, not only the ones
+// that moved, because a tile the wind never touched is left hanging when the
+// neighbours holding it up slide away. Whoever set the wind off may catch one
+// and throw it straight back down, taking a second placement while the hole the
 // wind just made is still open. Once a turn.
 //
-// FOLLOWERS ARE WEATHER TOO. Once a figure is on the board it never comes off
-// by choice: a gust blows it the same distance as everything else in its lane,
-// and it takes up whatever it lands in. Blown over open sky, it goes back to
-// its owner's hand. That is the only way home for a knight — and it is why a
-// follower STAYS in a city that finishes. The city is a thing that can be
-// blown open again, and the figure standing in it is the record of who owns
-// it. Only farmers ever walk home off a scored feature.
+// FOLLOWERS ARE WEATHER TOO, and they STAY. A figure put down is a figure that
+// stays down: it is never handed back for having scored, because in this mode
+// a feature scores over and over and the figure standing in it is the record of
+// whose it is. Nine of them each rather than seven, because they do not come
+// back. Exactly two things take one off the board — a gust that carries it out
+// over open sky, and your own flying machine going out to fetch it.
 //
-// WHAT SCORES, AND WHAT UN-SCORES:
+// NOTHING IS PAID FOR BEING FINISHED. The sferas are the scoring engine, and
+// closing a sphere is the event the whole mode turns on: each of its two halves
+// fires a scoring pass over one kind of thing, EVERYWHERE ON THE BOARD, paying
+// whoever is standing in each one.
 //
-//   A CITY pays 2 a tile the FIRST time it finishes, and only ever to somebody
-//     standing in it — an empty city is a nice piece of country worth nothing.
-//     After that it is worth 1 a tile, down every time the wind blows it open
-//     and up every time it closes again. So a city you finish and then lose is
-//     still ahead; what the weather takes is the difference between holding it
-//     and having held it. The WINDMILL is the reason to build around one:
-//     every turbine standing in a city that finishes pays 2 to whoever laid
-//     the last tile, and no wind ever takes that back.
-//   A ROAD is nobody's. You don't claim it; you finish it, and finishing it
-//     pays you 1 a tile. What makes a road worth building is what it ARRIVES
-//     at: every city or temple it runs into pays 2 to whoever holds that city
-//     or temple — which is very often not you. Roads are the mode's diplomacy.
-//   A FARM is harvested when a SPHERE CLOSES, and the COLOURS of the sphere's
-//     two halves decide what the harvest counts on the field it is lying in.
-//     GREEN pays 1 a tile of farmland, BLUE 2 a finished city the field feeds,
-//     RED 2 a temple standing on it — and BOTH HALVES FIRE. Any half fits any
-//     other, so pairing is the decision: two greens double the ground, a green
-//     against a blue takes a smaller field and the cities on it. The farmers
-//     then walk home — the only figures in the mode that ever leave a scored
-//     feature under their own steam.
-//   AN ISLAND pays more of everything. Roads 2 a tile, cities 3, farms double
-//     — and at the end of the game a flat 10 to whoever has a follower
-//     standing on more separate islands than anybody else.
-//   A TEMPLE pays as it goes: 1 to its keeper for every tile LAID in the eight
-//     squares around it, 2 for every tile the wind BLOWS in.
+//   GREEN  the farms — a point for every two tiles of field
+//   BLUE   the cities — 1 a tile for one still open, 2 a tile once it has closed
+//   RED    the temples — 1 for every tile standing in the eight around one
+//   YELLOW the roads — 1 a tile, plus 1 for each city the road reaches and 2
+//            if that city has closed, whoever owns the far end
 //
-// AT THE END the sky settles up, the way Carcassonne does, bent to a board
-// that never settled. The islands are counted off the board exactly as play
-// left it. Every farm still being worked is harvested once more, with every
-// UNPAIRED half lying in the field firing as though you had found it a
-// partner — so a sfera you could never place against another is a standing
-// instruction rather than a wasted tile. A field with no loose half on it is
-// counted blue, the ordinary Carcassonne farm. And a
-// city that never finished at all pays 1 a tile — while one that finished and
-// was blown open pays nothing more, because it was already paid in full and
-// already gave a point a tile back. That is the whole of its account.
+// Any half fits any other, and BOTH fire: two yellows score the roads twice
+// over, a yellow against a blue scores the roads and the cities once each. So
+// the question every turn is never "can I close this" but "will a sphere close
+// while I am still standing in it" — and finishing a city is not a payday, it
+// is a rate change on every blue sphere still to come.
+//
+// Two things still pay outside the spheres, both small and both deliberate. A
+// TEMPLE takes an offering for every tile that arrives in its parish — 1 for
+// one a player laid, 2 for one the wind blew in. And a WINDMILL pays 2 to
+// whoever lays the tile that closes its city, which is the one guaranteed
+// point on the board.
+//
+// AN ISLAND pays exactly DOUBLE, all of it — and at the end a flat 10 goes to
+// whoever has a follower standing on more separate islands than anybody else.
+//
+// AT THE END the sky fires every colour once, plus once more for every
+// half-sphere still lying around unpaired. A sfera you could never find a
+// partner for is a colour you get one more of when the wind drops.
 //
 // THE PALAZZO is what "mainland" means. Whichever piece of country the seat of
 // government is standing on is the kingdom; every other group of two or more
@@ -93,14 +91,18 @@
 // without ever meeting anything. It is also perfectly blowable — and when it
 // goes, everything it was holding shut is open country again.
 //
-// THE FLYING MACHINE points down a lane. Place one and your follower may go on
-// ANY tile out along that lane rather than only the tile you just laid — an
-// island included, which is the one way to reach one on purpose.
+// THE FLYING MACHINE points down a lane, and does one of three things along it.
+// It can put a NEW follower on any tile out there — an island included, which
+// is the one way to reach one on purpose. It can go and FETCH one of yours off
+// the lane, back into your supply. Or it can fetch one and SET IT DOWN again
+// further along the same flight, which is the only way a figure in this mode
+// ever moves anywhere on purpose.
 //
-// The thesis is in one line: NOTHING IS SETTLED. A city is finished until the
-// weather says otherwise, the mainland is wherever the Palazzo happens to be
-// this turn, and the only permanent thing on the board is a whale that anyone
-// can move.
+// The thesis is in one line: NOTHING IS SETTLED AND NOTHING IS BANKED. A city
+// is finished until the weather says otherwise, the mainland is wherever the
+// Palazzo happens to be this turn, what you hold is only worth anything at the
+// moment somebody closes a sphere, and the only permanent thing on the board is
+// a whale that anyone can move.
 // ---------------------------------------------------------------------------
 
 import { Mode } from './mode.js';
@@ -113,7 +115,13 @@ import {
   storm, zephyrDirs, worldDir, turbineOn, isTemple, MAX_STRENGTH,
 } from '../wind.js';
 
-const DECK_SIZE = 72;        // a full Carcassonne set's worth of country
+/**
+ * Bigger than a Carcassonne set, because the cloud pool alone is now 65 tiles
+ * and four sfera colours want four different kinds of country to count. Cut to
+ * 72 and the base tiles that carry the ordinary cities, roads and fields came
+ * to seven, which is a board with nothing on it for three of the four colours.
+ */
+const DECK_SIZE = 88;
 /**
  * The backstop, in tiles laid rather than rounds played. Counting placements
  * is the only clock that means the same thing at every player count, and this
@@ -129,40 +137,36 @@ const MAX_CHAIN = 6;         // storms raised while a storm is still landing
 const FLIGHT_RANGE = 24;     // squares, before we assume the zephyrs are a loop
 const BALENA_RANGE = 3;      // squares the whale swims in one turn
 const ARCHIPELAGO = 10;      // at the end, to whoever stands on the most islands
+const EXTRA_FOLLOWERS = 2;   // …on top of everyone's usual seven
+const SUPPLY = 9;            // …which is what the panel draws
 
 /**
- * What everything pays, on the mainland and out on an island. Islands pay more
- * of everything, and you cannot build onto one: the only ways to be there are
- * to have been blown there, to have been there when the country came apart, or
- * to have flown. That premium is the whole reason to take any of those.
+ * What everything pays, on the mainland and out on an island — and everything
+ * out on an island pays exactly DOUBLE. Nothing here is paid for finishing;
+ * it is all paid by a sphere closing, over the whole board at once.
  */
 const RATE = {
-  city: { main: 2, isle: 3 },     // per tile, the FIRST time it finishes
-  road: { main: 1, isle: 2 },     // per tile, to whoever finishes it
-  // …and per tile, at the very end, for a city that never finished at all.
-  cityOpen: { main: 1, isle: 2 },
-  /**
-   * The harvest, by the colour of the sphere that called it in. Green counts
-   * the ground, blue counts what the ground feeds, red counts what is standing
-   * on it — so the field worth planting depends on which sfera you are holding,
-   * which is the whole reason the sfera has colours.
-   */
-  farm: {
-    green: { of: 'tiles', main: 1, isle: 2, what: 'tile of farmland' },
-    blue: { of: 'cities', main: 2, isle: 4, what: 'finished city' },
-    red: { of: 'temples', main: 2, isle: 4, what: 'temple' },
-  },
+  farm: { main: 1, isle: 2, per: 2 },     // per `per` tiles of field
+  cityOpen: { main: 1, isle: 2 },         // per tile, unfinished
+  cityDone: { main: 2, isle: 4 },         // per tile, finished
+  temple: { main: 1, isle: 2 },           // per tile standing around it
+  road: { main: 1, isle: 2 },             // per tile
+  roadCity: { main: 1, isle: 2 },         // …plus this per city the road reaches
+  roadCityDone: { main: 2, isle: 4 },     // …and this if that city is finished
 };
 
 /**
- * A city is worth 2 a tile ONCE. After that it is worth 1 a tile, down when
- * the wind blows it open and up when it closes again — flat, on the mainland
- * and on an island alike, because it is the oscillation that is being priced
- * rather than the country. So a city you finish and then lose is still ahead;
- * what you lose is the difference between holding it and having held it.
+ * What each sfera colour counts when its half of a sphere fires. Each is a
+ * scoring pass over one kind of thing, EVERYWHERE ON THE BOARD, paying whoever
+ * holds each one — which is why closing a sphere is the event the whole mode
+ * turns on rather than a bonus on top of it.
  */
-const CITY_AGAIN = 1;           // per tile, every closure after the first
-const CITY_BACK = 1;            // per tile, every time it is blown open again
+const COLOURS = {
+  green: 'the farms',
+  blue: 'the cities',
+  red: 'the temples',
+  yellow: 'the roads',
+};
 
 /** The colour of the half-sphere on a tile, if there is one. */
 const sferaHue = (cell) =>
@@ -240,7 +244,13 @@ export class Girando extends Mode {
   }
 
   setup() {
+    // Two more followers than anywhere else. Nothing here ever comes home off
+    // a scored feature — a figure is put down and stays down — so a supply of
+    // seven is a supply you run out of halfway through and then watch the
+    // spheres go off without you.
+    for (const p of this.game.players) p.meeples += EXTRA_FOLLOWERS;
     this.flight = null;
+    this.lifted = null;
     this.laid = 0;
     this.gusts = 0;
     this.fallen = 0;
@@ -253,7 +263,6 @@ export class Girando extends Mode {
     this.caught = false;       // a tile fell into our hands this turn
     this.balenaMoved = false;  // …and the whale has already swum this turn
     this.paidRing = new Set(); // "temple|tile" pairs already paid this turn
-    this.owed = new Set();     // city payouts still owed back if the wind opens them
     // The whale starts asleep over the seat of government. Nothing else is on
     // the board yet for it to lie on, and the first player who wants the
     // Palazzo blowable has only to move it.
@@ -319,9 +328,8 @@ export class Girando extends Mode {
     return { onto: this.land().mainKeys };
   }
 
-  /** Roads belong to nobody now, and an island is somewhere you're blown to. */
-  claimAllowed({ x, y, f }) {
-    if (f.type === 'road') return false;
+  /** An island is somewhere you are blown or flown to, never walked onto. */
+  claimAllowed({ x, y }) {
     return !this.onIsland(this.game.board.get(x, y));
   }
 
@@ -348,6 +356,7 @@ export class Girando extends Mode {
 
   endTurn() {
     this.flight = null;
+    this.lifted = null;
     this.paidRing.clear();
     this.caught = false;
     this.balenaMoved = false;
@@ -450,101 +459,159 @@ export class Girando extends Mode {
       const cells = board.cellsOf(d);
       if (cells.every((c) => c.sphered)) continue;          // an old one
       for (const c of cells) c.sphered = true;
-      // BOTH halves fire. Two greens is the green harvest twice over; a green
-      // against a blue is one of each. The pairing is the decision, and it is
-      // why any half fits any other — a colour you have no partner for is
-      // still worth playing against whatever you can reach.
+      // BOTH halves fire. Two yellows score the roads twice over; a yellow
+      // against a blue scores the roads and the cities once each. The pairing
+      // is the decision, and it is why any half fits any other — a colour you
+      // have no partner for is still worth playing against whatever you can
+      // reach.
       const hues = cells.map(sferaHue).filter(Boolean);
       this.spheres++;
       for (const h of hues) this.hues[h] = (this.hues[h] || 0) + 1;
       const names = tallyOf(hues).map(([h]) => h);
-      this.game.say(`A ${listOf(names)} sphere closes, and calls in the harvest on the field `
-        + `beneath it — ${listTally(hues, (h) => `${RATE.farm[h].main} a ${RATE.farm[h].what}`)}.`);
+      this.game.say(`A ${listOf(names)} sphere closes — the sky scores `
+        + `${listTally(hues, (h) => COLOURS[h])}.`);
       this.game.emit('landmark');
-      this.harvest(cells, hues);
+      for (const h of hues) this.fire(h);
     }
   }
 
-  /** Score every field the closing sphere's own tiles are lying in. */
-  harvest(cells, hues) {
-    const board = this.game.board;
-    const done = new Set();
-    let paid = 0;
-    for (const cell of cells) {
-      cell.type.feats.forEach((f, i) => {
-        if (f.type !== 'field') return;
-        const field = board.featureOf(cell.x, cell.y, i);
-        if (!field || done.has(field)) return;
-        done.add(field);
-        if (this.scoreFarm(field, hues)) paid++;
-      });
+  /**
+   * One half-sphere going off: a scoring pass over one kind of thing, over the
+   * whole board, paying whoever holds each one. Nothing in Girando is paid for
+   * being finished any more — finishing a city changes what it is worth when a
+   * blue sphere next closes, and that is all. Which means the question every
+   * turn is not "can I close this" but "will a sphere close while I am still
+   * standing in it".
+   */
+  fire(hue) {
+    switch (hue) {
+      case 'green': return this.scoreFarms();
+      case 'blue': return this.scoreCities();
+      case 'red': return this.scoreTemples();
+      case 'yellow': return this.scoreRoads();
+      default: return undefined;
     }
-    if (!paid) this.game.say('…and there is nobody farming it.');
+  }
+
+  /** Which of a rate pair applies to a component, by where it is standing. */
+  rate(kind, cells) {
+    return this.onIsland(cells[0]) ? RATE[kind].isle : RATE[kind].main;
   }
 
   /**
-   * What a field is worth under ONE half-sphere. A closed sphere calls this
-   * twice, once per half; the colour picks what gets counted, and the field it
-   * is counted over is the same field either way:
-   *
-   *   GREEN counts the GROUND — a point a tile, so the sprawling field nobody
-   *     built anything on is suddenly the valuable one.
-   *   BLUE counts what the ground FEEDS — two a finished city, which is the
-   *     nearest thing to Carcassonne's own farm and the one that rewards
-   *     farming beside your own building.
-   *   RED counts what is STANDING on it — two a temple, and a temple is
-   *     already the thing you were garrisoning for its own income.
-   *
-   * Doubled out on an island, like everything else out there.
+   * GREEN — the farms. A point for every two tiles of field, doubled to a
+   * point a tile out on an island. It is the one colour that pays for GROUND
+   * rather than for anything built on it, so the sprawling field nobody wanted
+   * is suddenly the thing worth holding.
    */
-  farmValue(field, hue) {
+  scoreFarms() {
     const board = this.game.board;
-    const rule = RATE.farm[hue] || RATE.farm.green;
-    const cells = board.cellsOf(field);
-    const per = this.onIsland(cells[0]) ? rule.isle : rule.main;
-    let n = 0;
-    if (rule.of === 'tiles') n = field.tiles.size;
-    else if (rule.of === 'cities') n = citiesFed(board, field).size;
-    else n = cells.filter(isTemple).length;
-    return { pts: n * per, n, per, rule, cells };
+    for (const d of board.allComponents()) {
+      if (d.type !== 'field' || !d.meeples.length) continue;
+      const cells = board.cellsOf(d);
+      if (!cells.length) continue;
+      const per = this.rate('farm', cells);
+      const pts = Math.floor(d.tiles.size / RATE.farm.per) * per;
+      this.payHolders(d, pts,
+        `Farm of ${d.tiles.size} tile${d.tiles.size === 1 ? '' : 's'}`
+        + `${per > RATE.farm.main ? ' out on an island' : ''}`, cells);
+    }
   }
 
   /**
-   * A farm pays whoever has the most farmers lying in it, once for EVERY half
-   * of the sphere that called the harvest in. Unlike every other figure in the
-   * mode, a farmer that has been paid walks home.
+   * BLUE — the cities. 1 a tile for one still open, 2 a tile for one that has
+   * closed, doubled on an island. Finishing a city no longer pays anything by
+   * itself; what it does is put the city on the higher rate for every blue
+   * sphere that closes afterwards, which is a much longer bet.
    */
-  scoreFarm(field, hues) {
-    const g = this.game;
-    const board = g.board;
-    if (!field.meeples.length) return false;
-    const winners = board.majority(field);
-    const parts = hues.map((h) => this.farmValue(field, h));
-    const pts = parts.reduce((n, v) => n + v.pts, 0);
-    const cells = parts[0].cells;
-    if (pts > 0 && winners.length) {
-      const how = parts.filter((v) => v.pts).map((v) =>
-        `${v.n} ${v.rule.what}${v.n === 1 ? '' : 's'} at ${v.per}`);
-      for (const p of winners) {
-        this.pay(p, pts,
-          `Farm of ${field.tiles.size} — ${listTally(how)}`
-          + `${parts.some((v) => v.per > v.rule.main) ? ' out on an island' : ''}`
-          + ` — ${g.players[p].name}`,
-          cells.map((c) => ({ x: c.x, y: c.y })));
+  scoreCities() {
+    const board = this.game.board;
+    for (const d of board.allComponents()) {
+      if (d.type !== 'city' || !d.meeples.length) continue;
+      const cells = board.cellsOf(d);
+      if (!cells.length) continue;
+      const done = d.open === 0;
+      const per = this.rate(done ? 'cityDone' : 'cityOpen', cells);
+      this.payHolders(d, per * d.tiles.size,
+        `${done ? 'A finished' : 'An unfinished'} city of ${d.tiles.size} tile${d.tiles.size === 1 ? '' : 's'}`
+        + `${per > RATE[done ? 'cityDone' : 'cityOpen'].main ? ' out on an island' : ''}`, cells);
+    }
+  }
+
+  /**
+   * RED — the temples. A point for every tile standing in the eight squares
+   * around one, doubled on an island. A temple already pays its keeper for
+   * every tile that ARRIVES in the parish; red pays them again for the parish
+   * as it stands, so a temple built early and kept is the compounding piece.
+   */
+  scoreTemples() {
+    const board = this.game.board;
+    for (const cell of board.cells.values()) {
+      if (!isTemple(cell) || !cell.meeple) continue;
+      const around = board.surroundCount(cell.x, cell.y);
+      if (!around) continue;
+      const per = this.onIsland(cell) ? RATE.temple.isle : RATE.temple.main;
+      this.pay(cell.meeple.player, around * per,
+        `A temple with ${around} tile${around === 1 ? '' : 's'} around it`
+        + `${per > RATE.temple.main ? ' out on an island' : ''}`
+        + ` — ${this.game.players[cell.meeple.player].name}`,
+        [{ x: cell.x, y: cell.y }]);
+    }
+  }
+
+  /**
+   * YELLOW — the roads. A point a tile, plus what each city the road runs into
+   * is worth: 1 for one still open, 2 for one that has closed. WHOSE city that
+   * is doesn't matter — a road is paid for what it reaches, not for who owns
+   * the far end, which is what makes building into somebody else's country a
+   * thing worth doing rather than a favour.
+   */
+  scoreRoads() {
+    const board = this.game.board;
+    for (const d of board.allComponents()) {
+      if (d.type !== 'road' || !d.meeples.length) continue;
+      const cells = board.cellsOf(d);
+      if (!cells.length) continue;
+      const isle = this.onIsland(cells[0]);
+      const per = isle ? RATE.road.isle : RATE.road.main;
+      let pts = per * d.tiles.size;
+      // Cities the road arrives at, deduped: one city sprawling over four of
+      // the road's tiles is one city and is counted once.
+      const seen = new Set();
+      let reached = 0;
+      for (const cell of cells) {
+        cell.type.feats.forEach((f, i) => {
+          if (f.type !== 'city') return;
+          const city = board.featureOf(cell.x, cell.y, i);
+          if (!city) return;
+          const root = board.find(city.parts[0]);
+          if (seen.has(root)) return;
+          seen.add(root);
+          reached++;
+          const key2 = city.open === 0 ? 'roadCityDone' : 'roadCity';
+          pts += isle ? RATE[key2].isle : RATE[key2].main;
+        });
       }
-    } else {
-      g.say(winners.length
-        ? `A farm is harvested, and there is nothing on it the ${listOf(tallyOf(hues).map(([h]) => h))} sphere counts.`
-        : 'A farm is harvested with nobody holding it.');
+      this.payHolders(d, pts,
+        `Road of ${d.tiles.size} tile${d.tiles.size === 1 ? '' : 's'}`
+        + `${reached ? ` into ${reached} cit${reached === 1 ? 'y' : 'ies'}` : ''}`
+        + `${isle ? ' out on an island' : ''}`, cells);
     }
-    // Home they go — the only figures in Girando that ever leave a scored
-    // feature under their own steam.
-    for (const m of board.reclaim(field)) {
-      g.players[m.player].meeples++;
-      if (m.big) g.players[m.player].big++;
-      g.emit('meeple', { recall: true, player: m.player, at: { x: m.x + 0.5, y: m.y + 0.5 } });
+  }
+
+  /**
+   * Pay a component's majority. Followers STAY where they are: a feature here
+   * can be scored many times over, and the figure standing in it is the record
+   * of whose it is. Only the wind and a friendly flying machine ever take one
+   * off the board.
+   */
+  payHolders(d, pts, line, cells) {
+    if (pts <= 0) return;
+    const g = this.game;
+    const where = cells.map((c) => ({ x: c.x, y: c.y }));
+    for (const p of g.board.majority(d)) {
+      this.pay(p, pts, `${line} — ${g.players[p].name}`, where);
     }
-    return true;
   }
 
   // --- the Balena -----------------------------------------------------------
@@ -595,7 +662,10 @@ export class Girando extends Mode {
    * The whale is spent INSTEAD of a follower, so the step has to stay open for
    * as long as there is a whale to send.
    */
-  holdsMeeplePhase() { return !this.balenaMoved && this.balenaTargets().length > 0; }
+  holdsMeeplePhase() {
+    return !!this.lifted || this.flightLifts().length > 0
+      || (!this.balenaMoved && this.balenaTargets().length > 0);
+  }
 
   /** Instead of putting a follower down: send the whale somewhere. */
   beginSwim() {
@@ -606,6 +676,7 @@ export class Girando extends Mode {
   }
 
   onCellClick(x, y) {
+    if (this.game.phase === 'flight') return this.liftAt(x, y);
     if (this.game.phase !== 'balena') return false;
     if (!this.balenaTargets().some((t) => t.x === x && t.y === y)) return false;
     this.balena = { x, y };
@@ -658,22 +729,81 @@ export class Girando extends Mode {
    * Anywhere along that flight will do — and unlike an ordinary claim, it
    * doesn't matter whether somebody already holds the feature, and the island
    * rule doesn't apply. Flying out to one is the one way to CHOOSE to be
-   * there. What it can't do is land on a tile with a figure standing on it,
-   * or take a road, because roads are nobody's.
+   * there. What it can't do is land on a tile with a figure already on it.
+   *
+   * If a follower has been LIFTED off the path, the flight carries on from
+   * where it picked them up: only squares further along the lane are offered,
+   * because the machine is flying, not turning round.
    */
   flightTargets() {
     if (!this.flight) return [];
     const board = this.game.board;
+    const from = this.lifted ? this.lifted.step + 1 : 0;
     const out = [];
-    for (const cell of this.flight) {
-      if (!board.get(cell.x, cell.y) || cell.meeple) continue;
+    this.flight.forEach((cell, step) => {
+      if (step < from) return;
+      if (!board.get(cell.x, cell.y) || cell.meeple) return;
       for (const { i, f } of claimableFeatures(cell.type, { fields: this.game.has('fields') })) {
-        if (f.type === 'road') continue;
         if (!board.featureOf(cell.x, cell.y, i)) continue;
         out.push({ x: cell.x, y: cell.y, i, f, flying: true });
       }
-    }
+    });
     return out;
+  }
+
+  // --- the flying machine's other two verbs ---------------------------------
+  //
+  // A machine can put a follower DOWN on its lane, or it can pick one UP. The
+  // second is the one that matters in a mode where nothing else ever comes
+  // home: a figure you put in a city three storms ago, out on a rock you have
+  // stopped caring about, is a figure you can go and fetch. Having fetched it
+  // you may set it down again further along the same flight, or bring it home.
+
+  /** Your own followers standing along this turn's flight. */
+  flightLifts() {
+    if (!this.flight || this.lifted) return [];
+    const board = this.game.board;
+    const out = [];
+    this.flight.forEach((cell, step) => {
+      if (board.get(cell.x, cell.y) !== cell) return;
+      if (cell.meeple?.player !== this.game.current) return;
+      out.push({ x: cell.x, y: cell.y, step });
+    });
+    return out;
+  }
+
+  canLift() {
+    return this.game.phase === 'meeple' && this.flightLifts().length > 0;
+  }
+
+  beginLift() {
+    if (!this.canLift()) return false;
+    this.game.phase = 'flight';
+    this.game.say(`${this.game.player.name} sends the flying machine down the lane to pick somebody up.`);
+    return true;
+  }
+
+  /**
+   * Lift one off. The follower goes straight back into its owner's supply,
+   * which is also how it gets spent again if they set it down further along —
+   * placing takes one out of the supply, so a lift-and-place nets to nothing
+   * and a lift-and-leave gives a follower back.
+   */
+  liftAt(x, y) {
+    const spot = this.flightLifts().find((o) => o.x === x && o.y === y);
+    if (!spot) return false;
+    const g = this.game;
+    const cell = g.board.get(x, y);
+    const m = cell.meeple;
+    g.sendHome(cell);
+    this.lifted = { step: spot.step, from: { x, y }, big: !!m.big };
+    g.board.rebuild();
+    g.phase = 'meeple';
+    g.say(`${g.player.name}'s follower is lifted off (${x}, ${y}) — it may ride on down the lane, or go home.`);
+    g.emit('meeple', { recall: true, player: m.player, at: { x: x + 0.5, y: y + 0.5 } });
+    // Nowhere further to set it down: the flight ends and so does the turn.
+    if (!this.flightTargets().length && !g.meepleOptions().length) g.endTurn();
+    return true;
   }
 
   // --- the weather ----------------------------------------------------------
@@ -736,7 +866,6 @@ export class Girando extends Mode {
     let caught = 0;
     for (const f of r.fell) {
       this.fallen++;
-      this.refundCity(f.cell);          // whatever it was part of is open again
       g.deck.unshift(f.id);
       caught++;
     }
@@ -829,13 +958,14 @@ export class Girando extends Mode {
 
   /**
    * …and the wind can UN-finish things. An Abbazia was capping that road; the
-   * wind took the Abbazia away, and the road is open country again. It has to
-   * stop counting as scored, or it can never pay a second time — and if it was
-   * a CITY, the 2 a tile it paid is taken straight back off whoever took it.
+   * wind took the Abbazia away, and the road is open country again. Nothing is
+   * taken back — nothing was paid for finishing in the first place — but it
+   * has to stop counting as scored, or its windmills can never pay again and a
+   * blue sphere would keep paying it at the finished rate for a city that is
+   * standing open.
    */
   reopen() {
     const board = this.game.board;
-    this.chargeDeparted();
     for (const d of board.allComponents()) {
       if (!d.scored) continue;
       const done = CENTRE_FEATURES.has(d.type)
@@ -843,83 +973,7 @@ export class Girando extends Mode {
         : d.open === 0;
       if (done) continue;
       board.unmark(d);
-      if (d.type === 'city') this.refundCityComponent(d);
       this.game.say(`The ${d.type} at (${d.at.x}, ${d.at.y}) is open country again.`);
-    }
-  }
-
-  /**
-   * Take a city's payment back — ONE a tile, not the whole of it. Finishing a
-   * city is worth keeping something for: what the wind takes when it blows one
-   * open is the difference between holding it and having held it, and closing
-   * it again pays that same one a tile straight back.
-   *
-   * Tile by tile, because a city blown open is usually a city blown APART, and
-   * each of the pieces reopens on its own. Charging each piece for its own
-   * tiles is what makes the total come out right however many pieces there
-   * are — including the piece that sailed off the edge of the world, which is
-   * charged as it falls.
-   */
-  refundCityComponent(d) {
-    const board = this.game.board;
-    const owed = new Map();
-    for (const cell of board.cellsOf(d)) {
-      const i = board.featIndexOn(cell, d);
-      if (i == null) continue;
-      this.takeBack(cell, i, owed);
-    }
-    this.settleBack(owed, d.at);
-  }
-
-  /** A tile leaving the board is charged for whatever it was still holding. */
-  refundCity(cell) {
-    if (!cell?.cityPaid) return;
-    const owed = new Map();
-    for (const k of Object.keys(cell.cityPaid)) this.takeBack(cell, k, owed);
-    this.settleBack(owed, cell);
-  }
-
-  /**
-   * One tile's worth, into the running tally. The record stays behind with
-   * `live` cleared: the debt is settled, but the tile has still been part of a
-   * finished city, which is what makes its next closure worth 1 rather than 2.
-   */
-  takeBack(cell, i, owed) {
-    this.charge(cell.cityPaid?.[i], owed);
-  }
-
-  /** One live record, settled once. */
-  charge(rec, owed) {
-    if (!rec || !rec.live) return;
-    rec.live = false;
-    this.owed.delete(rec);
-    for (const p of rec.players) owed.set(p, (owed.get(p) || 0) + CITY_BACK);
-  }
-
-  /**
-   * The backstop for a tile that left the board by some route other than being
-   * blown off the edge of it. Every live record is held here as well as on its
-   * tile, so a tile that has gone can still be charged for its point — the
-   * component sweep can only ever see the tiles that are still there.
-   */
-  chargeDeparted() {
-    const board = this.game.board;
-    const owed = new Map();
-    let at = null;
-    for (const rec of [...this.owed]) {
-      if (board.get(rec.cell.x, rec.cell.y) === rec.cell) continue;
-      at = at || rec.cell;
-      this.charge(rec, owed);
-    }
-    if (at) this.settleBack(owed, at);
-  }
-
-  /** …and paid out as one line per player, rather than one per tile. */
-  settleBack(owed, at) {
-    for (const [p, n] of owed) {
-      this.pay(p, -n,
-        `A city blown open again — ${this.game.players[p].name} gives back a point a tile`,
-        [{ x: at.x, y: at.y }]);
     }
   }
 
@@ -945,148 +999,48 @@ export class Girando extends Mode {
   // --- closing --------------------------------------------------------------
 
   onClosed(d, closer) {
-    if (d.type === 'sfera' || d.type === 'field') return;   // a sphere is a rule, not a score
-    if (d.type === 'temple') return this.templeCloses(d);
     if (d.type === 'city') return this.cityCloses(d, closer);
-    if (d.type === 'road') return this.roadCloses(d, closer);
+    if (d.type === 'temple') return this.templeCloses(d);
   }
 
   /**
-   * A city pays 2 a tile — 3 out on an island — and only ever to somebody
-   * standing in it. The followers STAY: a city here is a thing that can be
-   * blown open and finished again, and the figure in it is the only record of
-   * whose it was. The windmills are the half that never comes back: 2 apiece
-   * to whoever laid the tile that closed the city, whatever the weather does
-   * to it afterwards.
+   * Finishing a city pays nothing. What it does is put the city on the higher
+   * rate — 2 a tile instead of 1 — for every blue sphere that closes after,
+   * which is a longer and much more interesting bet than a lump sum.
+   *
+   * The WINDMILL is the one thing left in the mode that is paid for finishing
+   * anything: 2 to whoever laid the closing tile, per turbine standing in the
+   * city, and no wind ever takes it back. It is the only guaranteed point on
+   * the board and it is deliberately small.
    */
   cityCloses(d, closer) {
     const g = this.game;
     const board = g.board;
     const cells = board.cellsOf(d);
-    if (!cells.length) return;
-    const per = this.rateFor('city', cells);
-    const winners = board.majority(d);
-    const where = cells.map((c) => ({ x: c.x, y: c.y }));
-
-    if (winners.length) {
-      // The ledger is kept TILE BY TILE, not city by city, because a city is
-      // not a stable object here: the wind splits one into two and shoves two
-      // into one, and only the tiles carry anything through that. A tile that
-      // has been part of a finished city before is worth 1; one that never has
-      // is worth the full rate. So a fresh wing built onto an old city pays
-      // properly for the new ground and nothing twice for the old.
-      let pts = 0;
-      let fresh = 0;
-      for (const cell of cells) {
-        const i = board.featIndexOn(cell, d);
-        if (i == null) continue;
-        const been = cell.cityPaid?.[i];
-        if (been) pts += CITY_AGAIN; else { pts += per; fresh++; }
-      }
-      for (const p of winners) {
-        this.pay(p, pts,
-          `City of ${d.tiles.size} tile${d.tiles.size > 1 ? 's' : ''}`
-          + `${fresh < cells.length ? ' closes again' : (per > RATE.city.main ? ' out on an island' : '')}`
-          + ` — ${g.players[p].name}`, where);
-      }
-      // Stamped on every tile with who is owed, so the wind can find it again
-      // to take it back — whichever of those tiles is still there to be found.
-      // `live` is the outstanding half; the record itself outlives the refund,
-      // because "this tile has been in a finished city before" is what makes
-      // the next closure worth 1 rather than 2.
-      for (const cell of cells) {
-        const i = board.featIndexOn(cell, d);
-        if (i == null) continue;
-        // One record per tile per city feature, for the whole game: reused
-        // rather than replaced, so `owed` can never accumulate a superseded
-        // entry for ground that has already been paid for again.
-        cell.cityPaid = cell.cityPaid || {};
-        const rec = cell.cityPaid[i] || (cell.cityPaid[i] = { cell, i });
-        rec.players = winners.slice();
-        rec.live = true;
-        this.owed.add(rec);
-      }
-    } else {
-      g.say(`A city of ${d.tiles.size} closed with nobody standing in it.`);
-    }
-
-    // Windmills standing in THIS city — a turbine is anchored to one feature
-    // on its tile, and on a tile carrying two cities that distinction is the
-    // difference between paying for the city that closed and the one that
-    // didn't.
+    if (!cells.length || closer == null) return;
+    // A turbine is anchored to one feature on its tile, and on a tile carrying
+    // two cities that distinction is the difference between paying for the
+    // city that closed and the one that didn't.
     const mills = cells.filter((c) => {
       const t = turbineOn(c);
       return t && t.on != null && board.featIndexOn(c, d) === t.on;
     }).length;
-    if (mills && closer != null) {
-      this.pay(closer, WINDMILL * mills,
-        `${mills} windmill${mills > 1 ? 's' : ''} in a finished city — ${g.players[closer].name} keeps this whatever the weather does`,
-        where);
-    }
+    if (!mills) return;
+    this.pay(closer, WINDMILL * mills,
+      `${mills} windmill${mills > 1 ? 's' : ''} in a finished city — ${g.players[closer].name}`,
+      cells.map((c) => ({ x: c.x, y: c.y })));
   }
 
   /**
-   * A road is nobody's. Finishing one pays the player who laid the last tile,
-   * 1 a tile and 2 out on an island — and then every city and every temple the
-   * road runs into pays 2 to WHOEVER HOLDS IT, which is as often as not the
-   * player across the table. Roads are how you are paid for connecting things,
-   * and how everybody else is paid for you connecting to them.
-   */
-  roadCloses(d, closer) {
-    const g = this.game;
-    const board = g.board;
-    const cells = board.cellsOf(d);
-    if (!cells.length) return;
-    const per = this.rateFor('road', cells);
-    const where = cells.map((c) => ({ x: c.x, y: c.y }));
-
-    if (closer != null) {
-      this.pay(closer, per * d.tiles.size,
-        `Road of ${d.tiles.size} tile${d.tiles.size > 1 ? 's' : ''}`
-        + `${per > RATE.road.main ? ' out on an island' : ''} — ${g.players[closer].name} finishes it`, where);
-    }
-
-    // What it arrived at. A city sprawling over four of the road's tiles is
-    // one city and pays once, so they are deduped by component.
-    const seen = new Set();
-    for (const cell of cells) {
-      cell.type.feats.forEach((f, i) => {
-        if (f.type !== 'city') return;
-        const city = board.featureOf(cell.x, cell.y, i);
-        if (!city) return;
-        const root = board.find(city.parts[0]);
-        if (seen.has(root)) return;
-        seen.add(root);
-        for (const p of board.majority(city)) {
-          this.pay(p, ROAD_LINK,
-            `The road runs into ${g.players[p].name}'s city`,
-            [{ x: cell.x, y: cell.y }]);
-        }
-      });
-      if (isTemple(cell) && cell.meeple) {
-        this.pay(cell.meeple.player, ROAD_LINK,
-          `The road runs up to ${g.players[cell.meeple.player].name}'s temple`,
-          [{ x: cell.x, y: cell.y }]);
-      }
-    }
-  }
-
-  /**
-   * A temple's income stops when the parish is full: eight tiles have arrived,
-   * eight offerings have been paid, and there is nowhere left for a ninth to
-   * come from. The keeper walks home.
+   * A temple's arrival income stops when the parish is full: eight tiles have
+   * come, eight offerings have been paid, and there is nowhere for a ninth to
+   * arrive from. The keeper STAYS — every figure in Girando stays where it is
+   * put — and goes on being paid by every red sphere that closes.
    */
   templeCloses(d) {
-    const g = this.game;
-    const home = g.board.reclaim(d);
-    for (const m of home) {
-      g.players[m.player].meeples++;
-      if (m.big) g.players[m.player].big++;
-    }
-    g.say(home.length
-      ? `The temple at (${d.at.x}, ${d.at.y}) is enclosed, and its keeper comes home.`
-      : `The temple at (${d.at.x}, ${d.at.y}) is enclosed, with nobody in it.`);
-    g.emit('landmark');
+    this.game.say(`The temple at (${d.at.x}, ${d.at.y}) is enclosed — no more offerings, `
+      + 'but its keeper keeps the parish.');
+    this.game.emit('landmark');
   }
 
   // --- the season -----------------------------------------------------------
@@ -1102,79 +1056,33 @@ export class Girando extends Mode {
    * where.
    */
   finish() {
-    // The islands are counted FIRST, off the board exactly as play left it.
-    // The harvest sends farmers home, and a follower that walked off an island
-    // during the tidying-up was standing on it when the wind dropped.
+    // The islands are counted FIRST, off the board exactly as play left it —
+    // before the last scoring round moves anything's rate around.
     this.archipelago();
-    this.lastHarvest();
-    this.openCities();
+    this.lastRound();
   }
 
   /**
-   * Every field still being farmed, harvested as though a sphere had closed on
-   * it. WHICH sphere is the question, and the field answers it: every UNPAIRED
-   * half lying in the field fires its own effect, exactly as it would have if
-   * you had found it a partner. A field with no loose sfera on it is counted
-   * BLUE, the ordinary Carcassonne farm, per finished city it feeds.
+   * The end of the season, and it is a sphere going off in every colour at
+   * once: the farms, the cities, the temples and the roads are all scored one
+   * final time. Everything you are still standing in pays, which is the whole
+   * point of a mode where nothing is ever finished for good.
    *
-   * That is what the halves you never managed to pair are for. A sfera you
-   * could not place against another is not a wasted tile — it is a standing
-   * instruction to the last harvest about the ground it is lying on.
-   *
-   * Fields already harvested are skipped for free: harvesting sends the
-   * farmers home, so an empty field is a field that has been paid.
+   * And every UNPAIRED half still lying on the board fires its own colour an
+   * EXTRA time. A sfera you could never find a partner for is not a wasted
+   * tile — it is a colour you get one more of when the wind drops.
    */
-  lastHarvest() {
+  lastRound() {
     const g = this.game;
-    const board = g.board;
-    const fields = board.allComponents().filter((d) => d.type === 'field' && d.meeples.length);
-    if (!fields.length) return;
-    g.say('The season turns, and every farm still standing is harvested.');
-    for (const field of fields) {
-      const hues = board.cellsOf(field)
-        .filter((c) => !c.sphered)                  // a closed sphere already paid
-        .map(sferaHue)
-        .filter(Boolean);
-      this.scoreFarm(field, hues.length ? hues : ['blue']);
-    }
-  }
-
-  /**
-   * A city that never closed at all pays 1 a tile — 2 out on an island — to
-   * whoever is standing in it, which is the ordinary endgame rule for a half
-   * a city.
-   *
-   * A city that DID close and has been blown open again pays nothing more. It
-   * was paid the full rate when it closed and it gave a point a tile back when
-   * the wind took it apart; that is the whole of its account, and paying it a
-   * third time at the end would be paying twice for the same country. The
-   * ledger on the tiles is what tells the two apart.
-   */
-  openCities() {
-    const g = this.game;
-    const board = g.board;
-    for (const d of board.allComponents()) {
-      if (d.type !== 'city' || d.open === 0) continue;
-      const cells = board.cellsOf(d);
-      if (!cells.length) continue;
-      const winners = board.majority(d);
-      if (!winners.length) continue;
-      // Only the tiles that have never been part of a finished city. A wing
-      // built onto an old city and left open pays for the wing.
-      const fresh = cells.filter((c) => {
-        const i = board.featIndexOn(c, d);
-        return i != null && !c.cityPaid?.[i];
-      });
-      if (!fresh.length) continue;
-      const per = this.onIsland(cells[0]) ? RATE.cityOpen.isle : RATE.cityOpen.main;
-      const pts = fresh.length * per;
-      for (const p of winners) {
-        this.pay(p, pts,
-          `Endgame: an unfinished city of ${fresh.length} tile${fresh.length > 1 ? 's' : ''}`
-          + `${per > RATE.cityOpen.main ? ' out on an island' : ''} — ${g.players[p].name}`,
-          cells.map((c) => ({ x: c.x, y: c.y })));
-      }
-    }
+    const spare = [...g.board.cells.values()]
+      .filter((c) => !c.sphered)
+      .map(sferaHue)
+      .filter(Boolean);
+    g.say('The season turns, and the sky scores everything one last time'
+      + `${spare.length ? ` — with ${listTally(spare, (h) => COLOURS[h])} once more, `
+        + `for the ${spare.length === 1 ? 'half-sphere' : 'half-spheres'} that never found a partner` : ''}.`);
+    for (const hue of Object.keys(COLOURS)) this.fire(hue);
+    for (const hue of spare) this.fire(hue);
   }
 
   /**
@@ -1213,12 +1121,45 @@ export class Girando extends Mode {
     let value = 0;
     for (const cell of cells) {
       value += this.templeValue(cell, player, TEMPLE_LAID);
-      if (this.joinsSphere(cell)) value += 4;
-      else if (cell.type.feats.some((f) => f.type === 'sfera')) value += 0.5;
+      // Closing a sphere is not a bonus in this mode, it is the scoring round:
+      // everything the two colours count pays out over the whole board, to
+      // whoever is standing in it. Priced as what it would pay US minus what
+      // it would pay the best rival, so a sphere the table is better placed
+      // for is one the bot leaves alone.
+      const joins = this.joinsSphere(cell);
+      if (joins) value += this.sphereValue(joins, player);
+      else if (cell.type.feats.some((f) => f.type === 'sfera')) value += 1;
       value += this.turbineValue(cell, player);
       for (const d of zephyrDirs(cell)) value += this.gustValue(cell, d, player);
     }
     return value;
+  }
+
+  /**
+   * What closing this sphere is worth to us, net of what it hands everybody
+   * else. Both halves fire, so both colours are counted; the pass is run for
+   * real against a scratch tally rather than estimated, because the board-wide
+   * passes are cheap and guessing at them was never going to be close.
+   */
+  sphereValue(hues, player) {
+    const before = this.game.players.map((p) => p.score);
+    const quiet = this.game.say;
+    const emit = this.game.emit;
+    this.game.say = () => {};
+    this.game.emit = () => {};
+    try {
+      for (const hue of hues) this.fire(hue);
+    } finally {
+      this.game.say = quiet;
+      this.game.emit = emit;
+    }
+    let mine = 0, best = 0;
+    this.game.players.forEach((p, i) => {
+      const gained = p.score - before[i];
+      p.score = before[i];
+      if (i === player) mine = gained; else best = Math.max(best, gained);
+    });
+    return mine - best;
   }
 
   /** Laying next to somebody's temple pays them, not you. */
@@ -1277,23 +1218,29 @@ export class Girando extends Mode {
       // A finished city we hold is a payout the weather can reverse. Pinning a
       // tile of it is worth a share of what blowing it open would cost us.
       const mine = d.meeples.some((m) => m.player === seat);
-      value += mine ? RATE.city.main * d.tiles.size * 0.25 : -1;
+      value += mine ? RATE.cityDone.main * d.tiles.size * 0.25 : -1;
     });
     return value;
   }
 
-  /** Does this tile put a half-sphere against its other half? */
+  /**
+   * Does this tile put a half-sphere against another half? Returns the two
+   * colours that would fire, or null — any half fits any other, so what the
+   * pairing is worth depends entirely on which two.
+   */
   joinsSphere(cell) {
     const board = this.game.board;
     for (let s = 0; s < 4; s++) {
       const i = board.featAt(cell, s);
       if (i == null || cell.type.feats[i].type !== 'sfera') continue;
       const nb = board.neighbor(cell.x, cell.y, s);
-      if (!nb) continue;
+      if (!nb || nb.sphered) continue;
       const theirs = board.featAt(nb, opposite(s));
-      if (theirs != null && nb.type.feats[theirs].type === 'sfera') return true;
+      if (theirs != null && nb.type.feats[theirs].type === 'sfera') {
+        return [cell.type.feats[i].hue, nb.type.feats[theirs].hue];
+      }
     }
-    return false;
+    return null;
   }
 
   /**
@@ -1347,12 +1294,28 @@ export class Girando extends Mode {
     if (g.phase === 'balena') {
       return [{ label: 'Leave the Balena where it is', fn: () => this.cancelSwim() }];
     }
+    if (g.phase === 'flight') {
+      return [{ label: 'Leave them where they are', fn: () => this.cancelLift() }];
+    }
     if (g.phase !== 'meeple') return [];
-    return [{
+    const out = [{
       label: `Send the Balena (${BALENA_RANGE} squares)`,
       fn: () => this.beginSwim(),
       disabled: !this.canSwim(),
     }];
+    if (this.canLift()) {
+      out.unshift({ label: 'Fly out and pick a follower up', fn: () => this.beginLift() });
+    }
+    if (this.lifted) {
+      out.unshift({ label: 'Bring the lifted follower home', fn: () => g.skipMeeple(), wide: true });
+    }
+    return out;
+  }
+
+  cancelLift() {
+    if (this.game.phase !== 'flight') return false;
+    this.game.phase = 'meeple';
+    return true;
   }
 
   cancelSwim() {
@@ -1375,7 +1338,7 @@ export class Girando extends Mode {
     const { isles } = this.land();
     const rows = g.players.map((p, i) => {
       const active = i === g.current && g.phase !== 'over';
-      const meeples = '●'.repeat(p.meeples) + `<span class="dim">${'○'.repeat(Math.max(0, 7 - p.meeples))}</span>`;
+      const meeples = '●'.repeat(p.meeples) + `<span class="dim">${'○'.repeat(Math.max(0, SUPPLY - p.meeples))}</span>`;
       const mine = isles.filter((grp) => grp.some((c) => c.meeple?.player === i)).length;
       return `<div class="player ${active ? 'active' : ''}">
           <span class="swatch" style="background:${PLAYER_COLORS[i]}"></span>
@@ -1402,9 +1365,9 @@ Girando.spec = {
   tideStart: 5,
   opening: 'A first stone hangs in the cloud. Everything else is weather.',
   hint: 'A zephyr blows its whole lane and wakes every other zephyr it reaches. '
-    + 'Cities pay 2 a tile to whoever stands in them the first time they close, then 1 a tile up and down as the wind opens and shuts them. '
-    + 'Roads are nobody’s: finish one for 1 a tile, and every city or temple it reaches pays its holder 2. '
-    + 'Farms are harvested when a sphere closes, and BOTH its halves fire — green 1 a tile of field, blue 2 a finished city, red 2 a temple. Any half fits any other, so the pairing is the decision. '
+    + 'Nothing is paid for being finished: closing a SPHERE is the scoring round, and both its halves fire a pass over the whole board. '
+    + 'Green scores the farms (1 per two tiles of field), blue the cities (1 a tile open, 2 finished), red the temples (1 per tile around one), yellow the roads (1 a tile plus what each city it reaches is worth). '
+    + 'Any half fits any other, so the pairing is the decision. '
     + 'You may only build onto the Palazzo’s mainland; everything adrift is an island, and islands pay more. '
     + 'Instead of a follower, send the Balena — nothing under the whale can be moved by any wind.',
 };

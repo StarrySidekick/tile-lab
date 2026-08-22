@@ -38,10 +38,18 @@
 //     but the gust carries on past it and shoves everything loose beyond. The
 //     one exception is a BLOCKER — in Girando that is the Balena, and nothing
 //     else. Wind hits it, stops, and everything in its lee is untouched.
-//   CORNERS DON'T COUNT. A tile has to land orthogonally beside something. One
-//     that ends up touching the board only at a corner falls out of the sky,
-//     which is what keeps a blown board from fraying into a diagonal lattice
-//     no placement could ever have produced.
+//   CORNERS DON'T COUNT, AND EVERY TILE IS CHECKED. A tile has to be beside
+//     something edge to edge or it falls out of the sky — and that is asked of
+//     every tile on the board after a gust, not only the ones that moved. A
+//     tile the wind never touched is left hanging when the neighbours holding
+//     it up slide away from it, which is by far the commonest way to end up
+//     with nothing underneath you.
+//   A ZEPHYR GOES WITH ITS OWN WIND. It is blowing, and it is in the wind too:
+//     one square downwind, into the hole its own lane just opened. Without it a
+//     zephyr is a permanent hole-maker, shoving the country away from itself
+//     and then sitting in the gap. One that blows SEVERAL ways at once doesn't
+//     travel — it is braced by its own weather, and there is no answer to
+//     which of four directions a compass rose would go.
 //   FOLLOWERS ARE BLOWN LIKE TILES. A follower travels the same distance as
 //     everything else in its lane, so one standing on a tile that also moves
 //     rides along and never notices — and one standing on a tile that DOESN'T
@@ -85,6 +93,11 @@ export function zephyrDirs(cell) {
   return (z.dirs || [z.dir ?? 0]).map((d) => (d + cell.rot) % 4);
 }
 
+/** How hard a zephyr opens — one square, or two for a double zephyr. */
+export function zephyrPush(cell) {
+  return zephyrOn(cell)?.push || 1;
+}
+
 /** Weathervanes and straight roads: the wind decides which way they lie. */
 export const swings = (cell) => !!(cell.type.swing || cell.type.align);
 
@@ -114,10 +127,10 @@ export const blocks = (cell) => !!cell.balena || (!!cell.blocks && !zephyrOn(cel
  *               downwind. Omit with `everywhere` for a mass event.
  * @param everywhere  every lane on the board at once
  */
-export function gust(board, { dir, from = null, everywhere = false }) {
+export function gust(board, { dir, from = null, everywhere = false, push = 1 }) {
   const [dx, dy] = SIDE_STEP[dir];
   const report = {
-    dir, from, everywhere, strength: 1,
+    dir, from, everywhere, push, strength: push,
     moved: [], fell: [], carried: [], homed: [], swung: [],
     turbines: [], reached: [], zephyrs: [],
   };
@@ -151,7 +164,10 @@ export function gust(board, { dir, from = null, everywhere = false }) {
 
   for (const row of lanes.values()) {
     row.sort((a, b) => along(a) - along(b));
-    let strength = 1;
+    // A DOUBLE ZEPHYR opens at two squares rather than one. Everything else
+    // about the lane is unchanged — it still hardens on zephyrs blowing its
+    // way and it still stops at three.
+    let strength = Math.min(MAX_STRENGTH, push);
     let blocked = false;
     for (const c of row) {
       if (blocked) { sheltered.add(c); continue; }
@@ -214,13 +230,47 @@ export function gust(board, { dir, from = null, everywhere = false }) {
     report.moved.push({ cell, from: was, steps });
   }
 
-  // --- what the move did to them --------------------------------------------
-  // Corners don't hold a tile up: it has to land beside something edge to edge.
-  for (const { cell } of report.moved) {
-    if (board.degree(cell.x, cell.y) > 0) continue;
-    report.fell.push({ id: cell.type.id, x: cell.x, y: cell.y, type: cell.type, rot: cell.rot, cell });
+  // --- the zephyr goes with its own wind -------------------------------------
+  // It is blowing; it is in the wind too. One square, downwind, into the hole
+  // the lane just left behind it — which is most of the point, because a
+  // zephyr that stayed put was a permanent hole-maker: it shoved the country
+  // away from itself and then sat in the gap it had made.
+  // …but only a zephyr that blows ONE way. A crosswind, a trident or a compass
+  // rose is letting go in several directions at once and is braced by its own
+  // weather; it is the fixed centre of its own storm, and asking it to travel
+  // four ways in one turn has no answer anyway.
+  const src = from && !everywhere ? board.get(from.x, from.y) : null;
+  const rides = src && zephyrDirs(src).length === 1;
+  if (rides && !immovable(src) && !board.get(from.x + dx, from.y + dy)) {
+    const was = { x: from.x, y: from.y };
+    if (board.shift(was, { x: was.x + dx, y: was.y + dy })) {
+      report.moved.push({ cell: src, from: was, steps: 1 });
+    }
   }
-  for (const f of report.fell) board.remove(f.x, f.y);
+
+  // --- what the move did to them --------------------------------------------
+  // Corners don't hold a tile up: a tile has to be beside something edge to
+  // edge or it falls out of the sky. EVERY tile is checked, not just the ones
+  // that moved — a tile the wind never touched is left hanging in the air when
+  // the neighbours that were holding it up slide away, and that is far and
+  // away the commonest way to be left holding nothing. Repeated, because
+  // dropping one tile can leave the next one hanging too.
+  //
+  // Two things are never dropped: the tile the whale is lying on, which is
+  // held up by a hundred tons of sky whale, and the last tile on the board,
+  // because a board with nothing on it is not a game.
+  for (let pass = 0; pass < 32; pass++) {
+    if (board.size <= 1) break;
+    const loose = [...board.cells.values()]
+      .filter((c) => !c.balena && board.degree(c.x, c.y) === 0)
+      .sort((a, b) => a.seq - b.seq);
+    if (!loose.length) break;
+    for (const cell of loose) {
+      if (board.size <= 1) break;
+      report.fell.push({ id: cell.type.id, x: cell.x, y: cell.y, type: cell.type, rot: cell.rot, cell });
+      board.remove(cell.x, cell.y);
+    }
+  }
 
   // --- put the followers down ------------------------------------------------
   for (const r of riders.sort((a, b) => (b.was.x * dx + b.was.y * dy) - (a.was.x * dx + a.was.y * dy))) {
@@ -314,7 +364,7 @@ export function storm(board, first, cap = MAX_GUSTS) {
     for (const { cell, dir } of g.zephyrs) {
       if (board.get(cell.x, cell.y) !== cell) continue;   // it fell, or was buried
       if (!once(cell, dir)) continue;
-      queue.push({ dir, from: { x: cell.x, y: cell.y } });
+      queue.push({ dir, from: { x: cell.x, y: cell.y }, push: zephyrPush(cell) });
     }
   }
   return out;

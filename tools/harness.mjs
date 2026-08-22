@@ -117,6 +117,14 @@ function step(game, rng) {
       }
       return;
     }
+    // Girando's flying machine, fetching a follower back off its own lane.
+    case 'flight': {
+      const spots = game.m.flightLifts();
+      if (!spots.length) return void game.m.cancelLift();
+      const t = pick(spots);
+      if (!game.cellClick(t.x, t.y)) game.m.cancelLift();
+      return;
+    }
     // Girando's whale: three squares, instead of a follower.
     case 'balena': {
       const spots = game.m.balenaTargets();
@@ -131,6 +139,7 @@ function step(game, rng) {
     case 'meeple': {
       // A mode may offer something INSTEAD of a follower; Girando's whale is
       // the only one, and it never gets exercised unless something picks it.
+      if (game.m.canLift?.() && rng() < 0.25) return void game.m.beginLift();
       if (game.m.canSwim?.() && rng() < 0.15) return void game.m.beginSwim();
       if (game.canPlaceBuilding?.() && rng() < 0.5) game.placeBuilding();
       if (game.canBuildBridge?.() && rng() < 0.4) game.buildBridge();
@@ -312,7 +321,8 @@ function checkWind() {
   const at = (b, x, y) => b.get(x, y);
   const lay = (b, x, y, id, rot = 0) => b.place(x, y, TILES[id], rot, { free: true });
 
-  // A lane slides one square, downwind of the zephyr and nowhere else.
+  // A lane slides one square, downwind of the zephyr and nowhere else — and
+  // the zephyr goes WITH its own wind, one square into the hole it just made.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');                     // the gust, pointing north
@@ -320,7 +330,8 @@ function checkWind() {
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (!at(b, 0, -2) || !at(b, 0, -3)) return fail('a lane shifts one square', 'it did not');
     if (!at(b, 1, -1)) return fail('the wind stays in its lane', 'the next column moved');
-    if (!at(b, 0, 0)) return fail('the zephyr stays put', 'it blew itself away');
+    if (at(b, 0, 0)) return fail('the zephyr goes with its own wind', 'it stayed put');
+    if (!at(b, 0, -1)) return fail('the zephyr moves one square', 'it went somewhere else');
   }
 
   // Corners DON'T count: a tile that lands touching the board only at a corner
@@ -329,9 +340,11 @@ function checkWind() {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
     lay(b, 0, -2, 'U');                     // alone in the lane, two clear
-    lay(b, 1, -4, 'U');                     // only a corner to catch it
+    lay(b, 1, -1, 'U');                     // somewhere for the zephyr to land beside
+    lay(b, 1, -4, 'U');                     // only a corner to catch the mover
+    lay(b, 2, -4, 'U');                     // …and this is what holds THAT up
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (at(b, 0, -3) || r.fell.length !== 1) return fail('a diagonal contact does not hold a tile up', JSON.stringify(r.fell));
+    if (at(b, 0, -3) || r.fell.length !== 1) return fail('a diagonal contact does not hold a tile up', JSON.stringify(r.fell.map((f) => `${f.id}@${f.x},${f.y}`)));
 
     const c = new Board();
     lay(c, 0, 0, 'Kz');
@@ -368,6 +381,8 @@ function checkWind() {
   }
 
   // A zephyr is never nailed down, whatever the mode has decided about it.
+  // Tracked by the TILE rather than the square, because the square it left is
+  // the square the zephyr that blew it slides into.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
@@ -375,7 +390,7 @@ function checkWind() {
     frozen.anchored = true;
     lay(b, 0, -3, 'U');
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (at(b, 0, -1)) return fail('a crystallised zephyr still blows about', 'it stayed put');
+    if (frozen.y !== -2) return fail('a crystallised zephyr still blows about', `it is at y ${frozen.y}`);
   }
 
   // A turbine is reported for every gust that runs over it.
@@ -408,6 +423,52 @@ function checkWind() {
     gust(b, { dir: 1, from: { x: 0, y: 0 } });
     const after = b.get(2, 0) || b.get(1, 0);
     if (!after || (after.rot & 1) !== 1) return fail('a straight road swings onto the wind', `rot ${after && after.rot}`);
+  }
+
+  // …and a tile the wind never touched falls too, if what was holding it up
+  // slides out from under it. Only checking the tiles that MOVED left single
+  // tiles standing in open sky with nothing beside them, which is the state
+  // the whole falling rule exists to prevent.
+  //
+  // The victim is in the NEXT lane over, so the gust never reaches it: its one
+  // neighbour is in the lane that blows, and when that leaves it is holding on
+  // to nothing.
+  const stranding = (b) => {
+    lay(b, 0, 0, 'Kz');                     // the gust, pointing north
+    lay(b, 0, -2, 'U');                     // the only thing propping the victim up
+    for (const y of [-1, -2, -3, -4]) lay(b, -1, y, 'U');   // a spine, out of the lane
+    return lay(b, 1, -2, 'U');              // the victim
+  };
+  {
+    const b = new Board();
+    const victim = stranding(b);
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (at(b, 1, -2)) return fail('a stranded tile falls even though it never moved', 'it is still there');
+    if (!r.fell.some((f) => f.cell === victim)) {
+      return fail('a stranded tile is reported as fallen', JSON.stringify(r.fell.map((f) => `${f.id}@${f.x},${f.y}`)));
+    }
+  }
+
+  // The whale holds its tile up as well as still: a gust that strands it
+  // leaves it hanging there, because a hundred tons of sky whale is holding it.
+  {
+    const b = new Board();
+    stranding(b).balena = true;
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (!at(b, 1, -2)) return fail('the whale holds its tile up', 'it fell out of the sky');
+  }
+
+  // A DOUBLE ZEPHYR opens at two squares rather than one.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kzz');                    // double, pointing north
+    lay(b, 0, -1, 'U');
+    lay(b, 1, -3, 'U'); lay(b, 2, -3, 'U'); // somewhere for it to land beside
+    lay(b, 1, -1, 'U');
+    gust(b, { dir: 0, from: { x: 0, y: 0 }, push: 2 });
+    if (!at(b, 0, -3)) return fail('a double zephyr blows two squares', 'it moved one');
+    // …and the zephyr itself still only goes with its own wind by one.
+    if (!at(b, 0, -1)) return fail('a double zephyr still travels one square itself', 'it went further');
   }
 
   // A weathervane turns to the wind, which re-cuts what runs through it.
@@ -473,28 +534,36 @@ function checkWind() {
     if (reports.length > 3) return fail('each zephyr blows once per storm', `${reports.length} gust(s)`);
   }
 
-  // A compass rose opens all four lanes out of one square.
+  // A compass rose opens all four lanes out of one square. Arms two tiles long,
+  // so each pair still holds itself up a square further out — and the rose is
+  // left standing in the hole it made of its own neighbourhood, which is a
+  // multi-way zephyr's whole life: it does not travel with its own wind (there
+  // is no answer to which of four directions it would go), so it strands
+  // itself and falls through the gap.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kzq');
-    for (const [x, y] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) lay(b, x, y, 'U');
-    for (const [x, y] of [[1, -2], [2, 1], [-1, 2], [-2, -1]]) lay(b, x, y, 'U');
+    for (const [x, y] of [[0, -1], [0, -2], [1, 0], [2, 0], [0, 1], [0, 2], [-1, 0], [-2, 0]]) lay(b, x, y, 'U');
     const dirs = [0, 1, 2, 3].map((dir) => ({ dir, from: { x: 0, y: 0 } }));
     storm(b, dirs);
-    const out = [[0, -2], [2, 0], [0, 2], [-2, 0]].filter(([x, y]) => at(b, x, y)).length;
+    const out = [[0, -3], [3, 0], [0, 3], [-3, 0]].filter(([x, y]) => at(b, x, y)).length;
     if (out !== 4) return fail('a compass rose blows all four lanes', `${out}/4 moved`);
-    if (!at(b, 0, 0)) return fail('the rose stays where it is', 'it blew itself away');
+    // It never MOVED — every square it could have gone to is empty, and it is
+    // gone from (0,0) because it fell, not because it travelled.
+    if (b.cells.size !== 8) return fail('a compass rose strands itself', `${b.cells.size} tiles left`);
   }
 
   // Followers ride their own tile: it moves, they move, and neither notices.
+  // Tracked by the TILE, because the square it vacates is the one the zephyr
+  // that blew it slides into.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
-    lay(b, 0, -1, 'U');
+    const under = lay(b, 0, -1, 'U');
     b.addMeeple(0, -1, 0, 0);
     lay(b, 0, -2, 'U');
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (b.get(0, -1)) return fail('the road under the follower moves', 'it stayed');
+    if (under.y !== -2) return fail('the road under the follower moves', `it is at y ${under.y}`);
     if (!b.get(0, -2)?.meeple) return fail('a follower travels with its tile', JSON.stringify(r.carried));
     if (r.homed.length) return fail('nobody goes home from a tile that landed', JSON.stringify(r.homed));
   }
@@ -622,9 +691,9 @@ function checkWind() {
     if (!b.get(0, -2)) return fail('the whale shelters its lee from a zephyr', 'the lee blew away');
   }
 
-  console.log('  ✓ lanes, corners, ramparts, paving, loose zephyrs, turbines, vanes, straight roads,'
-    + ' chains, rebounds, absorbed zephyrs, the whale, once-per-storm, the rose, stacking, followers,'
-    + ' temples, locks, Abbazias, bad seams');
+  console.log('  ✓ lanes, corners, stranded tiles, self-push, double zephyrs, ramparts, paving,'
+    + ' loose zephyrs, turbines, vanes, straight roads, chains, rebounds, absorbed zephyrs,'
+    + ' the whale, once-per-storm, the rose, stacking, followers, temples, locks, Abbazias, bad seams');
 }
 
 /**
@@ -672,9 +741,9 @@ function checkGirando() {
     if (!h.m.onIsland(b.get(5, 5))) return fail('two tiles adrift are an island', 'it did not count');
   }
 
-  // A city pays 2 a tile to whoever is STANDING IN IT, the followers stay put,
-  // the windmill pays the closer 2 — and blowing the city open again takes the
-  // 2 a tile straight back off, while the windmill's 2 stays paid.
+  // NOTHING is paid for being finished any more. Closing a city puts it on the
+  // higher rate for the next blue sphere and pays its windmills, and that is
+  // the whole of what closing anything does.
   {
     const h = fresh(4);
     const b = h.board;
@@ -683,198 +752,197 @@ function checkGirando() {
     b.addMeeple(0, 0, 0, 1);                  // seat 1 garrisons it
     b.rebuild();
     h.m.settle(0);                            // seat 0 laid the closing tile
-    if (h.players[1].score !== 4) {
-      return fail('a city pays 2 a tile to whoever stands in it', `paid ${h.players[1].score} for two tiles`);
+    if (h.players[1].score !== 0) {
+      return fail('finishing a city pays its holder nothing', `paid ${h.players[1].score}`);
     }
     if (h.players[0].score !== 2) {
       return fail('a windmill pays 2 to whoever closes its city', `paid ${h.players[0].score}`);
     }
     if (!b.get(0, 0).meeple) return fail('a follower stays in the city it finished', 'it went home');
-    if (b.get(0, 0).anchored) return fail('nothing crystallises any more', 'the tile turned to stone');
 
-    // The wind shoves the cap four squares away — the same tile, somewhere
-    // else, which is what a gust actually does to one.
-    b.shift({ x: 0, y: -1 }, { x: 4, y: -4 });
-    b.rebuild();
-    h.m.reopen();
-    if (h.players[1].score !== 2) {
-      return fail('a city blown open gives back ONE a tile', `left holding ${h.players[1].score} of 4`);
-    }
-    if (h.players[0].score !== 2) {
-      return fail('a windmill\'s 2 survives the city being blown open', `left holding ${h.players[0].score}`);
-    }
-
-    // …and shoved back, closing it again brings back that one a tile — not the
-    // full rate, because neither of these tiles is new country any more.
-    b.shift({ x: 4, y: -4 }, { x: 0, y: -1 });
-    b.rebuild();
-    h.m.settle(0);
+    // …and a BLUE sphere is what actually pays it: 2 a tile now that it has
+    // closed, where an open one would have paid 1.
+    h.players[1].score = 0;
+    h.m.fire('blue');
     if (h.players[1].score !== 4) {
-      return fail('closing a city again pays one a tile', `holding ${h.players[1].score}, expected 4`);
+      return fail('blue pays 2 a tile for a finished city', `paid ${h.players[1].score} for two tiles`);
     }
-    // The windmill pays again too — it is a bounty on closing, not on the city.
-    if (h.players[0].score !== 4) {
-      return fail('a windmill pays every time its city closes', `holding ${h.players[0].score}`);
+    b.remove(0, -1);                          // blown open again
+    h.m.reopen();
+    h.players[1].score = 0;
+    h.m.fire('blue');
+    if (h.players[1].score !== 1) {
+      return fail('blue pays 1 a tile for an unfinished city', `paid ${h.players[1].score} for one tile`);
     }
   }
 
-  // A city that never closed at all pays 1 a tile at the end. One that closed
-  // and was blown open pays nothing more: it was paid in full and gave a point
-  // a tile back, and that is the whole of its account.
+  // RED — the temples, a point for every tile standing around one.
   {
-    const h = fresh(18);
+    const h = fresh(31);
     const b = h.board;
-    lay(b, 0, 0, 'Ktb');                      // a city facing north
-    lay(b, 0, -1, 'Ca');                      // …carried on north, and left open
+    lay(b, 0, 0, 'Kt');
+    for (const [x, y] of [[1, 0], [-1, 0], [0, 1], [1, 1]]) lay(b, x, y, 'Kz');
     b.addMeeple(0, 0, 0, 0);
     b.rebuild();
-    h.m.openCities();
-    const first = h.players[0].score;
-    if (first !== 2) {
-      return fail('an unfinished city pays 1 a tile at the end', `paid ${first} for two tiles`);
-    }
-    // Mark it as having closed once and been blown open; now it pays nothing.
-    for (const c of [b.get(0, 0), b.get(0, -1)]) {
-      c.cityPaid = { 0: { players: [0], live: false } };
-    }
-    h.players[0].score = 0;
-    h.m.openCities();
-    if (h.players[0].score !== 0) {
-      return fail('a city that already closed pays nothing at the end', `paid ${h.players[0].score}`);
+    h.m.fire('red');
+    if (h.players[0].score !== 4) {
+      return fail('red pays a point per tile around a temple', `paid ${h.players[0].score} for four`);
     }
   }
 
-  // The three sferas, on one board: the field is three tiles, it feeds one
-  // finished city, and two temples stand on it. So a green half is worth 3
-  // there, a blue one 2 and a red one 4 — and BOTH halves of a sphere fire, so
-  // a matched pair doubles one of those and a mixed pair does two of them once
-  // each. Any half fits any other, which is what makes that a decision.
+  // YELLOW — the roads: a point a tile, plus what each city the road reaches
+  // is worth, whoever owns that city.
   {
-    const worth = { green: 3, blue: 2, red: 4 };
-    const span = { green: 'Ksx', blue: 'Kbx', red: 'Krx' };
-    const half = { green: 'Kso', blue: 'Kbo', red: 'Kro' };
-    const pairs = [
-      ['green', 'green'], ['blue', 'blue'], ['red', 'red'],   // doubled
-      ['green', 'blue'], ['red', 'green'],                    // one of each
-    ];
-    const before = failures;
-    pairs.forEach(([a, b], n) => {
-      const want = worth[a] + worth[b];
-      const h = fresh(20 + n);
-      const bd = h.board;
-      lay(bd, 0, 0, span[a]);                 // sfera north, cities east and west
-      lay(bd, 0, -1, half[b], 2);             // …meeting a half of the other colour
-      lay(bd, 1, 0, 'Kce', 3);                // the city, capped both ways
-      lay(bd, -1, 0, 'Kce', 1);
-      lay(bd, 0, 1, 'Kt');                    // two temples out on the same field
-      lay(bd, 0, 2, 'Kt');
-      const field = TILES[span[a]].feats.findIndex((f) => f.type === 'field');
-      bd.addMeeple(0, 0, field, 0);
-      bd.rebuild();
-      h.players[0].meeples = 6;
-      h.m.joinSferas();
-      if (h.players[0].score !== want) {
-        return fail(`a ${a}+${b} sphere fires both its halves`,
-          `paid ${h.players[0].score}, expected ${worth[a]} + ${worth[b]}`);
-      }
-      if (h.players[0].meeples !== 7) {
-        return fail('a harvested farmer walks home whatever the colours', `${h.players[0].meeples} in hand`);
-      }
-    });
-    if (failures > before) return;
+    const h = fresh(32);
+    const b = h.board;
+    lay(b, 0, 0, 'D');                        // city north, road east-west
+    lay(b, -1, 0, 'Rb', 1);                   // a road stub facing east
+    lay(b, 1, 0, 'Rb', 3);                    // …and one facing west
+    const road = TILES.D.feats.findIndex((f) => f.type === 'road');
+    b.addMeeple(0, 0, road, 0);               // roads are claimed again
+    b.addMeeple(0, -0, 0, 1);                 // …and seat 1 holds the city
+    b.rebuild();
+    b.addMeeple(0, 0, road, 0);
+    b.rebuild();
+    h.m.fire('yellow');
+    // Three tiles at 1, plus 1 for the unfinished city it runs into.
+    if (h.players[0].score !== 4) {
+      return fail('yellow pays a road 1 a tile plus its cities', `paid ${h.players[0].score}, expected 4`);
+    }
+    if (h.players[1].score !== 0) {
+      return fail('a road pays its own holder, not the city\'s', `the city holder got ${h.players[1].score}`);
+    }
   }
 
-  // …and any half fits any other. Colour is what the half DOES, not what it
-  // will meet: a green ball and a red one make a sphere that is half of each.
+  // GREEN — the farms, a point for every TWO tiles of field.
+  {
+    const h = fresh(33);
+    const b = h.board;
+    for (const [x, y] of [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]]) lay(b, x, y, 'Kz');
+    const field = TILES.Kz.feats.findIndex((f) => f.type === 'field');
+    b.addMeeple(0, 0, field, 0);
+    b.rebuild();
+    h.m.fire('green');
+    if (h.players[0].score !== 2) {
+      return fail('green pays a point per two tiles of field', `paid ${h.players[0].score} for five tiles`);
+    }
+  }
+
+  // A sphere fires BOTH its halves, and any half fits any other. Two yellows
+  // score the roads twice over; a yellow against a red scores the roads and the
+  // temples once each. That is what makes the pairing a decision.
+  {
+    const build = (b) => {
+      lay(b, 0, 0, 'Kt');                     // a temple, with a parish round it
+      for (const [x, y] of [[1, 0], [-1, 0], [0, 1], [1, 1]]) lay(b, x, y, 'Kz');
+      b.addMeeple(0, 0, 0, 0);                // a keeper for red to pay…
+      b.rebuild();
+      b.addMeeple(1, 0, 0, 0);                // …and a farmer for green
+      b.rebuild();
+    };
+    // A sphere hung north of the temple, so the two halves meet on the seam
+    // between them: north face against south face.
+    const sphere = (h, a, bb) => {
+      build(h.board);
+      lay(h.board, 0, -1, a, 0);              // sfera facing north…
+      lay(h.board, 0, -2, bb, 2);             // …meeting one facing south
+      h.board.rebuild();
+      h.m.joinSferas();
+    };
+    const twice = fresh(35);
+    sphere(twice, 'Kro', 'Kro');              // red twice over
+    const parish = twice.board.surroundCount(0, 0);
+    const mixed = fresh(36);
+    sphere(mixed, 'Kro', 'Kso');              // red once, green once
+    if (twice.players[0].score !== parish * 2) {
+      return fail('a matched sphere fires its colour twice',
+        `paid ${twice.players[0].score}, expected ${parish} around the temple, twice`);
+    }
+    if (mixed.players[0].score <= parish || mixed.players[0].score >= parish * 2) {
+      return fail('a mixed sphere fires one of each',
+        `paid ${mixed.players[0].score}, expected ${parish} of red plus some green`);
+    }
+    // …and it only ever fires once.
+    const was = twice.players[0].score;
+    twice.m.joinSferas();
+    if (twice.players[0].score !== was) {
+      return fail('a sphere fires once', `paid ${twice.players[0].score - was} again`);
+    }
+  }
+
+  // Any half fits any other. Colour is what a half DOES, not what it will meet.
   {
     const h = fresh(24);
     const b = h.board;
     lay(b, 0, 0, 'Kso', 2);                   // green, facing south
-    if (!b.canPlace(0, 1, TILES.Kro, 0, {})) {
-      return fail('a green sfera meets a red one', 'the seam was refused');
+    if (!b.canPlace(0, 1, TILES.Kyo, 0, {})) {
+      return fail('a green sfera meets a yellow one', 'the seam was refused');
     }
     if (!b.canPlace(0, 1, TILES.Kso, 0, {})) {
       return fail('a green sfera meets a green one', 'the seam was refused');
     }
   }
 
-  // The last harvest: a field still being farmed when the wind drops is scored
-  // as though a sphere had closed on it, taking its colour from any sfera
-  // lying in it and falling back to blue.
+  // The end of the season fires every colour once, plus once more for each
+  // half-sphere still lying around unpaired.
   {
-    const h = fresh(25);
+    const h = fresh(37);
     const b = h.board;
-    lay(b, 0, 0, 'Kro');                      // an unpaired RED half, in the field
-    lay(b, 2, 0, 'Kso');                      // …and an unpaired GREEN one
-    lay(b, 1, 0, 'Kt');                       // one temple, on the same field
-    const field = TILES.Kro.feats.findIndex((f) => f.type === 'field');
-    b.addMeeple(0, 0, field, 0);
+    lay(b, 0, 0, 'Kt');                       // a temple, one tile beside it
+    lay(b, 1, 0, 'Kz');
+    b.addMeeple(0, 0, 0, 0);
     b.rebuild();
-    h.m.lastHarvest();
-    // Red pays 2 for the one temple; green pays 1 for each of the three tiles.
-    if (h.players[0].score !== 5) {
-      return fail('every unpaired sfera fires at the last harvest',
-        `paid ${h.players[0].score}, expected 2 (red, one temple) + 3 (green, three tiles)`);
-    }
-    // …and a field with no sfera in it is counted BLUE, per finished city.
-    const k = fresh(26);
-    const kb = k.board;
-    lay(kb, 0, 0, 'Ktb');                     // a city facing north…
-    lay(kb, 0, -1, 'E', 2);                   // …capped, so it is finished
-    const kf = TILES.Ktb.feats.findIndex((f) => f.type === 'field');
-    kb.addMeeple(0, 0, kf, 0);
-    kb.rebuild();
-    k.m.settle(0);                            // close the city so the farm feeds one
-    k.players[0].score = 0;
-    k.m.lastHarvest();
-    if (k.players[0].score !== 2) {
-      return fail('a field with no sfera in it is harvested blue',
-        `paid ${k.players[0].score}, expected 2 for one finished city`);
-    }
-  }
-
-  // A road is nobody's to claim, and finishing one pays its finisher 1 a tile
-  // — plus 2 to the holder of every city it runs into, whoever that is.
-  {
-    const h = fresh(12);
-    const b = h.board;
-    lay(b, 0, 0, 'D');                        // city north, road east-west
-    lay(b, -1, 0, 'Rb', 1);                   // a road stub facing east
-    lay(b, 1, 0, 'Rb', 3);                    // …and one facing west
-    b.addMeeple(0, 0, 0, 1);                  // seat 1 holds the city
-    b.rebuild();
-    const roadIdx = TILES.D.feats.findIndex((f) => f.type === 'road');
-    if (h.m.claimAllowed({ x: 0, y: 0, i: roadIdx, f: { type: 'road' } })) {
-      return fail('a road cannot be claimed', 'it was offered');
-    }
-    h.m.settle(0);
-    if (h.players[0].score !== 3) {
-      return fail('finishing a road pays 1 a tile', `paid ${h.players[0].score} for three tiles`);
-    }
-    if (h.players[1].score !== 2) {
-      return fail('a road pays 2 to the holder of the city it reaches', `paid ${h.players[1].score}`);
-    }
-  }
-
-  // A sphere is harvested exactly once, however many times the board is asked.
-  {
-    const h = fresh(13);
-    const b = h.board;
-    lay(b, 0, 0, 'Kso');                      // green sfera, facing north
-    lay(b, 0, -1, 'Kso', 2);                  // …meeting its other half
-    const field = TILES.Kso.feats.findIndex((f) => f.type === 'field');
-    b.addMeeple(0, 0, field, 0);
-    b.rebuild();
-    h.m.joinSferas();
+    h.m.lastRound();
     const once = h.players[0].score;
-    if (!once) return fail('a closing sphere harvests its field', 'it paid nothing');
-    h.m.joinSferas();
-    if (h.players[0].score !== once) {
-      return fail('a sphere is harvested once', `paid ${h.players[0].score - once} again`);
+    if (once < 1) return fail('the endgame scores everything one last time', 'it paid nothing');
+
+    const spare = fresh(38);
+    const sb = spare.board;
+    lay(sb, 0, 0, 'Kt');
+    lay(sb, 1, 0, 'Kro');                     // an unpaired RED half beside it
+    sb.addMeeple(0, 0, 0, 0);
+    sb.rebuild();
+    spare.m.lastRound();
+    if (spare.players[0].score <= once) {
+      return fail('an unpaired half fires its colour once more at the end',
+        `paid ${spare.players[0].score}, no better than ${once} without it`);
     }
   }
 
-  // Everything out on an island is worth half again as much.
+  // The flying machine picks a follower back up. It is the only thing in the
+  // mode that takes one off the board on purpose.
+  {
+    const h = fresh(39);
+    const b = h.board;
+    const flier = lay(b, 0, 0, 'Kfl');        // pointing north
+    lay(b, 0, -1, 'Kt');                      // a temple, with our follower in it
+    lay(b, 0, -2, 'Kt');                      // …and somewhere further along
+    b.addMeeple(0, -1, 0, 0);
+    b.rebuild();
+    h.m.flight = h.m.flightPath(flier);
+    h.players[0].meeples = 5;
+    const lifts = h.m.flightLifts();
+    if (!lifts.some((o) => o.x === 0 && o.y === -1)) {
+      return fail('the flight offers your own followers to lift', JSON.stringify(lifts));
+    }
+    h.phase = 'meeple';
+    h.m.beginLift();
+    h.m.liftAt(0, -1);
+    if (b.get(0, -1).meeple) return fail('a lifted follower comes off the board', 'it is still there');
+    if (h.players[0].meeples !== 6) {
+      return fail('a lifted follower goes back to the supply', `${h.players[0].meeples} in hand`);
+    }
+    // …and it may be set down further along the lane, but never back before it.
+    const on = h.m.flightTargets();
+    if (on.some((o) => o.y >= -1)) {
+      return fail('a lifted follower only goes further along the flight', JSON.stringify(on));
+    }
+    if (!on.some((o) => o.x === 0 && o.y === -2)) {
+      return fail('a lifted follower may be set down further along', JSON.stringify(on));
+    }
+  }
+
+  // Everything out on an island is worth exactly DOUBLE.
   {
     const h = fresh(14);
     const b = h.board;
@@ -883,10 +951,12 @@ function checkGirando() {
     lay(b, 5, 4, 'E', 2);
     b.addMeeple(5, 5, 0, 0);
     b.rebuild();
-    h.m.settle(1);
-    // 2 tiles at the island rate of 3, plus the windmill's flat 2 to the closer.
-    if (h.players[0].score !== 6) {
-      return fail('a city on an island pays 3 a tile', `paid ${h.players[0].score} for two tiles`);
+    h.m.settle(1);                            // closes it — pays the windmill only
+    h.players[0].score = 0;
+    h.players[1].score = 0;
+    h.m.fire('blue');
+    if (h.players[0].score !== 8) {
+      return fail('a finished city on an island pays 4 a tile', `paid ${h.players[0].score} for two tiles`);
     }
   }
 
@@ -961,8 +1031,8 @@ function checkGirando() {
     }
   }
 
-  console.log('  ✓ mainland and islands, city pay/clawback/reclose, unfinished cities, windmills,'
-    + ' road tolls, sfera colours matched and mixed, the last harvest, island rates, the Balena,'
+  console.log('  ✓ mainland and islands, the four sfera passes, matched and mixed spheres,'
+    + ' windmills, island rates, the last round, the flying machine\'s lift, the Balena,'
     + ' towed islands, long flights, the archipelago');
 }
 

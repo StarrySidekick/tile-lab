@@ -226,6 +226,25 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > The temple is still the thing most worth pointing a knob at next. It is the only income in the mode that arrives without anything closing.
 
 
+> **Tenth pass: the sferas become the whole economy, and two bugs that had been shaping the board all along.**
+>
+> **The bug that mattered.** Tiles were standing in open sky with nothing beside them, and it had been happening for passes: the falling rule only ever asked the tiles that MOVED whether they were still touching anything. A tile the wind never reached is left hanging the moment the neighbours propping it up slide out from under it — which is not a rare case, it is what a gust does to the lane *next* to the one it blows. 179 stranded tiles across twelve games, now zero. The check runs over every tile on the board after a gust and repeats, because dropping one can leave the next one hanging; the whale's tile is exempt, and so is the last tile on the board.
+>
+> **And a rule that fixes holes at the source.** A zephyr now goes WITH its own wind — one square downwind, into the gap its own lane just opened. Without it a zephyr was a permanent hole-maker: it shoved the country away from itself and then sat in the middle of the space it had made. The ones that blow several ways at once don't travel, because there is no answer to which of four directions a compass rose would go; it stands still in the hole it makes of its own neighbourhood, and now usually falls through it, which is a fitting end for a compass rose. Two DOUBLE ZEPHYRS join the pool, opening at two squares rather than one.
+>
+> **Nothing is paid for being finished any more.** This is the big one. The sferas are the scoring engine, and closing a sphere is the event the whole mode turns on: each of its two halves fires a scoring pass over one kind of thing, over the WHOLE BOARD, paying whoever is standing in each one. Green the farms, blue the cities, red the temples, yellow the roads — a fourth colour, and roads are claimable again like anywhere else. Both halves fire and any half fits any other, so two yellows score the roads twice over and a yellow against a blue does the roads and the cities once each.
+>
+> What that does to the turn is worth stating plainly: the question is never "can I close this" but "will a sphere close while I am still standing in it". Finishing a city is not a payday, it is a rate change — 2 a tile instead of 1 on every blue sphere still to come. And it deleted a lot of machinery: the per-tile city ledger, the clawback, the reopen refunds, the road tolls, the separate endgame city rule. Two things still pay outside the spheres, both deliberately small: the temple's offering per arriving tile, and the windmill's 2 for closing its city.
+>
+> Followers now STAY, everywhere and always — a feature scores over and over, so the figure standing in it is the record of whose it is. Nine each rather than seven, because they never come back. Exactly two things take one off the board: a gust that carries it out over open sky, and your own flying machine going out to fetch it. The machine grew accordingly — it can put a new follower down its lane, fetch one of yours back to the supply, or fetch one and set it down again further along the same flight, which is the only way a figure in this mode ever moves anywhere on purpose.
+>
+> **The deck had to grow.** The cloud pool is 65 tiles now, and cut to 72 that left seven base tiles — a board with nothing on it for three of the four colours to count. 88, which gives about twenty-one ordinary cities, roads and fields.
+>
+> **Where it landed, and the one number to argue about.** Thirty sharp-bot games, two players, per game: green 309, blue 245, red 218, yellow 168, temple offerings 70, turbine gusts 9.5, archipelago 10.7, windmills 5.2. Scores 86–401, mean 222, about 8 spheres a game.
+>
+> The four-way split across the colours is remarkably even, which is the thing worth having — no colour is a trap and none is the obvious pick. What is startling is the magnitude: scores went up roughly tenfold, because a scoring pass over the whole board fired sixteen times a game pays for everything you hold every single time. That is exactly what the rules say and it may well be the point — but if the numbers want to be Carcassonne-sized rather than pinball-sized, the knob is the rates themselves, not the structure. Halving every rate would leave the split untouched.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 
@@ -752,13 +771,14 @@ A few things the harness noticed that are worth watching for at the table:
   bot games, where Classic runs 28 and 45. That was the thesis working (nothing
   pays until it closes, and the wind keeps things from closing) but it sat close
   to the edge: if a game can end with everyone on 4, the wind is winning too
-  often. *Several passes later it runs 42 across random play and 69 across bot
+  often. *Several passes later it runs 134 across random play and 174 across bot
   games*, and the question has inverted twice over — see the Girando entry above
   for where the points come from now. The gap between the two numbers is the
-  thing worth watching: it is a mode where knowing what you are doing is worth
-  two thirds again as much as not, a wider gap than Classic's, and it comes
-  from a board that pays you for being somewhere you couldn't have chosen to
-  be.
+  thing worth watching, and it has narrowed: the sfera passes pay for everything
+  on the board every time one fires, so a lot of a random player's score is
+  arriving whether they meant it or not. That is the cost of making the
+  spheres the whole economy, and it is the number to watch if the rates ever
+  get tuned.
 - **Marches** is capped at twelve rounds because uncapped income compounds into
   meaningless numbers. If the campaign feels short, raise the cap before you
   touch the scoring — the round count is the tuning knob, not the points.
