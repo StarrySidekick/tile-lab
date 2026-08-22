@@ -721,7 +721,8 @@ export class Game {
     const next = this.m.afterPlace(cell);
     if (!next) return this.endTurn();
     this.phase = next;
-    if (next === 'meeple' && this.meepleOptions().length === 0) this.endTurn();
+    if (next === 'meeple' && this.meepleOptions().length === 0
+      && !this.m.holdsMeeplePhase()) this.endTurn();
   }
 
   /**
@@ -763,6 +764,7 @@ export class Game {
         // A chosen figure narrows where you may go: the mayor only into
         // cities, the abbot only onto a monastery or a garden.
         if (fig && !fig.allows(f)) return false;
+        if (!this.m.claimAllowed({ x, y, i, f })) return false;
         const d = this.board.featureOf(x, y, i);
         return d && d.meeples.length === 0;
       })
@@ -772,7 +774,8 @@ export class Game {
     // unfinished instead — the tile itself is only the ticket.
     const portal = this.has('portal') && hasMark(this.board.get(x, y), 'portal')
       ? portalTargets(this.board, { fields: this.has('fields') })
-        .filter(({ f }) => (!fig || fig.allows(f)) && f.type !== 'garden')
+        .filter((o) => (!fig || fig.allows(o.f)) && o.f.type !== 'garden'
+          && this.m.claimAllowed(o))
       : [];
 
     return [...here, ...portal, ...(this.m.flightTargets?.() || [])];
@@ -2301,7 +2304,7 @@ export class Game {
     this.tile = null;
     this.market = null;
     this.m.finish();
-    if (this.has('fields')) this.scoreFarms();
+    if (this.has('fields') && this.m.finalFarms) this.scoreFarms();
     if (this.has('goldmines')) this.scoreIngots();
     if (this.has('littleBuildings')) this.scoreBuildings();
     if (this.has('wonders')) {

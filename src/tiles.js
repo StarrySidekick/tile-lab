@@ -301,25 +301,31 @@ export const TILE_TYPES = [
   // Girando's pool. Most of these exist to make the board MOVE rather than to
   // score: the zephyr blows a lane, the windvane re-points itself in the wind
   // and re-cuts what runs through it, and the turbine is paid for every gust
-  // that arrives. The only thing that stops any of it is a city somebody has
-  // finished, which turns to stone and is solid all the way up.
+  // that arrives. Nothing here is ever nailed down — the only thing in the
+  // mode that stops a tile moving is the Balena lying on top of it.
+  //
+  // Every one of them carries FIELDS, worked out the same way the base set's
+  // are: the ground between the roads and the walls. They matter because the
+  // farm is the one thing in Girando that scores for where the country IS
+  // rather than for what closed on it, and a pool where half the tiles had no
+  // ground on them would be a pool where farms stopped at the weather.
   // Gusts, pointing north on the tile and wherever you turn it in the world.
   // Sixteen single-facing ones, on every kind of ground there is: wind that
   // only ever arrived on empty fields would be wind you could plan around.
-  { id: 'Kz',  n: 5, group: 'cloud', name: 'Zephyr',        feats: [],                        marks: [zephyr([N])] },
-  { id: 'Kzr', n: 4, group: 'cloud', name: 'Zephyr road',   feats: [road([E, W])],            marks: [zephyr([N])] },
-  { id: 'Kzb', n: 3, group: 'cloud', name: 'Zephyr bend',   feats: [road([S, E])],            marks: [zephyr([N])] },
-  { id: 'Kzc', n: 3, group: 'cloud', name: 'Zephyr wall',   feats: [city([W])],               marks: [zephyr([N])] },
-  { id: 'Kzt', n: 1, group: 'cloud', name: 'Zephyr gate',   feats: [city([S]), road([E, W])], marks: [zephyr([N])] },
+  { id: 'Kz',  n: 5, group: 'cloud', name: 'Zephyr',        feats: [],                        marks: [zephyr([N])], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Kzr', n: 4, group: 'cloud', name: 'Zephyr road',   feats: [road([E, W])],            marks: [zephyr([N])], fields: [[7, 0, 1, 2], [3, 4, 5, 6]] },
+  { id: 'Kzb', n: 3, group: 'cloud', name: 'Zephyr bend',   feats: [road([S, E])],            marks: [zephyr([N])], fields: [[3, 4], [5, 6, 7, 0, 1, 2]] },
+  { id: 'Kzc', n: 3, group: 'cloud', name: 'Zephyr wall',   feats: [city([W])],               marks: [zephyr([N])], fields: [[0, 1, 2, 3, 4, 5]] },
+  { id: 'Kzt', n: 1, group: 'cloud', name: 'Zephyr gate',   feats: [city([S]), road([E, W])], marks: [zephyr([N])], fields: [[3, 6], [7, 0, 1, 2]] },
 
   // The four winds that blow more than one way at once — one gust per lane,
   // out of the same square, all in the turn it's played. One of each, because
   // a compass rose in a seventy-two tile deck should be a thing that happens
   // once and gets talked about afterwards.
-  { id: 'Kzx', n: 1, group: 'cloud', name: 'Crosswind',     feats: [], marks: [zephyr([N, E])] },
-  { id: 'Kzy', n: 1, group: 'cloud', name: 'Split wind',    feats: [], marks: [zephyr([N, S])] },
-  { id: 'Kzw', n: 1, group: 'cloud', name: 'Trident wind',  feats: [], marks: [zephyr([N, E, W])] },
-  { id: 'Kzq', n: 1, group: 'cloud', name: 'Compass rose',  feats: [], marks: [zephyr([N, E, S, W])] },
+  { id: 'Kzx', n: 1, group: 'cloud', name: 'Crosswind',     feats: [], marks: [zephyr([N, E])], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Kzy', n: 1, group: 'cloud', name: 'Split wind',    feats: [], marks: [zephyr([N, S])], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Kzw', n: 1, group: 'cloud', name: 'Trident wind',  feats: [], marks: [zephyr([N, E, W])], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Kzq', n: 1, group: 'cloud', name: 'Compass rose',  feats: [], marks: [zephyr([N, E, S, W])], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
 
   // The Palazzo: the founding stone of the kingdom, and the only tile on the
   // board that was there before anybody played. Same connections as the base
@@ -327,37 +333,37 @@ export const TILE_TYPES = [
   // rooted than anything else, so the sky can and does shove the seat of
   // government around. What it has instead is worth: the island it is sitting
   // on counts double when a sphere closes.
-  { id: 'Kpz', n: 0, group: 'cloud', name: 'The Palazzo', feats: [city([N]), road([E, W])], marks: [mark('palazzo', 0)] },
+  { id: 'Kpz', n: 0, group: 'cloud', name: 'The Palazzo', feats: [city([N]), road([E, W])], marks: [mark('palazzo', 0)], fields: [[2, 7], [3, 4, 5, 6]] },
 
   // The tower turbine: a windmill built into a city wall. Every gust that runs
   // through it pays a point to whoever holds the city it belongs to, which
   // makes a city something you want the weather to keep visiting rather than
   // something you want it to leave alone.
-  { id: 'Ktb', n: 3, group: 'cloud', name: 'Tower turbine',  feats: [city([N])],    marks: [mark('turbine', 0)] },
-  { id: 'Ktc', n: 2, group: 'cloud', name: 'Turbine corner', feats: [city([N, W])], marks: [mark('turbine', 0)] },
+  { id: 'Ktb', n: 3, group: 'cloud', name: 'Tower turbine',  feats: [city([N])],    marks: [mark('turbine', 0)], fields: [[2, 3, 4, 5, 6, 7]] },
+  { id: 'Ktc', n: 2, group: 'cloud', name: 'Turbine corner', feats: [city([N, W])], marks: [mark('turbine', 0)], fields: [[2, 3, 4, 5]] },
 
   // The sfera: one edge is half a sphere and meets nothing but its other half.
   // Join two and the sky starts counting islands, for the rest of the game.
-  { id: 'Kso', n: 3, group: 'cloud', name: 'Sfera',          feats: [sfera(N)] },
-  { id: 'Ksr', n: 3, group: 'cloud', name: 'Sfera road',     feats: [sfera(N), road([E, W])] },
-  { id: 'Ksc', n: 2, group: 'cloud', name: 'Sfera wall',     feats: [sfera(N), city([S])] },
-  { id: 'Ksb', n: 2, group: 'cloud', name: 'Sfera lane',     feats: [sfera(N), road([S])] },
-  { id: 'Ksx', n: 2, group: 'cloud', name: 'Sfera span',     feats: [sfera(N), city([E, W])] },
+  { id: 'Kso', n: 3, group: 'cloud', name: 'Sfera',          feats: [sfera(N)], fields: [[2, 3, 4, 5, 6, 7]] },
+  { id: 'Ksr', n: 3, group: 'cloud', name: 'Sfera road',     feats: [sfera(N), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
+  { id: 'Ksc', n: 2, group: 'cloud', name: 'Sfera wall',     feats: [sfera(N), city([S])], fields: [[2, 3], [6, 7]] },
+  { id: 'Ksb', n: 2, group: 'cloud', name: 'Sfera lane',     feats: [sfera(N), road([S])], fields: [[2, 3, 4], [5, 6, 7]] },
+  { id: 'Ksx', n: 2, group: 'cloud', name: 'Sfera span',     feats: [sfera(N), city([E, W])], fields: [[4, 5]] },
 
   // End caps. A city has to be able to stop somewhere, and in a country that
   // keeps being rearranged it needs to be able to stop more often than the
   // base set allows.
-  { id: 'Kce', n: 5, group: 'cloud', name: 'Cloud city cap', feats: [city([N])] },
+  { id: 'Kce', n: 5, group: 'cloud', name: 'Cloud city cap', feats: [city([N])], fields: [[2, 3, 4, 5, 6, 7]] },
 
   // The windvane: four ways in, only two of them joined, and the wind decides
   // which two. Every edge matches, so it always fits — what changes is what
   // runs THROUGH it. Its city twin, the vestibule, is out: it was a four-sided
   // city, and a city with four ways in and no way to cap it is a city the
   // weather never lets you finish.
-  { id: 'Kw', n: 3, group: 'cloud', name: 'Windvane',   swing: true, feats: [road([N, S]), road([E]), road([W])] },
+  { id: 'Kw', n: 3, group: 'cloud', name: 'Windvane',   swing: true, feats: [road([N, S]), road([E]), road([W])], fields: [[1, 2], [3, 4], [5, 6], [7, 0]] },
 
-  { id: 'Kt',  n: 3, group: 'cloud', name: 'Temple',        feats: [temple(N)] },
-  { id: 'Kta', n: 0, group: 'cloud', name: 'Temple + road', feats: [temple(N), road([S])] },
+  { id: 'Kt',  n: 3, group: 'cloud', name: 'Temple',        feats: [temple(N)], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Kta', n: 0, group: 'cloud', name: 'Temple + road', feats: [temple(N), road([S])], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
 
   // The Abbazia: every edge is a wildcard, and everything it touches ends
   // there. Blow it away and all of that is unfinished again.
@@ -365,15 +371,15 @@ export const TILE_TYPES = [
 
   // A flying machine and its strip. Placing one lets a follower fly out along
   // the way it points, riding any zephyr it crosses.
-  { id: 'Kfl', n: 3, group: 'cloud', name: 'Flying machine', feats: [road([S])], marks: [mark('flier', null, N)] },
+  { id: 'Kfl', n: 3, group: 'cloud', name: 'Flying machine', feats: [road([S])], marks: [mark('flier', null, N)], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
 
   // Not dealt: Girando swaps these in for the base 3-way junctions. They END
   // the three roads that run into them, the way the base set's do, and they
   // carry the village that grew up at the junction. Girando tried the opposite
   // for two passes — junctions that carried a road straight through, to stop
   // things closing — and the mode did not need the help.
-  { id: 'Gw', n: 0, group: 'cloud', name: 'Road 3-way + village',    feats: [road([E]), road([S]), road([W])],            marks: [mark('village')] },
-  { id: 'Gl', n: 0, group: 'cloud', name: 'City + 3-way + village',  feats: [city([N]), road([E]), road([S]), road([W])], marks: [mark('village')] },
+  { id: 'Gw', n: 0, group: 'cloud', name: 'Road 3-way + village',    feats: [road([E]), road([S]), road([W])],            marks: [mark('village')], fields: [[3, 4], [5, 6], [7, 0, 1, 2]] },
+  { id: 'Gl', n: 0, group: 'cloud', name: 'City + 3-way + village',  feats: [city([N]), road([E]), road([S]), road([W])], marks: [mark('village')], fields: [[3, 4], [5, 6], [2, 7]] },
 
   // --- mountains ------------------------------------------------------------
   // Mountain edges only meet mountain edges, so a range grows as one mass and
@@ -722,9 +728,9 @@ export const MARKS = {
   fruit:    { label: 'Fruit tree', score: 0, note: 'The next four tiles laid beside it each pay their placer 1.' },
 
   // cloud
-  turbine: { label: 'Tower turbine', score: 0, note: 'Pays 1 to whoever holds its city every time a gust runs through it.' },
-  palazzo: { label: 'The Palazzo', score: 0, note: 'The seat of the kingdom. The island it sits on is worth double when a sphere closes.' },
-  zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane when played, and again whenever the wind reaches it. Gusts stack up to three squares.' },
+  turbine: { label: 'Windmill turbine', score: 0, note: 'Pays 1 to whoever holds its city for every gust through it, and 2 to whoever closes that city — kept even if the city blows open again.' },
+  palazzo: { label: 'The Palazzo', score: 0, note: 'The seat of the kingdom: whatever it stands on is the mainland, and everything else adrift is an island. Blown by a gust, it tows every island one square with it.' },
+  zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane when played. A gust that reaches it absorbs it if they agree and wakes it otherwise — the storm then turns down this zephyr’s own lane. Gusts stack up to three squares.' },
   abbazia: { label: 'Abbazia', score: 0, note: 'Caps every feature it touches — and un-caps them if the wind takes it away.' },
   flier:   { label: 'Flying machine', score: 0, note: 'Place it and a follower may fly out along it, riding any zephyr it crosses.' },
 };

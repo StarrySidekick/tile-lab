@@ -189,10 +189,15 @@ export class Effects {
         // at a time is the difference between a number changing and a result.
         const wait = game?.phase === 'over' ? this.tally++ * TALLY_STEP : 0;
         const winners = data.players?.length ? data.players : [data.player ?? game?.current ?? 0];
+        // Points can go DOWN: Girando takes a city's payment back when the wind
+        // blows it open again. A clawback wants its own sign and its own
+        // colour, or "+-4" flashes up in the colour of a reward.
+        const back = data.points < 0;
         winners.forEach((p, i) => {
-          this.float(here.x, here.y - i * 0.4, `+${data.points}`, colorOf(p), wait);
+          this.float(here.x, here.y - i * 0.4, signed(data.points),
+            back ? LOSS : colorOf(p), wait);
         });
-        this.flash(data.cells, colorOf(winners[0]), wait);
+        this.flash(data.cells, back ? LOSS : colorOf(winners[0]), wait);
         return;
       }
 
@@ -321,6 +326,12 @@ export class Effects {
 }
 
 const colorOf = (p) => PLAYER_COLORS[(p || 0) % PLAYER_COLORS.length];
+
+/** Points can be negative; a minus sign is not a plus sign. */
+const signed = (n) => (n < 0 ? `${n}` : `+${n}`);
+
+/** What a payment being taken back looks like: dust, not gold. */
+const LOSS = '#a8443a';
 
 /** A cell's middle, in world units. */
 export const centre = (cell) => ({ x: cell.x + 0.5, y: cell.y + 0.5 });

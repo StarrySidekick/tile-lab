@@ -435,9 +435,15 @@ canvas.addEventListener('pointerup', (e) => {
   const c = renderer.cellAt(sx, sy);
 
   // With the confirm step on, a tap on the board STAGES rather than plays:
-  // tapping the staged square again commits it, tapping elsewhere moves it.
+  // tapping the staged square again TURNS it, tapping elsewhere moves it, and
+  // the only thing that commits it is the checkmark. A tap used to be the
+  // commit, which meant the one gesture you reach for to see the tile the
+  // other way round was also the gesture that ended your decision.
   if (confirming()) {
-    if (pending && pending.x === c.x && pending.y === c.y) return void commitPending();
+    if (pending && pending.x === c.x && pending.y === c.y) {
+      if (pending.rots.length > 1) turnPending(1); else sfx.play('deny');
+      return;
+    }
     if (stagePending(c.x, c.y)) return;
     if (!game.board.get(c.x, c.y) && nearBoard(c)) {
       sfx.play('deny');
@@ -859,11 +865,13 @@ function setLean(on) {
 $('lean').onclick = () => setLean(true);
 $('hudExpand').onclick = () => setLean(false);
 
-// --- the claim step, up close -------------------------------------------------
+// --- the box in the corner ----------------------------------------------------
 //
-// A feature spot at play zoom is a target a few pixels wide. This is the same
-// tile drawn big, with one dot per feature you could actually take, so the
-// claim is a decision you make by looking rather than by squinting.
+// One panel, two jobs, and they are consecutive halves of the same turn: first
+// "is this where the tile goes?", then "what do you take on it?". Both are
+// decisions about a single tile, both want that tile drawn big enough to read,
+// and both are answered by touching the same corner of the screen — so they
+// share the box rather than each having one.
 
 const claimCtx = $('claimTile').getContext('2d');
 let claimSpots = [];
@@ -876,6 +884,7 @@ function claimOptions() {
 }
 
 function renderClaim() {
+  if (pending && !botTurn()) return renderConfirm();
   const host = $('claim');
   const opts = $('zoomClaim').checked ? claimOptions() : [];
   if (!opts.length || botTurn()) {
@@ -976,9 +985,51 @@ function renderClaim() {
   });
 
   $('claimWho').textContent = `${game.player.name} — claim a feature`;
+  $('claim').classList.remove('confirming');
+}
+
+/**
+ * The confirm half. A staged tile is drawn here at the rotation it is actually
+ * going down at, and the checkmark under it is the ONE thing that puts it on
+ * the board — on the board itself a tap only turns it. Shown whenever
+ * something is staged, whether or not the zoomed claim step is switched on:
+ * with the tap no longer committing, hiding this would leave a touch screen
+ * with no way to say yes at all.
+ */
+function renderConfirm() {
+  const host = $('claim');
+  const cur = currentTile();
+  if (!cur || !cur.type) { host.hidden = true; return; }
+  host.hidden = false;
+  claimSpots = [];
+  renderer.hideMeepleTargets = false;
+
+  const size = $('claimTile').width;
+  claimCtx.clearRect(0, 0, size, size);
+  claimCtx.save();
+  claimCtx.translate(size / 2, size / 2);
+  claimCtx.rotate(pending.rot * Math.PI / 2);
+  claimCtx.translate(-size / 2, -size / 2);
+  claimCtx.scale(size, size);
+  drawTile(claimCtx, cur.type, { terrain: cur.terrain, rot: pending.rot });
+  claimCtx.restore();
+
+  claimCtx.save();
+  claimCtx.strokeStyle = 'rgba(212,175,95,0.8)';
+  claimCtx.lineWidth = 3;
+  claimCtx.strokeRect(1.5, 1.5, size - 3, size - 3);
+  claimCtx.restore();
+
+  $('claimWho').textContent = `${game.player.name} — place it here?`;
+  $('claim').classList.add('confirming');
 }
 
 $('claimTile').addEventListener('pointermove', (e) => {
+  if (pending) {
+    $('claimTile').title = pending.rots.length > 1 ? 'Turn it' : '';
+    $('claimTile').style.cursor = pending.rots.length > 1 ? 'pointer' : 'default';
+    return;
+  }
   const hit = claimHit(e);
   $('claimTile').title = hit ? `Claim the ${hit.f.type}` : '';
   $('claimTile').style.cursor = hit ? 'pointer' : 'default';
@@ -993,6 +1044,9 @@ function claimHit(e) {
 }
 
 $('claimTile').addEventListener('pointerdown', (e) => {
+  // The big tile turns when you touch it, exactly as the staged one on the
+  // board does — the same gesture in both places, and neither of them commits.
+  if (pending) { if (pending.rots.length > 1) turnPending(1); return; }
   const hit = claimHit(e);
   if (hit) game.placeMeeple(hit.i, hit);
 });
@@ -1064,6 +1118,7 @@ const PHASE_TEXT = {
   magic: 'Place the figure — click an unfinished road or city',
   crop: 'A crop circle — choose what everyone does',
   rob: 'Post your robber on an opponent',
+  balena: 'Send the Balena — click a tile within three squares',
   'interior-place': 'Lay the next piece',
   'interior-move': 'Move, or hold',
   over: 'Game over',
@@ -1108,21 +1163,23 @@ function renderActions() {
     return;
   }
   const btns = [];
-  const add = (label, key, fn, disabled = false, wide = false) =>
-    btns.push({ label, key, fn, disabled, wide });
+  const add = (label, key, fn, disabled = false, wide = false, tone = '') =>
+    btns.push({ label, key, fn, disabled, wide, tone });
 
-  // A staged tile owns the turn until it is committed or taken back.
+  // A staged tile owns the turn until it is committed or taken back — and the
+  // checkmark is the only thing on screen that commits it, so it is drawn as
+  // the one obvious answer rather than as the first of three buttons.
   if (pending) {
-    add('Place it here', 'Enter', () => commitPending(), false, true);
+    add('✓ Place it here', 'Enter', () => commitPending(), false, true, 'check');
     if (pending.rots.length > 1) {
-      add(`Turn it (${pending.rots.length} ways fit)`, 'R', () => turnPending(1));
+      add(`⟳ Turn it (${pending.rots.length} ways fit)`, 'R', () => turnPending(1));
     }
-    add('Put it back', 'Esc', () => clearPending());
+    add('✕ Put it back', 'Esc', () => clearPending());
     const host = $('actions');
     host.innerHTML = '';
     for (const b of btns) {
       const el = document.createElement('button');
-      if (b.wide) el.className = 'wide';
+      el.className = [b.wide ? 'wide' : '', b.tone || ''].filter(Boolean).join(' ');
       el.innerHTML = `${b.label}${b.key ? ` <kbd>${b.key}</kbd>` : ''}`;
       el.onclick = b.fn;
       host.appendChild(el);
@@ -1195,7 +1252,7 @@ function renderActions() {
   host.innerHTML = '';
   for (const b of btns) {
     const el = document.createElement('button');
-    if (b.wide) el.className = 'wide';
+    el.className = [b.wide ? 'wide' : '', b.tone || ''].filter(Boolean).join(' ');
     el.innerHTML = `${b.label}${b.key ? ` <kbd>${b.key}</kbd>` : ''}`;
     el.disabled = b.disabled;
     el.onclick = b.fn;
@@ -1221,6 +1278,7 @@ function mirrorActions(btns) {
       : list;
     for (const b of wanted) {
       const btn = document.createElement('button');
+      btn.className = [b.wide ? 'wide' : '', b.tone || ''].filter(Boolean).join(' ');
       btn.innerHTML = `${b.label}${b.key ? ` <kbd>${b.key}</kbd>` : ''}`;
       btn.disabled = b.disabled;
       btn.onclick = b.fn;

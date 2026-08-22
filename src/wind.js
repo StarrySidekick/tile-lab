@@ -17,12 +17,14 @@
 //   IT PICKS UP STRENGTH — AND ONLY FROM ITS OWN KIND. A gust that runs over
 //     a zephyr blowing the same way absorbs it and blows a square harder: one,
 //     two, three squares, and no further. That is the only thing that makes a
-//     gust travel further. A zephyr blowing ACROSS the wind isn't absorbed; it
-//     fires in its own turn, down its own lane, which is how a line of them
-//     becomes a chain reaction. And a zephyr blowing straight INTO the wind
-//     does nothing at all — the two brace against each other. Head-on used to
-//     retrigger, and two facing zephyrs then took turns shoving the same lane
-//     apart until everything at both ends of it had fallen out of the sky.
+//     gust travel further. The boost applies BEYOND the absorbed zephyr, never
+//     to it: a tile is never blown further by its own breath.
+//   EVERY OTHER ZEPHYR THE WIND TOUCHES FIRES, AND THE WEATHER TURNS. A gust
+//     that reaches a zephyr pointing any way but its own wakes it, and the
+//     storm carries on down the new zephyr's lane in the new zephyr's
+//     direction. Across the wind, back into it — it makes no difference; a
+//     line of zephyrs is a chain reaction that turns corners and rebounds.
+//     What keeps that finite is the rule below, not any bracing.
 //   NO ZEPHYR BLOWS TWICE IN ONE STORM. Not per direction, not per gust: the
 //     whole cascade is one weather event, and a zephyr contributes each of its
 //     directions to it once. It's the other half of what stops a chain from
@@ -32,12 +34,10 @@
 //     tile, if it carries a zephyr the wind can move it. Weather that could be
 //     frozen in place stops being weather, and a board of stuck zephyrs is a
 //     board where the engine has quietly switched itself off.
-//   SOLID THINGS DON'T MOVE, AND A SOLID CITY ALSO STOPS THE WIND. Ground a
-//     mode has anchored doesn't budge, and neither does a tile with nowhere to
-//     go — but the gust carries on past both and shoves everything loose
-//     beyond. The exception is a BLOCKER: anchored ground the mode has marked
-//     as solid all the way up. Wind hits it and stops, and everything in its
-//     lee is untouched.
+//   ONLY THE WHALE STOPS THE WIND. A tile with nowhere to go doesn't budge,
+//     but the gust carries on past it and shoves everything loose beyond. The
+//     one exception is a BLOCKER — in Girando that is the Balena, and nothing
+//     else. Wind hits it, stops, and everything in its lee is untouched.
 //   CORNERS DON'T COUNT. A tile has to land orthogonally beside something. One
 //     that ends up touching the board only at a corner falls out of the sky,
 //     which is what keeps a blown board from fraying into a diagonal lattice
@@ -89,19 +89,21 @@ export function zephyrDirs(cell) {
 export const swings = (cell) => !!(cell.type.swing || cell.type.align);
 
 /**
- * Everything the wind can't move: ground a mode has anchored, and a tile a
- * mode has pinned outright. A zephyr overrides both — see the header.
+ * Everything the wind can't move. THE WHALE outranks everything, including a
+ * zephyr: a tile with the Balena lying over it is a tile with a hundred tons
+ * of sky whale on it. Anything else a mode has anchored or pinned is still
+ * unmovable, but a zephyr overrides those — see the header.
  */
 export const immovable = (cell) =>
-  (!!cell.anchored || !!cell.fixed) && !zephyrOn(cell);
+  !!cell.balena || ((!!cell.anchored || !!cell.fixed) && !zephyrOn(cell));
 
 /**
- * …and the smaller set that also STOPS a gust dead. A mode marks these itself
- * (`cell.blocks`), because "solid all the way up" is a rule about that mode's
- * terrain rather than about wind: in Girando it's a crystallised city, and a
- * crystallised road — flat ground you can be blown across — is not.
+ * …and the smaller set that also STOPS a gust dead, so that everything in the
+ * lee of it is untouched. The whale is the one thing that reliably does this;
+ * `cell.blocks` is left for a mode that wants terrain of its own to be solid
+ * all the way up.
  */
-export const blocks = (cell) => !!cell.blocks && !zephyrOn(cell);
+export const blocks = (cell) => !!cell.balena || (!!cell.blocks && !zephyrOn(cell));
 
 /**
  * One gust.
@@ -153,17 +155,29 @@ export function gust(board, { dir, from = null, everywhere = false }) {
     let blocked = false;
     for (const c of row) {
       if (blocked) { sheltered.add(c); continue; }
-      if (blocks(c)) { blocked = true; continue; }  // solid all the way up
-      for (const d of zephyrDirs(c)) {
-        // Blowing our way: absorbed, and the gust hardens.
-        if (d === dir) { strength = Math.min(MAX_STRENGTH, strength + 1); continue; }
-        // Blowing straight back at us: the two brace, and nothing comes of it.
-        if (d === opposite(dir)) continue;
-        report.zephyrs.push({ cell: c, dir: d });  // across the wind: it fires next
-      }
+      if (blocks(c)) { blocked = true; continue; }  // the whale, and nothing else
+
+      // The force on THIS tile is the wind as it arrived — worked out before
+      // the tile's own zephyr is folded in. A zephyr blowing the same way as
+      // the gust used to boost the wind and then be moved by the boosted
+      // figure, which looked exactly like a tile being blown two squares by
+      // its own breath. It hardens the wind BEYOND itself, not upon itself.
       force.set(c, strength);
       report.strength = Math.max(report.strength, strength);
       if (turbineOn(c)) report.turbines.push(c);
+
+      let absorbed = false;
+      for (const d of zephyrDirs(c)) {
+        // Blowing our way: absorbed, and the gust hardens from here on.
+        if (d === dir) { absorbed = true; continue; }
+        // Every other way it points, it FIRES — the gust arrives, the zephyr
+        // wakes, and the weather turns down the new zephyr's own lane. That
+        // includes one pointing straight back at us: the wind rebounds rather
+        // than bracing. Nothing runs away, because a zephyr contributes each
+        // of its directions to a storm exactly once (see `storm`).
+        report.zephyrs.push({ cell: c, dir: d });
+      }
+      if (absorbed) strength = Math.min(MAX_STRENGTH, strength + 1);
     }
   }
 

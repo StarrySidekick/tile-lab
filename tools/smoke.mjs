@@ -242,8 +242,12 @@ for (const mode of modes) {
     return out;
   });
 
-  // The same tap with the confirm step on: the first stages the tile, the
-  // second commits it. Nothing reaches the board until that second tap.
+  // The same tap with the confirm step on. The first tap STAGES; every tap
+  // after that only TURNS the staged tile, however many times you do it; and
+  // the tile reaches the board when the checkmark in the confirm panel is
+  // pressed and not before. The old behaviour — a second tap commits — meant
+  // the gesture for "let me see it the other way round" was also the gesture
+  // that ended the decision.
   await page.click('#newGame');
   const c = await page.evaluate(() => {
     const cv = document.getElementById('board');
@@ -254,14 +258,38 @@ for (const mode of modes) {
     const { renderer, game } = window.LAB;
     const out = {};
     document.getElementById('confirmPlace').checked = true;
-    const spot = game.board.legalPlacements(game.tile, game.placeOpts())[0];
+    // A tile with more than one legal rotation, so "tap turns it" has
+    // something to show; otherwise the turn is a no-op and proves nothing.
+    let spot = null;
+    for (let n = 0; n < 40 && !spot; n++) {
+      const places = game.board.legalPlacements(game.tile, game.placeOpts());
+      const first = places[0];
+      const ways = first
+        ? places.filter((p) => p.x === first.x && p.y === first.y).length : 0;
+      if (ways > 1) spot = first;
+      else { game.deck.push(game.deck.shift()); game.drawTile(); }
+    }
+    if (!spot) return { skip: true };
     const [tx, ty] = renderer.toScreen(spot.x + 0.5, spot.y + 0.5);
     const before = game.board.size;
     ev('pointerdown', tx, ty); ev('pointerup', tx, ty);
     out.staged = !!renderer.pending;
     out.rots = renderer.pending ? renderer.pending.rots.length : 0;
     out.stagedLaid = game.board.size - before;
+
+    // The confirm panel is up, in the claim box's place, with a checkmark.
+    out.panelUp = !document.getElementById('claim').hidden;
+    out.hasCheck = !!document.querySelector('#claimActions button.check');
+
+    // A second and third tap only turn it.
+    const wasRot = renderer.pending.rot;
     ev('pointerdown', tx, ty); ev('pointerup', tx, ty);
+    out.turned = renderer.pending && renderer.pending.rot !== wasRot;
+    out.stillStaged = !!renderer.pending;
+    out.tapLaid = game.board.size - before;
+
+    // …and the checkmark is what puts it down.
+    document.querySelector('#claimActions button.check').click();
     out.committed = game.board.size - before;
     out.cleared = !renderer.pending;
     return out;
@@ -275,13 +303,19 @@ for (const mode of modes) {
   if (!(t.spread > t.start * 1.5)) problems.push(`spreading gave ${t.spread.toFixed(0)} from ${t.start.toFixed(0)}`);
   if (!(t.pinched < t.spread * 0.6)) problems.push(`pinching gave ${t.pinched.toFixed(0)} from ${t.spread.toFixed(0)}`);
   if (t.pinchLaid) problems.push('a pinch placed a tile');
+  if (c.skip) problems.push('no tile with two legal rotations to test with');
   if (!c.staged) problems.push('a tap did not stage a tile for confirming');
   if (c.stagedLaid) problems.push('staging a tile put it straight on the board');
   if (!c.rots) problems.push('a staged tile offered no rotations');
-  if (c.committed !== 1) problems.push('a second tap did not commit the staged tile');
+  if (!c.panelUp) problems.push('the confirm panel did not come up');
+  if (!c.hasCheck) problems.push('the confirm panel had no checkmark');
+  if (!c.turned) problems.push('a second tap did not turn the staged tile');
+  if (!c.stillStaged) problems.push('a second tap unstaged the tile');
+  if (c.tapLaid) problems.push('a second tap put the tile on the board');
+  if (c.committed !== 1) problems.push('the checkmark did not place the staged tile');
   if (!c.cleared) problems.push('committing left the tile staged');
   if (problems.length) { failures++; console.log(`  ✗ touch input: ${problems.join(' · ')}`); }
-  else console.log(`  ✓ touch input       tap places · drag pans · pinch ${t.start.toFixed(0)} → ${t.spread.toFixed(0)} → ${t.pinched.toFixed(0)} · tap-tap confirms`);
+  else console.log(`  ✓ touch input       tap places · drag pans · pinch ${t.start.toFixed(0)} → ${t.spread.toFixed(0)} → ${t.pinched.toFixed(0)} · tap turns, ✓ commits`);
 }
 
 // Score effects: a closure has to put a number on the board and a flash on the

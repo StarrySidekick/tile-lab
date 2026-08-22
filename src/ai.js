@@ -119,10 +119,10 @@ export class Bot {
   decide() {
     const g = this.game;
     // Some modes offer a move that replaces the turn rather than decorating it
-    // — Girando's ship is moored instead of laying a tile. Only the mode can
-    // price that, so it gets asked before we start pricing squares.
-    if ((g.phase === 'market' || g.phase === 'place') && this.level.verbs
-      && g.m.botAction?.(this.seat)) return;
+    // — Girando sends the Balena instead of putting a follower down. Only the
+    // mode can price that, so it gets asked before we start pricing squares.
+    if ((g.phase === 'market' || g.phase === 'place' || g.phase === 'meeple')
+      && this.level.verbs && g.m.botAction?.(this.seat)) return;
     switch (g.phase) {
       case 'market': return this.draft();
       case 'place': return g.m.piece ? this.playPiece() : this.playTile();

@@ -153,6 +153,21 @@ body.lean #panel { display: none; }
 #claim .btns { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; max-width: 200px; }
 #claim .btns button { font-size: 11px; padding: 3px 7px; }
 
+/* The confirm step. Committing a placement is now a deliberate press rather
+   than a second tap on the board, so the checkmark has to look like the answer
+   to the question in the panel's head — not like the first of three buttons. */
+#claim.confirming { border-color: var(--accent); }
+#claim .btns button.check,
+#actions button.check,
+#hudActions button.check {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #17130c;
+  font-weight: 700;
+}
+#claim .btns button.check { font-size: 15px; padding: 7px 10px; width: 100%; text-align: center; }
+#claim .btns button.check kbd { display: none; }
+
 @media (max-width: 760px) {
   #claim { right: 8px; top: 8px; padding: 7px; }
   #claimTile { width: 148px; height: 148px; }

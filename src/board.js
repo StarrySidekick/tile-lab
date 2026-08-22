@@ -104,10 +104,22 @@ export class Board {
    * Can `type` at rotation `rot` legally go at (x,y)?
    *   free   ignore edge matching entirely (sandbox)
    *   cover  the cell may already be occupied (Strata builds on top)
+   *   onto   a set of cell keys the placement must touch orthogonally. This is
+   *          how Girando says "you may only build on the mainland": everything
+   *          adrift is still on the board, still blowable, still scoring — it
+   *          just can't be reached with a tile in your hand.
    */
-  canPlace(x, y, type, rot, { free = false, cover = false } = {}) {
+  canPlace(x, y, type, rot, { free = false, cover = false, onto = null } = {}) {
     if (!this.inBounds(x, y)) return false;
     if (this.cells.has(keyOf(x, y)) && !cover) return false;
+    if (onto && this.size > 0) {
+      let reaches = false;
+      for (let s = 0; s < 4 && !reaches; s++) {
+        const nb = this.neighbor(x, y, s);
+        if (nb && onto.has(keyOf(nb.x, nb.y))) reaches = true;
+      }
+      if (!reaches) return false;
+    }
     if (free) return true;
     const probe = { x, y, type, rot };
     let touches = 0;
