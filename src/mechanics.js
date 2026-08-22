@@ -217,22 +217,25 @@ export const MECHANICS = [
   {
     id: 'dragon', layer: 'exp', pack: 'Exp. 3 — Princess & Dragon (2005) · C3.1: Dragon & Fairy',
     name: 'Dragon',
-    note: 'Woken by a dragon tile, it walks six tiles chosen by the players in '
-      + 'turn and eats every follower it steps on.',
-    status: 'planned', wiki: wiki('The_Princess_and_the_Dragon'), since: 'all',
+    note: 'Woken by a dragon tile, it rampages six tiles and eats every '
+      + 'follower it lands on. The printed game hands each step to the '
+      + 'players in turn; here the beast hunts on its own.',
+    status: 'partial', needs: ['volcano'], groups: ['dragonfire'],
   },
   {
     id: 'volcano', layer: 'exp', pack: 'Exp. 3 — Princess & Dragon (2005) · C3.1: Dragon & Fairy',
     name: 'Volcanoes',
-    note: 'A volcano tile takes no follower and summons the dragon to it.',
-    status: 'planned', needs: ['dragon'], wiki: wiki('The_Princess_and_the_Dragon'), since: 'all',
+    note: 'A volcano erupts and the dragon wheels down onto it — nothing '
+      + 'rampages until a dragon tile follows.',
+    status: 'live', groups: ['dragonfire'],
   },
   {
     id: 'fairy', layer: 'exp', pack: 'Exp. 3 — Princess & Dragon (2005) · C3.1: Dragon & Fairy',
     name: 'Fairy',
-    note: 'Stands beside one of your followers: 1 a turn, 3 when its feature '
-      + 'closes, and the dragon will not touch it.',
-    status: 'planned', needs: ['meeple'], wiki: wiki('The_Princess_and_the_Dragon'), since: 'all',
+    note: 'Call her to stand guard beside a follower: 1 at the start of your '
+      + 'turn, 3 when the guarded feature scores, and neither dragon nor '
+      + 'tower dares touch her tile. She picks the follower nearest the dragon.',
+    status: 'partial', needs: ['meeple'],
   },
   {
     id: 'princess', layer: 'exp', pack: 'Exp. 3 — Princess & Dragon (2005) · C3.1: Dragon & Fairy',
@@ -254,9 +257,10 @@ export const MECHANICS = [
   {
     id: 'tower', layer: 'exp', pack: 'Exp. 4 — The Tower (2006) · C3.1: Towers & Thieves (new mechanic)',
     name: 'Towers',
-    note: 'Stack a storey instead of placing a follower, then capture any '
-      + 'follower within the tower\'s new reach and ransom it back.',
-    status: 'planned', needs: ['meeple'], wiki: wiki('The_Tower'), since: 'all',
+    note: 'Add a floor instead of claiming, and the tower seizes an enemy '
+      + 'follower within its reach — a tile per floor, four ways. Ransom '
+      + 'comes due at 3, paid automatically on the owner’s turn.',
+    status: 'partial', needs: ['meeple'], groups: ['towersg'],
   },
 
   // --- Exp. 5: Abbey & Mayor -----------------------------------------------
@@ -285,9 +289,10 @@ export const MECHANICS = [
   {
     id: 'barn', layer: 'exp', pack: 'Exp. 5 — Abbey & Mayor (2007) · C3.1: Messengers & Mayors',
     name: 'Barn',
-    note: 'Placed on the corner where four tiles meet, it claims that field for '
-      + 'good — and throws every farmer already on it off the board, scoring them.',
-    status: 'planned', needs: ['fields'], wiki: wiki('Abbey_and_Mayor'), since: 'all',
+    note: 'A barn settles its farm early at today’s rate, sends the farmers '
+      + 'home, and keeps the field for good at a point more per city. Placed '
+      + 'on the field rather than the printed four-corner join.',
+    status: 'partial', needs: ['fields'],
   },
 
   // --- Exp. 6: Count, King & Robber ----------------------------------------
@@ -315,15 +320,17 @@ export const MECHANICS = [
   {
     id: 'cult', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008) · C3.1: Jousts & Crests',
     name: 'Cult places (shrines)',
-    note: 'A shrine placed within sight of a cloister starts a duel: the first '
-      + 'of the two to close takes 9, the other takes nothing.',
-    status: 'planned', needs: ['cloisters'], wiki: wiki('The_Cult'), since: 'all',
+    note: 'A shrine within sight of a cloister starts a race: the first of the '
+      + 'two to close scores, and the loser is voided on the spot, its keeper '
+      + 'going home with nothing.',
+    status: 'live', needs: ['cloisters'], groups: ['cults'], wiki: wiki('The_Cult'), since: 'all',
   },
   {
     id: 'riverII', layer: 'exp', pack: 'Exp. 6 — Count, King & Robber (2008) · C3.1: Jousts & Crests',
     name: 'The River II',
-    note: 'A longer river with a fork, a lake and a volcano in it.',
-    status: 'planned', needs: ['river'], wiki: wiki('The_River_II'), since: 'all',
+    note: 'A longer, busier river. The fork — the printed set’s one big idea — '
+      + 'isn’t modelled yet, so this is the length without the branch.',
+    status: 'partial', needs: ['river'],
   },
 
   // --- Exp. 7: The Catapult ------------------------------------------------
@@ -362,16 +369,18 @@ export const MECHANICS = [
   {
     id: 'hills', layer: 'exp', pack: 'Exp. 9 — Hills & Sheep (2014) · C3.1: Sheep & Shepherds (geese replace hills)',
     name: 'Hills',
-    note: 'A hill tile hides a face-down tile under it, and breaks ties on the '
-      + 'feature above it — high ground wins.',
-    status: 'planned', wiki: wiki('Hills_and_Sheep'), since: 'c2',
+    note: 'High ground settles arguments: a tied majority goes outright to '
+      + 'whoever has more followers standing on hills. The hidden tile under '
+      + 'each hill isn’t modelled.',
+    status: 'partial', needs: ['meeple'], groups: ['hillsg'],
   },
   {
     id: 'sheep', layer: 'exp', pack: 'Exp. 9 — Hills & Sheep (2014) · C3.1: Sheep & Shepherds (geese replace hills)',
     name: 'Shepherds & sheep',
-    note: 'Put a shepherd in a field and keep drawing tokens: the flock grows '
-      + 'until you cash it in, or the wolf arrives and takes the lot.',
-    status: 'planned', needs: ['fields'], wiki: wiki('Hills_and_Sheep'), since: 'c2',
+    note: 'Put a shepherd in a field and grow the flock each time the field '
+      + 'grows — or herd it home for a point a sheep. Two wolves in the bag '
+      + 'take everything.',
+    status: 'live', needs: ['fields'],
   },
   {
     id: 'vineyards', layer: 'exp', pack: 'Exp. 9 — Hills & Sheep (2014) · C3.1: Sheep & Shepherds (geese replace hills)',
@@ -385,16 +394,16 @@ export const MECHANICS = [
   {
     id: 'circus', layer: 'exp', pack: 'Exp. 10 — Under the Big Top (2017) · C3.1: Circus & Artists',
     name: 'The big top',
-    note: 'The circus moves around the board; followers around the ring when it '
-      + 'moves on get paid for being there.',
-    status: 'planned', wiki: wiki('Under_the_Big_Top'), since: 'c2',
+    note: 'The tent moves from big-top tile to big-top tile, and each move '
+      + 'pays 2 per follower around the ground it leaves.',
+    status: 'partial', needs: ['meeple'], groups: ['bigtopg'],
   },
   {
     id: 'acrobats', layer: 'exp', pack: 'Exp. 10 — Under the Big Top (2017) · C3.1: Circus & Artists',
     name: 'Acrobats',
-    note: 'Followers stack into a human pyramid on an acrobat tile, and the '
-      + 'whole troupe scores when the third one climbs on.',
-    status: 'planned', needs: ['meeple'], wiki: wiki('Under_the_Big_Top'), since: 'c2',
+    note: 'Followers stack into a pyramid on an acrobat tile — anyone’s. The '
+      + 'third one up pays every member 5 and the troupe takes a bow.',
+    status: 'live', needs: ['meeple'], groups: ['circusg'],
   },
   {
     id: 'ringmaster', layer: 'exp', pack: 'Exp. 10 — Under the Big Top (2017) · C3.1: Circus & Artists',
@@ -433,51 +442,57 @@ export const MECHANICS = [
   },
   {
     id: 'messengers', layer: 'mini', pack: 'The Messengers (2012)', name: 'Messengers',
-    note: 'A second marker on the score track. Land either of them on a multiple '
-      + 'of five and you draw a message worth points or an extra action.',
-    status: 'planned', wiki: wiki('The_Messengers'), since: 'all',
+    note: 'Land your score exactly on a multiple of five and a message arrives: '
+      + 'the engine reads it and takes the better of the printed choices. The '
+      + 'second scoring figure isn’t modelled.',
+    status: 'partial',
   },
   {
     id: 'ferries', layer: 'mini', pack: 'The Ferries (2013)', name: 'Ferries',
-    note: 'A ferry on a lake joins two road ends, and can be shunted to a '
-      + 'different pair later — breaking a road that had already been paid for.',
-    status: 'planned', needs: ['roads'], wiki: wiki('The_Ferries'), since: 'all',
+    note: 'Several roads end at the lake; a ferry decides which two are really '
+      + 'one. The engine moors it where it does the most; repositioning '
+      + 'isn’t modelled yet.',
+    status: 'partial', needs: ['roads'], groups: ['ferriesg'],
   },
   {
     id: 'goldmines', layer: 'mini', pack: 'The Gold Mines (2014)', name: 'Gold mines',
-    note: 'Ingots pile onto tiles and go to whoever closes the feature under '
-      + 'them. What an ingot is worth is not known until the game ends.',
-    status: 'planned', wiki: wiki('The_Gold_Mines'), since: 'all',
+    note: 'Ingots pile onto tiles and go to whoever holds the feature under '
+      + 'them when it closes. Worth more the more you mined: 1 each up to 3, up '
+      + 'to 4 each past 9. The second ingot lands where the engine judges best.',
+    status: 'partial', groups: ['goldrush'], wiki: wiki('The_Gold_Mines'), since: 'all',
   },
   {
     id: 'mageWitch', layer: 'mini', pack: 'Mage & Witch (2014)', name: 'Mage & witch',
-    note: 'The mage adds 1 a tile to the feature he stands on; the witch halves '
-      + 'whatever she is standing on, rounded up.',
-    status: 'planned', wiki: wiki('The_Mage_and_the_Witch'), since: 'all',
+    note: 'A magic tile forces one of the pair onto an unfinished road or city: '
+      + 'the mage adds 1 a tile to whatever he stands on, the witch halves it, '
+      + 'rounded up. They never share a feature.',
+    status: 'live', groups: ['magic'], wiki: wiki('The_Mage_and_the_Witch'), since: 'all',
   },
   {
     id: 'robbers', layer: 'mini', pack: 'The Robbers (2015)', name: 'Robbers',
-    note: 'Park a robber on another player\'s space on the score track and take '
-      + 'half of the next thing they score.',
-    status: 'planned', wiki: wiki('The_Robbers'), since: 'all',
+    note: 'Post your robber on an opponent and take half of the next thing they '
+      + 'score — they keep the full amount, you skim the shadow of it.',
+    status: 'live', needs: ['meeple'], groups: ['robbers'],
   },
   {
     id: 'cropCircles', layer: 'mini', pack: 'The Crop Circles (2016)', name: 'Crop circles',
-    note: 'A crop circle tile makes every player either add a follower to a '
-      + 'matching feature, or take one back off.',
-    status: 'planned', needs: ['meeple'], wiki: wiki('The_Crop_Circles'), since: 'all',
+    note: 'Whoever lays a crop circle decides for the table: everyone adds a '
+      + 'follower beside one of theirs of the shown kind, or everyone takes one '
+      + 'back. The additions are placed by the engine.',
+    status: 'partial', needs: ['meeple'], groups: ['crops'], wiki: wiki('The_Crop_Circles'), since: 'all',
   },
   {
     id: 'tunnel', layer: 'mini', pack: 'The Tunnel (2010)', name: 'Tunnels',
-    note: 'Two matching tunnel tokens join two road ends anywhere on the board '
-      + 'into one road.',
-    status: 'planned', needs: ['roads'], wiki: wiki('The_Tunnel'), since: 'all',
+    note: 'A road that dives into the hill. The next tunnel mouth laid joins '
+      + 'its road to the one still waiting, however far apart they are.',
+    status: 'partial', needs: ['roads'], groups: ['tunnels'], wiki: wiki('The_Tunnel'), since: 'all',
   },
   {
     id: 'plague', layer: 'mini', pack: 'The Plague (2010)', name: 'The Plague',
-    note: 'Infection spreads from flea-bitten tiles along features and removes '
-      + 'the followers it reaches.',
-    status: 'planned', needs: ['meeple'], wiki: wiki('The_Plague'), since: 'all',
+    note: 'An outbreak clears every follower in the surrounding eight tiles, '
+      + 'sent home with nothing. The printed slow spread of fleas is collapsed '
+      + 'into the one bad moment.',
+    status: 'partial', needs: ['meeple'], groups: ['plagues'], wiki: wiki('The_Plague'), since: 'all',
   },
   {
     id: 'phantom', layer: 'mini', pack: 'The Phantom (2011)', name: 'The Phantom',
@@ -499,58 +514,60 @@ export const MECHANICS = [
   },
   {
     id: 'barbers', layer: 'mini', pack: 'The Barber-Surgeons (2018)', name: 'Barber-surgeons',
-    note: 'Bathhouse tiles that let a follower already on the board be moved '
-      + 'somewhere better.',
-    status: 'planned', needs: ['meeple'], wiki: wiki('The_Barber-Surgeons'), since: 'c2',
+    note: 'A bathhouse lets one of your followers leave wherever it was stuck '
+      + 'and come out onto the new tile instead.',
+    status: 'partial', needs: ['meeple'], groups: ['baths'],
   },
   {
     id: 'watchtowers', layer: 'mini', pack: 'The Watchtowers (2018)', name: 'Watchtowers',
-    note: 'Each watchtower scores for a particular thing it can see in the eight '
-      + 'tiles around it — followers, roads, cities, cloisters.',
-    status: 'planned', wiki: wiki('The_Watchtowers'), since: 'c2',
+    note: 'Stand a follower on the tower and close its feature: the tower pays '
+      + '2 for every follower it can see, yours or not. One tower design of the '
+      + 'printed six, for now.',
+    status: 'partial', groups: ['watchtowers'], wiki: wiki('The_Watchtowers'), since: 'c2',
   },
   {
     id: 'littleBuildings', layer: 'mini', pack: 'Little Buildings (2011)', name: 'Little buildings',
-    note: 'Sheds, houses and towers placed on a tile you just laid, paid out at '
-      + 'the end for what they ended up beside.',
-    status: 'planned', wiki: wiki('The_Little_Buildings'), since: 'all',
+    note: 'A shed, a house and a tower each, placed on tiles you lay — on top '
+      + 'of whatever else the turn does. Worth 1, 2 and 3 at the end.',
+    status: 'live', wiki: wiki('The_Little_Buildings'), since: 'all',
   },
   {
     id: 'windRoses', layer: 'mini', pack: 'The Wind Roses (2013)', name: 'Wind roses',
-    note: 'A tile laid on the correct side of the start tile pays a small bonus, '
-      + 'and more again if it completes something.',
-    status: 'planned', wiki: wiki('The_Wind_Roses'), since: 'all',
+    note: 'Four tiles, one per quadrant of the map. Laid in its own quadrant, a '
+      + 'rose pays 3 on the spot; laid anywhere else, nothing.',
+    status: 'live', groups: ['windroses'], wiki: wiki('The_Wind_Roses'), since: 'all',
   },
   {
     id: 'besiegers', layer: 'mini', pack: 'The Besiegers (2003)', name: 'Besiegers',
-    note: 'Siege camps around a city: the city pays half, and the besiegers take '
-      + 'the other half.',
-    status: 'planned', needs: ['cities'], wiki: wiki('The_Besiegers'), since: 'c1',
+    note: 'A city under siege is worth half, rounded up. The printed escape '
+      + 'through a nearby cloister isn’t modelled yet.',
+    status: 'partial', needs: ['cities'], groups: ['sieges'], wiki: wiki('The_Besiegers'), since: 'c1',
   },
   {
     id: 'monasteries', layer: 'mini', pack: 'Monasteries of the world (2013–)', name: 'Regional monasteries',
-    note: 'German, Dutch & Belgian and Spanish monastery tiles — each set with '
-      + 'its own local completion rule.',
-    status: 'planned', needs: ['cloisters'], wiki: wiki('German_Monasteries'), since: 'all',
+    note: 'German-style monasteries: left unfinished, one commands its row and '
+      + 'column — 1 per tile in the unbroken runs, plus itself.',
+    status: 'partial', needs: ['cloisters'], groups: ['abbeyDE'],
   },
   {
     id: 'orchards', layer: 'mini', pack: 'Fruit-Bearing Trees (2019)', name: 'Fruit-bearing trees',
-    note: 'Orchard tiles that pay a bonus to whoever closes the feature growing '
-      + 'through them.',
-    status: 'planned', wiki: wiki('The_Fruit-Bearing_Trees'), since: 'c2',
+    note: 'A tree pays whoever lays each of the next four tiles beside it — '
+      + 'the fruit ripens and is picked as the country grows around it.',
+    status: 'partial', groups: ['orchards'],
   },
   {
     id: 'signposts', layer: 'mini', pack: 'The Signposts (2021)', name: 'Signposts',
-    note: 'Road tiles that point somewhere, and pay for whatever is found in '
-      + 'that direction.',
-    status: 'planned', needs: ['roads'], wiki: wiki('The_Signposts'), since: 'c3',
+    note: 'A signpost adds 2 to its road when the road closes. The printed '
+      + 'direction-matching is folded into the flat bonus.',
+    status: 'partial', needs: ['roads'], groups: ['signposts'],
   },
 
   {
     id: 'gifts', layer: 'mini', pack: 'The Gifts (2020)', name: 'The Gifts',
-    note: 'Extend somebody else’s road or city and you are handed a face-down '
-      + 'gift card, to be opened before a later placement.',
-    status: 'planned', wiki: wiki('The_Gifts'), since: 'c2',
+    note: 'Extend somebody else’s road or city and a gift arrives on the spot — '
+      + 'a couple of points, or an extra tile this turn. Opened immediately '
+      + 'rather than held.',
+    status: 'partial',
   },
   {
     id: 'bets', layer: 'mini', pack: 'The Bets (2020)', name: 'The Bets',
@@ -560,22 +577,24 @@ export const MECHANICS = [
   {
     id: 'peasantRevolts', layer: 'mini', pack: 'The Peasant Revolts (2020)',
     name: 'Peasant revolts',
-    note: 'A revolt tile names a feature type. Your unprotected followers '
-      + 'standing in one come straight home; your protected ones pay 2 each.',
-    status: 'planned', needs: ['meeple'], wiki: wiki('The_Peasant_Revolts'), since: 'c2',
+    note: 'A revolt names a feature type: your lone followers on one flee home, '
+      + 'and any standing in pairs weather it for 2 apiece. “Protected” is '
+      + 'read as “not alone” here.',
+    status: 'partial', needs: ['meeple'], groups: ['revolts'],
   },
   {
     id: 'wonders', layer: 'mini', pack: 'The Wonders of Humanity (2020)',
     name: 'Wonders of humanity',
-    note: 'Pairs of followers wait along the score track; pass one and you take '
-      + 'a wonder tile to lay and score later.',
-    status: 'planned', wiki: wiki('The_Wonders_of_Humanity'), since: 'c2',
+    note: 'The first player past 15, 20 and 25 raises a wonder, worth 8 at the '
+      + 'end. The printed meeple-pairs on the track are folded into the '
+      + 'milestones.',
+    status: 'partial',
   },
   {
     id: 'maps', layer: 'mini', pack: 'The Maps (2020)', name: 'The Maps',
-    note: 'Play on a printed map with several start squares and a hard border, '
-      + 'instead of out across an open table.',
-    status: 'planned', wiki: wiki('The_Maps'), since: 'c2',
+    note: 'Play within a hard border — an 11×11 map — instead of out across an '
+      + 'open table. The printed start squares aren’t modelled.',
+    status: 'partial',
   },
   {
     id: 'castlesGermany', layer: 'mini', pack: 'Castles in Germany (2020)',
@@ -587,9 +606,9 @@ export const MECHANICS = [
   {
     id: 'japanese', layer: 'mini', pack: 'Japanese Buildings (2017)',
     name: 'Japanese buildings',
-    note: 'Regional buildings with their own completion rule, from the Japanese '
-      + 'edition.',
-    status: 'planned', wiki: wiki('Japanese_Buildings'), since: 'c2',
+    note: 'The Japanese edition’s buildings, commanding their row and '
+      + 'column the same way the German monasteries do.',
+    status: 'partial', groups: ['abbeyJP'],
   },
   {
     id: 'mists', layer: 'exp', pack: 'Mists over Carcassonne (2023)',
@@ -608,8 +627,9 @@ export const MECHANICS = [
   },
   {
     id: 'school', layer: 'promo', pack: 'The School (2011)', name: 'The School',
-    note: 'A schoolhouse tile and a teacher who follows whoever last scored.',
-    status: 'planned', wiki: wiki('The_School'), since: 'all',
+    note: 'Close the road the school stands on and the teacher follows you: '
+      + '+2 on your next scored feature, then back to his desk.',
+    status: 'partial', groups: ['schools'],
   },
   {
     id: 'markets', layer: 'promo', pack: 'The Markets of Leipzig (2015)', name: 'Markets of Leipzig',
@@ -772,6 +792,13 @@ export const FIGURES = [
     // The abbot is the only figure who may keep a garden, and the only reason
     // a garden is its own feature type rather than another cloister.
     allows: (f) => f.type === 'monastery' || f.type === 'garden',
+  },
+  {
+    id: 'shepherd', mech: 'sheep', supply: 'shepherds', key: 'S',
+    name: 'shepherd', label: 'Send the shepherd', using: 'Sending the SHEPHERD',
+    // A shepherd stands in a field but is no farmer: he counts for nothing in
+    // the farm majority, and his flock is his own business.
+    allows: (f) => f.type === 'field',
   },
 ];
 

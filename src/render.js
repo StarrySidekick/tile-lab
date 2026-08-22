@@ -6,7 +6,7 @@
 // its own fixed camera — same Board, same tile art, different transform.
 // ---------------------------------------------------------------------------
 
-import { drawTile, drawMeeple, drawPig, PLAYER_COLORS } from './art.js';
+import { drawTile, drawMeeple, drawPig, drawIngots, drawBuilding, PLAYER_COLORS } from './art.js';
 import { tileSprite } from './sprites.js';
 import { LIGHT } from './light.js';
 import { THEME, applyDusk } from './theme.js';
@@ -745,6 +745,7 @@ export class Renderer {
   // --- classic meeples ------------------------------------------------------
 
   drawMeeples(game) {
+    this.drawTokens(game);
     this.drawPigs(game);
     for (const cell of game.board.cells.values()) {
       if (!cell.meeple || !this.onScreen(cell.x, cell.y)) continue;
@@ -765,6 +766,79 @@ export class Renderer {
           kind: cell.meeple.kind,
           big: cell.meeple.big,
         });
+    }
+  }
+
+  /** Gold, little buildings, and the two magic figures. */
+  drawTokens(game) {
+    const z = this.cam.zoom;
+    for (const cell of game.board.cells.values()) {
+      if (!this.onScreen(cell.x, cell.y)) continue;
+      if (cell.gold) {
+        const [sx, sy] = this.toScreen(cell.x + 0.18, cell.y + 0.82);
+        drawIngots(this.ctx, sx, sy, z * 0.16, cell.gold);
+      }
+      if (cell.building) {
+        const [sx, sy] = this.toScreen(cell.x + 0.82, cell.y + 0.20);
+        drawBuilding(this.ctx, sx, sy, z * 0.20, cell.building.kind,
+          PLAYER_COLORS[cell.building.player]);
+      }
+    }
+    // Pyramids and flocks stack on their own tiles.
+    for (const cell of game.board.cells.values()) {
+      if (!this.onScreen(cell.x, cell.y)) continue;
+      if (cell.pyramid?.length) {
+        for (let i = 0; i < cell.pyramid.length; i++) {
+          const [sx, sy] = this.toScreen(cell.x + 0.5, cell.y + 0.62 - i * 0.22);
+          drawMeeple(this.ctx, sx, sy, z * (0.34 - i * 0.04), PLAYER_COLORS[cell.pyramid[i]]);
+        }
+      }
+      if (cell.flock?.length) {
+        const n = cell.flock.reduce((a, b) => a + b, 0);
+        const [sx, sy] = this.toScreen(cell.x + 0.80, cell.y + 0.80);
+        this.ctx.fillStyle = '#e8e2d4';
+        this.ctx.beginPath();
+        this.ctx.ellipse(sx, sy, z * 0.10, z * 0.07, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.fillStyle = '#2a2433';
+        this.ctx.font = `${Math.max(9, z * 0.16)}px ui-sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(String(n), sx, sy - z * 0.12);
+      }
+    }
+    // Tower floors stack as rings; the dragon is unmistakable.
+    for (const cell of game.board.cells.values()) {
+      if (!cell.tower || !this.onScreen(cell.x, cell.y)) continue;
+      const [sx, sy] = this.toScreen(cell.x + 0.5, cell.y + 0.5);
+      for (let i = 0; i < cell.tower; i++) {
+        this.ctx.strokeStyle = 'rgba(79,68,51,0.9)';
+        this.ctx.lineWidth = Math.max(2, z * 0.05);
+        this.ctx.strokeRect(sx - z * (0.20 - i * 0.03), sy - z * (0.20 - i * 0.03) - i * z * 0.08,
+          z * (0.40 - i * 0.06), z * (0.40 - i * 0.06));
+      }
+    }
+    if (game.dragon) {
+      const [sx, sy] = this.toScreen(game.dragon.x + 0.5, game.dragon.y + 0.5);
+      this.ctx.font = `${z * 0.6}px serif`;
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText('🐉', sx, sy);
+    }
+    if (game.fairy) {
+      const [sx, sy] = this.toScreen(game.fairy.x + 0.78, game.fairy.y + 0.26);
+      this.ctx.font = `${z * 0.34}px serif`;
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText('🧚', sx, sy);
+    }
+    for (const [fig, color] of [[game.mage, '#8a5fbf'], [game.witch, '#d47a2f']]) {
+      if (!fig) continue;
+      const cell = game.board.get(fig.x, fig.y);
+      if (!cell || !this.onScreen(fig.x, fig.y)) continue;
+      const anchor = cell.type.spots[fig.feat] || [0.5, 0.5];
+      const spot = rotPoint(anchor, cell.rot);
+      const [sx, sy] = this.toScreen(fig.x + spot[0] * 0.6 + 0.2, fig.y + spot[1] * 0.6 + 0.2);
+      drawMeeple(this.ctx, sx, sy, z * 0.34, color, { hero: true });
     }
   }
 

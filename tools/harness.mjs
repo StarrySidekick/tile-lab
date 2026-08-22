@@ -107,7 +107,11 @@ function step(game, rng) {
       }
       return;
     }
+    case 'magic': { game.magicAuto(); return; }
+    case 'rob': { if (rng() < 0.5) game.robAuto(); else game.robSkip(); return; }
+    case 'crop': { game.cropChoose(rng() < 0.5 ? 'add' : 'remove'); return; }
     case 'meeple': {
+      if (game.canPlaceBuilding?.() && rng() < 0.5) game.placeBuilding();
       const opts = game.meepleOptions();
       if (game.canRecall() && rng() < 0.08) return void game.beginRecall();
       if (game.has('bigMeeple') && game.player.big > 0 && rng() < 0.3) game.toggleBig();
@@ -768,6 +772,424 @@ function runMode(spec, games, extraOpts = {}, label = '') {
  * tile that carries the symbol has to meet a specific situation and waiting for
  * a shuffle to produce one is not a test.
  */
+/**
+ * The symbol batch: mage & witch, gold, cults, wind roses, tunnels, plague,
+ * sieges and buildings — checked on hand-built boards where the arithmetic
+ * can be read straight off the printed rule.
+ */
+/** The score-side batch: robbers, messages, gifts, revolts, signposts, fruit. */
+/** Hills, sheep, the barn, the acrobats and the baths. */
+/** The dragon, the fairy, the tower, the ferries and the far monasteries. */
+/** The big top, the teacher and the wonders. */
+function checkShowBatch() {
+  console.log('\nthe travelling show');
+  const ok = (what, cond, detail = '') => {
+    if (cond) console.log(`  ✓ ${what.padEnd(46)} ${detail}`);
+    else { failures++; console.log(`  ✗ ${what}${detail ? `: ${detail}` : ''}`); }
+  };
+
+  // the circus pays the old ground when it moves on
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'bigtopg'], options: { circus: true } });
+    g.board.place(20, 20, TILES.Bga, 0);
+    g.moveBigTop(g.board.get(20, 20));
+    g.board.place(21, 20, TILES.E, 0);
+    g.board.addMeeple(21, 20, 0, 1);
+    g.board.place(30, 30, TILES.Bga, 0);
+    const before = g.players[1].score;
+    g.moveBigTop(g.board.get(30, 30));
+    ok('the circus pays 2 a head as it moves on', g.players[1].score === before + 2);
+  }
+
+  // the teacher follows the school road's closer
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'schools'], options: { school: true } });
+    g.board.place(20, 20, TILES.Sca, 0);
+    g.board.place(19, 20, TILES.Rb, 1);
+    g.board.place(21, 20, TILES.Rb, 3);
+    g.board.addMeeple(20, 20, 0, 0);
+    g.award(g.board.featureOf(20, 20, 0), false, 0);
+    ok('closing the school road takes the teacher', g.teacher === 0);
+    g.board.place(30, 30, TILES.E, 0);
+    g.board.place(30, 29, TILES.E, 2);
+    g.board.addMeeple(30, 30, 0, 0);
+    const before = g.players[0].score;
+    g.award(g.board.featureOf(30, 30, 0), false, 0);
+    ok('…and his lesson pays 2 on the next closure',
+      g.players[0].score === before + 6 && g.teacher === null);
+  }
+
+  // wonders go to whoever passes the milestone first
+  {
+    const g = new Game({ players: 2, seed: 1, options: { wonders: true } });
+    g.players[0].score = 14;
+    g.players[0].score += 2; g.onPaid(0, 2);
+    g.players[1].score = 16;
+    g.players[1].score += 2; g.onPaid(1, 2);
+    ok('the first past 15 takes the wonder', g.players[0].wonders === 1 && g.players[1].wonders === 0);
+  }
+}
+
+function checkBeastBatch() {
+  console.log('\ndragons, towers and ferries');
+  const ok = (what, cond, detail = '') => {
+    if (cond) console.log(`  ✓ ${what.padEnd(46)} ${detail}`);
+    else { failures++; console.log(`  ✗ ${what}${detail ? `: ${detail}` : ''}`); }
+  };
+
+  // --- the volcano summons, the dragon devours -------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'dragonfire'], options: { dragon: true, volcano: true } });
+    g.board.place(20, 20, TILES.E, 0);
+    g.board.addMeeple(20, 20, 0, 1);
+    g.board.place(21, 20, TILES.Dva, 0);
+    g.onMarks(g.board.get(21, 20));
+    ok('the volcano brings the dragon down', !!g.dragon
+      && g.dragon.x === 21 && g.dragon.y === 20);
+    const had = g.players[1].meeples;
+    g.rampage();
+    ok('…and the rampage eats the neighbour', g.players[1].meeples === had + 1
+      && !g.board.get(20, 20).meeple);
+  }
+
+  // --- the fairy pays and protects -------------------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, options: { fairy: true } });
+    g.board.place(30, 30, TILES.E, 0);
+    g.board.addMeeple(30, 30, 0, 0);
+    g.fairy = { x: 30, y: 30 };
+    g.current = 0;
+    const before = g.players[0].score;
+    g.startTurn();
+    ok('the fairy pays 1 at the start of the turn', g.players[0].score === before + 1);
+    g.board.place(30, 29, TILES.E, 2);
+    g.award(g.board.featureOf(30, 30, 0), false, 0);
+    ok('…and 3 more when the guarded feature scores',
+      g.players[0].score >= before + 1 + 4 + 3, `score ${g.players[0].score}`);
+  }
+
+  // --- the tower captures within its reach -----------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'towersg'], options: { tower: true } });
+    g.board.place(40, 40, TILES.Twb, 0);
+    g.board.place(41, 40, TILES.E, 0);
+    g.board.addMeeple(41, 40, 0, 1);            // an enemy one tile out
+    g.current = 0;
+    g.phase = 'meeple';
+    g.lastPlaced = { x: 40, y: 40, type: TILES.Twb };
+    g.buildTower({ x: 40, y: 40 });
+    ok('one floor reaches one tile out', g.prisoners.length === 1
+      && g.prisoners[0].owner === 1 && !g.board.get(41, 40).meeple);
+    g.players[1].score = 5;
+    g.current = 1;
+    const captorBefore = g.players[0].score;
+    g.payRansoms();
+    ok('…and the ransom comes due at 3', g.players[1].score === 2
+      && g.players[0].score === captorBefore + 3 && g.players[1].meeples === 8);
+  }
+
+  // --- the ferry joins two roads across the lake -----------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'ferriesg'], options: { ferries: true } });
+    g.board.place(50, 50, TILES.Fya, 0);
+    g.placeFerry(g.board.get(50, 50));
+    const cell = g.board.get(50, 50);
+    ok('the ferry moors between two stubs', Array.isArray(cell.ferry)
+      && g.board.featureOf(50, 50, cell.ferry[0]) === g.board.featureOf(50, 50, cell.ferry[1]));
+  }
+
+  // --- a regional monastery commands its row and column ----------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'abbeyDE'], options: { monasteries: true } });
+    g.board.place(60, 60, TILES.Rmd, 0);
+    for (const [x, y] of [[61, 60], [62, 60], [59, 60], [60, 61]]) g.board.place(x, y, TILES.E, 0);
+    const d = g.board.featureOf(60, 60, 0);
+    const pts = g.valueOf(d, true);
+    // Runs: 2 east + 1 west + 1 south = 4, plus itself = 5; the ordinary
+    // count is 1 + 4 neighbours = 5 too — equal here, so accept >= 5.
+    ok('the unfinished monastery commands its runs', pts >= 5, `${pts}`);
+    g.board.place(63, 60, TILES.E, 0);          // stretch the eastern run
+    ok('…and a longer run beats the neighbourhood', g.valueOf(d, true) === 6,
+      `${g.valueOf(d, true)}`);
+  }
+}
+
+function checkFlockBatch() {
+  console.log('\nhills, flocks and pyramids');
+  const ok = (what, cond, detail = '') => {
+    if (cond) console.log(`  ✓ ${what.padEnd(46)} ${detail}`);
+    else { failures++; console.log(`  ✗ ${what}${detail ? `: ${detail}` : ''}`); }
+  };
+
+  // --- hills settle the tie --------------------------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'hillsg'], options: { hills: true } });
+    g.board.place(30, 30, TILES.Hlb, 0);
+    g.board.place(30, 29, TILES.E, 2);
+    g.board.addMeeple(30, 30, 0, 0);           // on the hill
+    g.board.addMeeple(30, 29, 0, 1);           // on the flat
+    const d = g.board.featureOf(30, 30, 0);
+    ok('the hill takes a tied city outright',
+      g.board.majority(d, { hills: true }).join() === '0');
+    ok('…and without hills both still score',
+      g.board.majority(d).length === 2);
+  }
+
+  // --- the shepherd grows and herds ------------------------------------------
+  {
+    const g = new Game({ players: 2, seed: 3, options: { sheep: true } });
+    g.board.place(20, 20, TILES.U, 0);
+    g.lastPlaced = { x: 20, y: 20, type: TILES.U };
+    g.phase = 'meeple'; g.current = 0;
+    g.useFigure('shepherd');
+    const o = g.meepleOptions().find((z) => z.f.type === 'field');
+    g.placeMeeple(o.i, o);
+    g.current = 0;
+    const cell = [...g.board.cells.values()].find((c) => c.meeple?.kind === 'shepherd');
+    ok('the shepherd arrives with a first token', (cell.flock || []).length === 1);
+    g.board.place(21, 20, TILES.U, 0);
+    g.lastPlaced = { x: 21, y: 20, type: TILES.U };
+    g.phase = 'meeple'; g.sheepActed = false;
+    ok('extending the field wakes the shepherd', !!g.shepherdExtended());
+    const before = g.players[0].score;
+    g.herdFlock();
+    ok('herding pays a point a sheep and goes home',
+      g.players[0].score > before && g.players[0].shepherds === 1
+        && g.flockBag.length === 18);
+  }
+
+  // --- the barn settles a farm early -----------------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, options: { barn: true } });
+    g.board.place(40, 40, TILES.E, 0);
+    g.board.place(40, 39, TILES.E, 2);         // one completed city
+    g.board.place(41, 40, TILES.U, 1);         // field alongside... U rot1 roads E-W
+    const fi = TILES.E.feats.findIndex((f) => f.type === 'field');
+    g.board.addMeeple(40, 40, fi, 0);          // a farmer on the city's field
+    g.lastPlaced = { x: 41, y: 40, type: TILES.U };
+    g.phase = 'meeple'; g.current = 0;
+    const spots = g.barnSpots();
+    ok('the barn finds the farmed field', spots.length === 1);
+    const before = g.players[0].score;
+    g.placeBarn();
+    ok('…settles it early at 3 per city', g.players[0].score === before + 3,
+      `+${g.players[0].score - before}`);
+    // The farmer went out via board.addMeeple, which bypasses the supply — so
+    // his homecoming shows as one MORE than the untouched seven.
+    ok('…and sends the farmer home', g.players[0].meeples === 8);
+  }
+
+  // --- the pyramid pays on the third -----------------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'circusg'], options: { acrobats: true } });
+    g.board.place(50, 50, TILES.Aca, 0);
+    const climb = () => {
+      g.lastPlaced = { x: 50, y: 50, type: TILES.Aca };
+      g.phase = 'meeple';
+      g.joinPyramid();
+    };
+    climb(); climb(); climb();                 // seats alternate as turns pass
+    const total = g.players[0].score + g.players[1].score;
+    ok('three acrobats up pays 5 apiece', total === 15, `${g.players[0].score}+${g.players[1].score}`);
+    ok('…and the troupe steps down',
+      (g.board.get(50, 50).pyramid || []).length === 0
+        && g.players[0].meeples + g.players[1].meeples === 14);
+  }
+}
+
+function checkScoreBatch() {
+  console.log('\nthe score-side batch');
+  const ok = (what, cond, detail = '') => {
+    if (cond) console.log(`  ✓ ${what.padEnd(46)} ${detail}`);
+    else { failures++; console.log(`  ✗ ${what}${detail ? `: ${detail}` : ''}`); }
+  };
+
+  // --- a robber skims half of the next payout --------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'robbers'], options: { robbers: true } });
+    g.thieves.push({ thief: 1, victim: 0 });
+    g.board.place(20, 20, TILES.E, 0);
+    g.board.place(20, 19, TILES.E, 2);
+    g.board.addMeeple(20, 20, 0, 0);
+    g.award(g.board.featureOf(20, 20, 0), false, 0);
+    ok('the robber takes half, the victim keeps all',
+      g.players[0].score === 4 && g.players[1].score === 2,
+      `${g.players[0].score} / ${g.players[1].score}`);
+    ok('…and the robber goes home to be posted again', g.players[1].robbers === 2);
+  }
+
+  // --- a score landing on a five brings a message ----------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, options: { messengers: true } });
+    g.players[0].score = 1;
+    g.board.place(20, 20, TILES.E, 0);
+    g.board.place(20, 19, TILES.E, 2);           // a closed city worth 4: 1 + 4 = 5
+    g.board.addMeeple(20, 20, 0, 0);
+    g.award(g.board.featureOf(20, 20, 0), false, 0);
+    ok('landing on a five brings a message', g.players[0].score >= 7,
+      `score ${g.players[0].score}`);
+  }
+
+  // --- a signpost fattens its road -------------------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'signposts'], options: { signposts: true } });
+    g.board.place(30, 30, TILES.Sna, 0);
+    g.board.place(30, 29, TILES.Rb, 2);          // dead end caps N... Rb is roads group
+    const d = g.board.featureOf(30, 30, 0);
+    const pts = g.valueOf(d, false);
+    ok('a signpost adds 2 to its road', pts === d.tiles.size + 2, `${d.tiles.size} tiles -> ${pts}`);
+  }
+
+  // --- a revolt spares the follower with company -----------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'revolts'], options: { peasantRevolts: true } });
+    g.board.place(40, 40, TILES.E, 0);           // a lone knight, doomed
+    g.board.addMeeple(40, 40, 0, 0);
+    const had = g.player.meeples;
+    g.revolt({ type: TILES.Rva });
+    ok('a lone follower flees the revolt',
+      g.player.meeples === had + 1 && !g.board.get(40, 40).meeple);
+  }
+
+  // --- fruit ripens four times ------------------------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'orchards'], options: { orchards: true } });
+    g.board.place(50, 50, TILES.Fta, 0);
+    g.board.get(50, 50).fruitLeft = 4;
+    const before = g.player.score;
+    for (const [x, y] of [[51, 50], [49, 50], [50, 51], [50, 49], [51, 51]]) {
+      g.board.place(x, y, TILES.E, 0);
+      g.checkFruit(g.board.get(x, y));
+    }
+    ok('a tree pays exactly four neighbours', g.player.score === before + 4,
+      `+${g.player.score - before}`);
+  }
+
+  // --- the maps put a wall around the world ----------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, options: { maps: true } });
+    ok('the map has a border', !g.board.inBounds(6, 0) && g.board.inBounds(5, 0));
+  }
+}
+
+function checkSymbolBatch() {
+  console.log('\nthe symbol batch');
+  const ok = (what, cond, detail = '') => {
+    if (cond) console.log(`  ✓ ${what.padEnd(46)} ${detail}`);
+    else { failures++; console.log(`  ✗ ${what}${detail ? `: ${detail}` : ''}`); }
+  };
+
+  // --- the mage adds a point a tile, the witch halves ------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'magic'], options: { mageWitch: true } });
+    g.board.place(20, 20, TILES.E, 0);
+    g.board.place(20, 19, TILES.E, 2);            // a closed 2-tile city, worth 4
+    const d = g.board.featureOf(20, 20, 0);
+    const plain = g.valueOf(d, false);
+    g.mage = { x: 20, y: 20, feat: 0 };
+    const maged = g.valueOf(d, false);
+    g.mage = null;
+    g.witch = { x: 20, y: 20, feat: 0 };
+    const witched = g.valueOf(d, false);
+    ok('the mage adds a point per tile', maged === plain + 2, `${plain} -> ${maged}`);
+    ok('the witch halves, rounded up', witched === Math.ceil(plain / 2), `${plain} -> ${witched}`);
+  }
+
+  // --- a besieged city is worth half -----------------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'sieges'], options: { besiegers: true } });
+    g.board.place(30, 30, TILES.Sgb, 0);          // besieged corner city (N,W)
+    g.board.place(30, 29, TILES.E, 2);            // caps N
+    g.board.place(29, 30, TILES.E, 1);            // caps W
+    const d = g.board.featureOf(30, 30, 0);
+    const pts = g.valueOf(d, false);
+    ok('a besieged city pays half', d.open === 0 && pts === Math.ceil((2 * d.tiles.size) / 2),
+      `${d.tiles.size} tiles -> ${pts}`);
+  }
+
+  // --- the cult race voids the loser -----------------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'cults'], options: { cult: true } });
+    g.board.place(40, 40, TILES.Cua, 0);          // the shrine
+    g.board.place(41, 40, TILES.B, 0);            // the rival monastery next door
+    g.board.addMeeple(41, 40, 0, 1);              // with a monk on it
+    const shrine = g.board.featureOf(40, 40, 0);
+    const had = g.players[1].meeples;
+    g.award(shrine, false, 0);                    // the shrine closes first
+    const rival = g.board.featureOf(41, 40, 0);
+    ok('the losing cloister is voided', rival.scored === true);
+    ok('…and its monk goes home with nothing',
+      g.players[1].meeples === had + 1 && g.players[1].score === 0);
+  }
+
+  // --- gold: dropped on placement, collected on closure, assayed at the end --
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'goldrush'], options: { goldmines: true } });
+    g.board.place(50, 50, TILES.E, 0);
+    g.board.get(50, 50).gold = 3;
+    const d = g.board.featureOf(50, 50, 0);
+    g.board.place(50, 49, TILES.E, 2);            // close the city
+    g.board.addMeeple(50, 50, 0, 0);
+    g.award(g.board.featureOf(50, 50, 0), false, 0);
+    ok('closing a feature collects its ingots', g.players[0].ingots === 3);
+    g.players[0].ingots = 10;
+    const before = g.players[0].score;
+    g.scoreIngots();
+    ok('ten ingots assay at 4 each', g.players[0].score === before + 40,
+      `+${g.players[0].score - before}`);
+  }
+
+  // --- a wind rose pays only in its own quadrant ------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'windroses'], options: { windRoses: true } });
+    const before = g.player.score;
+    g.windRose({ x: 3, y: -2, type: TILES.WrNE });
+    const right = g.player.score - before;
+    g.windRose({ x: -3, y: 2, type: TILES.WrNE });
+    const wrong = g.player.score - before - right;
+    ok('a rose pays 3 in its own quadrant', right === 3 && wrong === 0);
+  }
+
+  // --- the tunnel joins two distant roads into one ---------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'tunnels'], options: { tunnel: true } });
+    g.board.place(60, 60, TILES.Tna, 0);
+    g.pairTunnel(g.board.get(60, 60));
+    g.board.place(70, 70, TILES.Tna, 0);
+    g.pairTunnel(g.board.get(70, 70));
+    const a = g.board.featureOf(60, 60, 0);
+    const b = g.board.featureOf(70, 70, 0);
+    ok('two tunnel mouths are one road', a === b, `${a.tiles.size} tiles, ${a.open} open`);
+    g.board.rebuild();
+    ok('…and the join survives a rebuild',
+      g.board.featureOf(60, 60, 0) === g.board.featureOf(70, 70, 0));
+  }
+
+  // --- the plague clears the neighbourhood -----------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, groups: ['base', 'plagues'], options: { plague: true } });
+    g.board.place(80, 80, TILES.E, 0);
+    g.board.addMeeple(80, 80, 0, 1);
+    g.board.place(81, 80, TILES.Pga, 0);
+    const had = g.players[1].meeples;
+    g.outbreak(g.board.get(81, 80));
+    ok('an outbreak sends the neighbours home',
+      g.players[1].meeples === had + 1 && !g.board.get(80, 80).meeple);
+  }
+
+  // --- little buildings pay 1 / 2 / 3 ----------------------------------------
+  {
+    const g = new Game({ players: 2, seed: 1, options: { littleBuildings: true } });
+    g.board.place(90, 90, TILES.E, 0);
+    g.board.get(90, 90).building = { player: 0, kind: 'tower' };
+    g.board.place(91, 90, TILES.E, 0);
+    g.board.get(91, 90).building = { player: 0, kind: 'shed' };
+    const before = g.players[0].score;
+    g.scoreBuildings();
+    ok('a tower and a shed are worth 4 together', g.players[0].score === before + 4);
+  }
+}
+
 function checkMarkRules() {
   console.log('\ntile-symbol rules');
   const ok = (what, cond, detail = '') => {
@@ -1070,6 +1492,11 @@ function main() {
     checkFields();
     checkFigures();
     checkMarkRules();
+    checkSymbolBatch();
+    checkScoreBatch();
+    checkFlockBatch();
+    checkBeastBatch();
+    checkShowBatch();
     checkBots(Math.max(4, games / 2));
     botVsRandom(Math.max(10, games * 2));
     // Classic is the plain case, Girando moves tiles around under you, and

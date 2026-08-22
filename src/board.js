@@ -37,6 +37,8 @@ export const keyOf = (x, y) => `${x},${y}`;
 export function meepleWeight(m, d) {
   if (m.big) return 2;
   if (m.kind === 'mayor') return d.shields || 0;
+  // A shepherd stands in the field but holds none of it.
+  if (m.kind === 'shepherd') return 0;
   return 1;
 }
 
@@ -48,6 +50,7 @@ export class Board {
     this.scoredParts = new Set(); // "x,y#i" of features already paid out
     this.bounds = bounds;         // {minX,maxX,minY,maxY} or null for unbounded
     this.seq = 0;                 // placement counter, for replay order
+    this.links = [];              // extra unions (tunnels) that survive a rebuild
   }
 
   get(x, y) { return this.cells.get(keyOf(x, y)); }
@@ -186,6 +189,26 @@ export class Board {
 
   featureOf(x, y, i) { return this.data.get(this.find(`${keyOf(x, y)}#${i}`)); }
 
+  /** Which feature index on this cell belongs to component d, or null. */
+  featIndexOn(cell, d) {
+    const root = this.find(d.parts[0]);
+    for (let i = 0; i < cell.type.feats.length; i++) {
+      const id = `${keyOf(cell.x, cell.y)}#${i}`;
+      if (this.parent.has(id) && this.find(id) === root) return i;
+    }
+    return null;
+  }
+
+  /**
+   * Join two features that never touch — a tunnel. Remembered, because a
+   * rebuild replays only what adjacency can see. Neither mouth is an open
+   * edge, so the joined road still completes by its outward ends alone.
+   */
+  addLink(a, b) {
+    this.links.push([a, b]);
+    if (this.parent.has(a) && this.parent.has(b)) this.union(a, b);
+  }
+
   /** Wire one already-placed cell into the union-find. */
   link(cell) {
     const { x, y } = cell;
@@ -286,6 +309,12 @@ export class Board {
     this.data.clear();
     const order = [...this.cells.values()].sort((a, b) => a.seq - b.seq);
     for (const cell of order) this.link(cell);
+    // The tunnels: unions between parts that are nowhere near each other, so
+    // the adjacency replay above can't rediscover them. A link whose end was
+    // lifted or blown away just goes quiet until the tile comes back.
+    for (const [a, b] of this.links) {
+      if (this.parent.has(a) && this.parent.has(b)) this.union(a, b);
+    }
     for (const cell of order) {
       if (!cell.meeple) continue;
       // A follower with no feature is lying on the tile rather than holding
@@ -677,7 +706,7 @@ export class Board {
    * Players with the most followers on a component (ties share full points).
    * A big follower counts as two, which is the whole of what it does.
    */
-  majority(d) {
+  majority(d, { hills = false } = {}) {
     const counts = new Map();
     for (const m of d.meeples) {
       counts.set(m.player, (counts.get(m.player) || 0) + meepleWeight(m, d));
@@ -687,7 +716,20 @@ export class Board {
     // A figure can be worth nothing — a mayor in a city with no coat of arms
     // is the whole gamble of the piece — and nobody wins a majority with 0.
     if (best <= 0) return [];
-    return [...counts.entries()].filter(([, c]) => c === best).map(([p]) => p);
+    let tied = [...counts.entries()].filter(([, c]) => c === best).map(([p]) => p);
+    // Hills settle ties: among the tied, whoever has more followers standing
+    // on high ground takes the feature alone. Still tied on hills, all score.
+    if (hills && tied.length > 1) {
+      const high = new Map(tied.map((p) => [p, 0]));
+      for (const m of d.meeples) {
+        if (!high.has(m.player)) continue;
+        const cell = this.get(m.x, m.y);
+        if (cell?.type.marks.some((k) => k.kind === 'hillmark')) high.set(m.player, high.get(m.player) + 1);
+      }
+      const top = Math.max(...high.values());
+      if (top > 0) tied = tied.filter((p) => high.get(p) === top);
+    }
+    return tied;
   }
 
   /**

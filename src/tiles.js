@@ -187,6 +187,29 @@ export const GROUPS = [
   { id: 'vineyards', name: 'Vineyards', note: 'Hills & Sheep. A vineyard beside a monastery adds 3 when it closes.', classic: false, expedition: false, adventure: false },
   { id: 'dragonset', name: 'Portals & princesses', note: 'The Princess & the Dragon. Portals deploy anywhere; a princess evicts a knight.', classic: false, expedition: false, adventure: false },
   { id: 'festivals', name: 'Festivals', note: 'The Festival. Take one of your own followers back instead of claiming.', classic: false, expedition: false, adventure: false },
+  { id: 'magic', name: 'Magic symbols', note: 'Mage & Witch. Each forces the mage or the witch onto an unfinished road or city.', classic: false, expedition: false, adventure: false },
+  { id: 'goldrush', name: 'Gold veins', note: 'The Gold Mines. Ingots pile up and go to whoever closes the feature under them.', classic: false, expedition: false, adventure: false },
+  { id: 'cults', name: 'Heretic shrines', note: 'Cult places. A shrine near a monastery starts a race to close first.', classic: false, expedition: false, adventure: false },
+  { id: 'crops', name: 'Crop circles', note: 'Everyone adds a follower of the shown kind, or everyone takes one back.', classic: false, expedition: false, adventure: false },
+  { id: 'sieges', name: 'Besieged cities', note: 'The Besiegers. A city under siege is worth half.', classic: false, expedition: false, adventure: false },
+  { id: 'watchtowers', name: 'Watchtowers', note: 'Pay for the followers standing near them when their feature closes.', classic: false, expedition: false, adventure: false },
+  { id: 'windroses', name: 'Wind roses', note: 'Pay 3 when laid in their own quadrant of the map.', classic: false, expedition: false, adventure: false },
+  { id: 'tunnels', name: 'Tunnels', note: 'Roads that dive underground and pair up with the next tunnel laid.', classic: false, expedition: false, adventure: false },
+  { id: 'plagues', name: 'The plague', note: 'Outbreak tiles that clear every follower around them.', classic: false, expedition: false, adventure: false },
+  { id: 'robbers', name: 'Robbers', note: 'Post a robber on an opponent and take half of the next thing they score.', classic: false, expedition: false, adventure: false },
+  { id: 'revolts', name: 'Peasant revolts', note: 'Lone followers on the named feature flee; paired ones stand firm.', classic: false, expedition: false, adventure: false },
+  { id: 'signposts', name: 'Signposts', note: 'Roads worth 2 more per signpost when they close.', classic: false, expedition: false, adventure: false },
+  { id: 'orchards', name: 'Fruit trees', note: 'Each tree pays the next four neighbours laid beside it.', classic: false, expedition: false, adventure: false },
+  { id: 'hillsg', name: 'Hills', note: 'High ground that settles tied majorities.', classic: false, expedition: false, adventure: false },
+  { id: 'bigtopg', name: 'The big top', note: 'The circus tent, moving from tile to tile and paying as it goes.', classic: false, expedition: false, adventure: false },
+  { id: 'schools', name: 'The school', note: 'One tile; whoever closes its road takes the teacher.', classic: false, expedition: false, adventure: false },
+  { id: 'circusg', name: 'Acrobat rings', note: 'Under the Big Top. Pyramids of followers, paid when the third climbs on.', classic: false, expedition: false, adventure: false },
+  { id: 'baths', name: 'Bathhouses', note: 'The Barber-Surgeons. Move a follower from anywhere to the new tile.', classic: false, expedition: false, adventure: false },
+  { id: 'dragonfire', name: 'Dragon & volcanoes', note: 'Eruptions summon the dragon; dragon tiles send it rampaging.', classic: false, expedition: false, adventure: false },
+  { id: 'towersg', name: 'Tower foundations', note: 'Build floors, capture followers, ransom them back.', classic: false, expedition: false, adventure: false },
+  { id: 'ferriesg', name: 'Ferry lakes', note: 'Lakes where several roads end, joined two at a time by ferry.', classic: false, expedition: false, adventure: false },
+  { id: 'abbeyDE', name: 'Regional monasteries', note: 'Unfinished, they pay for the row and column they command.', classic: false, expedition: false, adventure: false },
+  { id: 'abbeyJP', name: 'Japanese buildings', note: 'The same command of row and column, from the Japanese edition.', classic: false, expedition: false, adventure: false },
 ];
 
 export const TILE_TYPES = [
@@ -355,17 +378,17 @@ export const TILE_TYPES = [
   // --- mountains ------------------------------------------------------------
   // Mountain edges only meet mountain edges, so a range grows as one mass and
   // can't be joined by anything else. Passes are the only way through.
-  { id: 'Pa', n: 6, group: 'mountains', name: 'Mountain spur',   feats: [mountain([N])] },
-  { id: 'Pb', n: 5, group: 'mountains', name: 'Mountain ridge',  feats: [mountain([N, S])] },
-  { id: 'Pc', n: 5, group: 'mountains', name: 'Mountain bend',   feats: [mountain([N, E])] },
-  { id: 'Pd', n: 3, group: 'mountains', name: 'Mountain massif', feats: [mountain([N, E, W])] },
+  { id: 'Pa', n: 6, group: 'mountains', name: 'Mountain spur',   feats: [mountain([N])] , fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Pb', n: 5, group: 'mountains', name: 'Mountain ridge',  feats: [mountain([N, S])] , fields: [[2, 3, 4, 5, 6, 7]] },
+  { id: 'Pc', n: 5, group: 'mountains', name: 'Mountain bend',   feats: [mountain([N, E])] , fields: [[4, 5, 6, 7]] },
+  { id: 'Pd', n: 3, group: 'mountains', name: 'Mountain massif', feats: [mountain([N, E, W])] , fields: [[0, 1], [4, 5]] },
   { id: 'Pe', n: 3, group: 'mountains', name: 'Mountain pass',   feats: [mountain([N, S]), road([E, W])] },
   { id: 'Pf', n: 1, group: 'mountains', name: 'The peak',        feats: [mountain([N, E, S, W])] },
 
   // --- forests --------------------------------------------------------------
-  { id: 'Fa', n: 6, group: 'forests', name: 'Forest edge',        feats: [forest([N])] },
-  { id: 'Fb', n: 3, group: 'forests', name: 'Forest edge + log',  feats: [forest([N], true)] },
-  { id: 'Fc', n: 3, group: 'forests', name: 'Forest across',      feats: [forest([E, W])] },
+  { id: 'Fa', n: 6, group: 'forests', name: 'Forest edge',        feats: [forest([N])] , fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Fb', n: 3, group: 'forests', name: 'Forest edge + log',  feats: [forest([N], true)] , fields: [[2, 3, 4, 5, 6, 7]] },
+  { id: 'Fc', n: 3, group: 'forests', name: 'Forest across',      feats: [forest([E, W])] , fields: [[5, 6], [0, 1, 2, 3, 4, 7]] },
   { id: 'Fd', n: 5, group: 'forests', name: 'Forest corner',      feats: [forest([N, W])] },
   { id: 'Fe', n: 2, group: 'forests', name: 'Forest corner + log',feats: [forest([N, W], true)] },
   { id: 'Ff', n: 2, group: 'forests', name: 'Deep forest',        feats: [forest([N, E, W])] },
@@ -385,28 +408,28 @@ export const TILE_TYPES = [
   // --- Inns & Cathedrals (Carcassonne expansion 1) --------------------------
   // An inn doubles its road and a cathedral triples its city — but both pay
   // nothing at all if the feature never closes.
-  { id: 'Ia', n: 3, group: 'innscath', name: 'Road + inn',        feats: [road([N, S])],          marks: [mark('inn', 0)] },
-  { id: 'Ib', n: 3, group: 'innscath', name: 'Road bend + inn',   feats: [road([W, S])],          marks: [mark('inn', 0)] },
-  { id: 'Ic', n: 2, group: 'innscath', name: 'Road 3-way + inn',  feats: [road([E]), road([S]), road([W])], marks: [mark('inn', 0)] },
-  { id: 'Id', n: 2, group: 'innscath', name: 'City + cathedral',  feats: [city([N, E, W])],       marks: [mark('cathedral', 0)] },
-  { id: 'Ie', n: 2, group: 'innscath', name: 'City across + cathedral', feats: [city([E, W])],    marks: [mark('cathedral', 0)] },
+  { id: 'Ia', n: 3, group: 'innscath', name: 'Road + inn',        feats: [road([N, S])],          marks: [mark('inn', 0)] , fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Ib', n: 3, group: 'innscath', name: 'Road bend + inn',   feats: [road([W, S])],          marks: [mark('inn', 0)] , fields: [[5, 6], [0, 1, 2, 3, 4, 7]] },
+  { id: 'Ic', n: 2, group: 'innscath', name: 'Road 3-way + inn',  feats: [road([E]), road([S]), road([W])], marks: [mark('inn', 0)] , fields: [[3, 4], [5, 6], [0, 1, 2, 7]] },
+  { id: 'Id', n: 2, group: 'innscath', name: 'City + cathedral',  feats: [city([N, E, W])],       marks: [mark('cathedral', 0)] , fields: [[4, 5]] },
+  { id: 'Ie', n: 2, group: 'innscath', name: 'City across + cathedral', feats: [city([E, W])],    marks: [mark('cathedral', 0)] , fields: [[0, 1], [4, 5]] },
 
   // --- Trade goods (Carcassonne expansion 2) --------------------------------
-  { id: 'Ta', n: 3, group: 'traders', name: 'City + wine',   feats: [city([N, E])],          marks: [mark('wine', 0)] },
-  { id: 'Tb', n: 3, group: 'traders', name: 'City + grain',  feats: [city([N, W])],          marks: [mark('grain', 0)] },
-  { id: 'Tc', n: 3, group: 'traders', name: 'City + cloth',  feats: [city([E, W])],          marks: [mark('cloth', 0)] },
-  { id: 'Td', n: 2, group: 'traders', name: 'City road + wine',  feats: [city([N]), road([E, W])], marks: [mark('wine', 0)] },
-  { id: 'Te', n: 2, group: 'traders', name: 'City road + grain', feats: [city([N]), road([S])],    marks: [mark('grain', 0)] },
+  { id: 'Ta', n: 3, group: 'traders', name: 'City + wine',   feats: [city([N, E])],          marks: [mark('wine', 0)] , fields: [[4, 5, 6, 7]] },
+  { id: 'Tb', n: 3, group: 'traders', name: 'City + grain',  feats: [city([N, W])],          marks: [mark('grain', 0)] , fields: [[2, 3, 4, 5]] },
+  { id: 'Tc', n: 3, group: 'traders', name: 'City + cloth',  feats: [city([E, W])],          marks: [mark('cloth', 0)] , fields: [[0, 1], [4, 5]] },
+  { id: 'Td', n: 2, group: 'traders', name: 'City road + wine',  feats: [city([N]), road([E, W])], marks: [mark('wine', 0)] , fields: [[2, 7], [3, 4, 5, 6]] },
+  { id: 'Te', n: 2, group: 'traders', name: 'City road + grain', feats: [city([N]), road([S])],    marks: [mark('grain', 0)] , fields: [[2, 3, 4], [5, 6, 7]] },
 
   // --- gardens: the Abbot's second seat -------------------------------------
-  { id: 'Ga', n: 3, group: 'gardens', name: 'Garden',            feats: [garden()], marks: [mark('garden')] },
-  { id: 'Gb', n: 2, group: 'gardens', name: 'Garden + road',     feats: [garden(), road([N, S])], marks: [mark('garden')] },
-  { id: 'Gc', n: 2, group: 'gardens', name: 'Garden + city',     feats: [garden(), city([N])], marks: [mark('garden')] },
+  { id: 'Ga', n: 3, group: 'gardens', name: 'Garden',            feats: [garden()], marks: [mark('garden')] , fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Gb', n: 2, group: 'gardens', name: 'Garden + road',     feats: [garden(), road([N, S])], marks: [mark('garden')] , fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Gc', n: 2, group: 'gardens', name: 'Garden + city',     feats: [garden(), city([N])], marks: [mark('garden')] , fields: [[2, 3, 4, 5, 6, 7]] },
 
   // --- vineyards: 3 more for the monastery next door ------------------------
-  { id: 'Va', n: 3, group: 'vineyards', name: 'Vineyard',        feats: [], marks: [mark('vineyard')] },
-  { id: 'Vb', n: 2, group: 'vineyards', name: 'Vineyard + road', feats: [road([W, E])], marks: [mark('vineyard')] },
-  { id: 'Vc', n: 2, group: 'vineyards', name: 'Vineyard + city', feats: [city([N])], marks: [mark('vineyard')] },
+  { id: 'Va', n: 3, group: 'vineyards', name: 'Vineyard',        feats: [], marks: [mark('vineyard')] , fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Vb', n: 2, group: 'vineyards', name: 'Vineyard + road', feats: [road([W, E])], marks: [mark('vineyard')] , fields: [[7, 0, 1, 2], [3, 4, 5, 6]] },
+  { id: 'Vc', n: 2, group: 'vineyards', name: 'Vineyard + city', feats: [city([N])], marks: [mark('vineyard')] , fields: [[2, 3, 4, 5, 6, 7]] },
 
   // --- the Princess & the Dragon, the parts that need no dragon -------------
   { id: 'Pa', n: 3, group: 'dragonset', name: 'Magic portal',        feats: [road([N, S])], marks: [mark('portal')] },
@@ -418,6 +441,103 @@ export const TILE_TYPES = [
   { id: 'Fa', n: 3, group: 'festivals', name: 'Festival',        feats: [road([N, S])], marks: [mark('festival')] },
   { id: 'Fb', n: 2, group: 'festivals', name: 'Festival + city', feats: [city([N])],    marks: [mark('festival')] },
   { id: 'Fc', n: 2, group: 'festivals', name: 'Festival + bend', feats: [road([W, S])], marks: [mark('festival')] },
+
+  // --- Mage & Witch: the tiles that summon them ------------------------------
+  { id: 'Mga', n: 3, group: 'magic', name: 'Road + magic',   feats: [road([N, S])], marks: [mark('magic')], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Mgb', n: 3, group: 'magic', name: 'City + magic',   feats: [city([N])],    marks: [mark('magic')], fields: [[2, 3, 4, 5, 6, 7]] },
+  { id: 'Mgc', n: 2, group: 'magic', name: 'Bend + magic',   feats: [road([W, S])], marks: [mark('magic')], fields: [[5, 6], [0, 1, 2, 3, 4, 7]] },
+
+  // --- the Gold Mines --------------------------------------------------------
+  { id: 'Aua', n: 3, group: 'goldrush', name: 'Bend + gold', feats: [road([W, S])], marks: [mark('ingot')], fields: [[5, 6], [0, 1, 2, 3, 4, 7]] },
+  { id: 'Aub', n: 3, group: 'goldrush', name: 'City + gold', feats: [city([N])],    marks: [mark('ingot')], fields: [[2, 3, 4, 5, 6, 7]] },
+  { id: 'Auc', n: 2, group: 'goldrush', name: 'Field + gold', feats: [],            marks: [mark('ingot')], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+
+  // --- Cult places: the shrine is a monastery with a grudge ------------------
+  { id: 'Cua', n: 3, group: 'cults', name: 'Shrine',         feats: [abbey()],           marks: [mark('cult')], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Cub', n: 2, group: 'cults', name: 'Shrine + road',  feats: [abbey(), road([S])], marks: [mark('cult')], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+
+  // --- Crop circles ----------------------------------------------------------
+  { id: 'Cca', n: 2, group: 'crops', name: 'Crop circle (farms)',  feats: [],             marks: [{ ...mark('crop'), crop: 'field' }], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Ccb', n: 2, group: 'crops', name: 'Crop circle (roads)',  feats: [road([N, S])], marks: [{ ...mark('crop'), crop: 'road' }],  fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Ccc', n: 2, group: 'crops', name: 'Crop circle (cities)', feats: [city([N])],    marks: [{ ...mark('crop'), crop: 'city' }],  fields: [[2, 3, 4, 5, 6, 7]] },
+
+  // --- the Besiegers ---------------------------------------------------------
+  { id: 'Sga', n: 2, group: 'sieges', name: 'Besieged city across', feats: [city([E, W], true)], marks: [mark('siege', 0)], fields: [[0, 1], [4, 5]] },
+  { id: 'Sgb', n: 2, group: 'sieges', name: 'Besieged city corner', feats: [city([N, W])],       marks: [mark('siege', 0)], fields: [[2, 3, 4, 5]] },
+  { id: 'Sgc', n: 1, group: 'sieges', name: 'Besieged city 3-side', feats: [city([N, E, W])],    marks: [mark('siege', 0)], fields: [[4, 5]] },
+
+  // --- the Watchtowers -------------------------------------------------------
+  { id: 'Wta', n: 3, group: 'watchtowers', name: 'Road + watchtower', feats: [road([N, S])], marks: [mark('watch')], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Wtb', n: 3, group: 'watchtowers', name: 'City + watchtower', feats: [city([N])],    marks: [mark('watch')], fields: [[2, 3, 4, 5, 6, 7]] },
+
+  // --- the Wind Roses: one per quadrant of the sky ---------------------------
+  { id: 'WrNE', n: 1, group: 'windroses', name: 'Wind rose NE', feats: [], marks: [mark('rose')], quad: 'NE', fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'WrSE', n: 1, group: 'windroses', name: 'Wind rose SE', feats: [], marks: [mark('rose')], quad: 'SE', fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'WrSW', n: 1, group: 'windroses', name: 'Wind rose SW', feats: [], marks: [mark('rose')], quad: 'SW', fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'WrNW', n: 1, group: 'windroses', name: 'Wind rose NW', feats: [], marks: [mark('rose')], quad: 'NW', fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+
+  // --- the Tunnel: a dead end that isn't one ---------------------------------
+  // The road runs into the hill; the field wraps around the mouth, so the tile
+  // has ONE field for all that the road is on it.
+  { id: 'Tna', n: 4, group: 'tunnels', name: 'Tunnel mouth', feats: [road([N])], marks: [mark('tunnel')], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+
+  // --- the Plague ------------------------------------------------------------
+  { id: 'Pga', n: 2, group: 'plagues', name: 'Outbreak',        feats: [],             marks: [mark('plague')], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Pgb', n: 1, group: 'plagues', name: 'Outbreak + road', feats: [road([N, S])], marks: [mark('plague')], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+
+  // --- the Robbers -----------------------------------------------------------
+  { id: 'Rba', n: 2, group: 'robbers', name: 'Road + robber',  feats: [road([N, S])], marks: [mark('swag')], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Rbb', n: 2, group: 'robbers', name: 'City + robber',  feats: [city([N])],    marks: [mark('swag')], fields: [[2, 3, 4, 5, 6, 7]] },
+
+  // --- the Peasant Revolts ---------------------------------------------------
+  { id: 'Rva', n: 1, group: 'revolts', name: 'Revolt (cities)',     feats: [], marks: [{ ...mark('revolt'), revolt: 'city' }], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Rvb', n: 1, group: 'revolts', name: 'Revolt (roads)',      feats: [], marks: [{ ...mark('revolt'), revolt: 'road' }], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Rvc', n: 1, group: 'revolts', name: 'Revolt (cloisters)',  feats: [], marks: [{ ...mark('revolt'), revolt: 'monastery' }], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+
+  // --- the Signposts ---------------------------------------------------------
+  { id: 'Sna', n: 2, group: 'signposts', name: 'Road + signpost', feats: [road([N, S])], marks: [mark('signpost', 0)], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Snb', n: 2, group: 'signposts', name: 'Bend + signpost', feats: [road([W, S])], marks: [mark('signpost', 0)], fields: [[5, 6], [0, 1, 2, 3, 4, 7]] },
+
+  // --- the Fruit-Bearing Trees -----------------------------------------------
+  { id: 'Fta', n: 2, group: 'orchards', name: 'Fruit tree',        feats: [],             marks: [mark('fruit')], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Ftb', n: 2, group: 'orchards', name: 'Fruit tree + road', feats: [road([N, S])], marks: [mark('fruit')], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+
+  // --- Hills & Sheep: the high ground ----------------------------------------
+  { id: 'Hla', n: 2, group: 'hillsg', name: 'Hill + road', feats: [road([N, S])], marks: [mark('hillmark')], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Hlb', n: 2, group: 'hillsg', name: 'Hill + city', feats: [city([N])],    marks: [mark('hillmark')], fields: [[2, 3, 4, 5, 6, 7]] },
+
+  // --- Under the Big Top: the acrobats ---------------------------------------
+  { id: 'Aca', n: 2, group: 'circusg', name: 'Acrobats',        feats: [],             marks: [mark('ring')], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Acb', n: 2, group: 'circusg', name: 'Acrobats + road', feats: [road([N, S])], marks: [mark('ring')], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+
+  // --- the big top itself ------------------------------------------------------
+  { id: 'Bga', n: 3, group: 'bigtopg', name: 'Big top',        feats: [],             marks: [mark('bigtop')], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Bgb', n: 2, group: 'bigtopg', name: 'Big top + road', feats: [road([N, S])], marks: [mark('bigtop')], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+
+  // --- the School --------------------------------------------------------------
+  { id: 'Sca', n: 1, group: 'schools', name: 'The school', feats: [road([E, W])], marks: [mark('school', 0)], fields: [[7, 0, 1, 2], [3, 4, 5, 6]] },
+
+  // --- the Barber-Surgeons ---------------------------------------------------
+  { id: 'Bta', n: 2, group: 'baths', name: 'Bathhouse',        feats: [road([N, S])], marks: [mark('bath')], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Btb', n: 1, group: 'baths', name: 'Bathhouse + city', feats: [city([N])],    marks: [mark('bath')], fields: [[2, 3, 4, 5, 6, 7]] },
+
+  // --- the Princess & the Dragon: the fire half ------------------------------
+  { id: 'Dva', n: 3, group: 'dragonfire', name: 'Volcano',       feats: [],             marks: [mark('volcano')], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Dvb', n: 4, group: 'dragonfire', name: 'Dragon + road', feats: [road([N, S])], marks: [mark('dragonmark')], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Dvc', n: 2, group: 'dragonfire', name: 'Dragon + city', feats: [city([N])],    marks: [mark('dragonmark')], fields: [[2, 3, 4, 5, 6, 7]] },
+
+  // --- the Tower --------------------------------------------------------------
+  { id: 'Twa', n: 3, group: 'towersg', name: 'Tower + road', feats: [road([N, S])], marks: [mark('towerbase')], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Twb', n: 2, group: 'towersg', name: 'Tower',        feats: [],             marks: [mark('towerbase')], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+
+  // --- the Ferries ------------------------------------------------------------
+  // Several roads end at the lake; the ferry decides which two are really one.
+  { id: 'Fya', n: 3, group: 'ferriesg', name: 'Ferry lake (3 roads)', feats: [road([N]), road([E]), road([W])], marks: [mark('lakef')], fields: [[1, 2], [0, 7], [3, 4, 5, 6]] },
+  { id: 'Fyb', n: 2, group: 'ferriesg', name: 'Ferry lake (4 roads)', feats: [road([N]), road([E]), road([S]), road([W])], marks: [mark('lakef')], fields: [[1, 2], [3, 4], [5, 6], [0, 7]] },
+
+  // --- monasteries of the world ----------------------------------------------
+  { id: 'Rmd', n: 3, group: 'abbeyDE', name: 'German monastery',  feats: [abbey()], marks: [mark('special')], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Rmj', n: 3, group: 'abbeyJP', name: 'Japanese building', feats: [abbey()], marks: [mark('pagoda')],  fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
 
   { id: 'La', n: 2, group: 'citylife', name: 'Market',   feats: [city([N, W])],           marks: [mark('market', 0)] },
   { id: 'Lb', n: 2, group: 'citylife', name: 'Keep',     feats: [city([N, E, W], true)],  marks: [mark('keep', 0)] },
@@ -575,6 +695,32 @@ export const MARKS = {
   princess:  { label: 'Princess',  score: 0, note: 'Lay it into a city and you may send a knight already there home.' },
   festival:  { label: 'Festival',  score: 0, note: 'Take one of your own followers back off the board instead of claiming.' },
 
+  magic:    { label: 'Magic symbol', score: 0, note: 'The mage or the witch must be placed or moved when this is laid.' },
+  ingot:    { label: 'Gold vein',  score: 0, note: 'Two ingots land here and nearby; whoever closes the feature under them takes them.' },
+  cult:     { label: 'Shrine',     score: 0, note: 'A heretic shrine. Placed near a monastery it starts a race — first to close wins, the loser takes nothing.' },
+  crop:     { label: 'Crop circle', score: 0, note: 'Everyone adds a follower beside one of theirs of this kind — or everyone takes one back.' },
+  siege:    { label: 'Siege camp', score: 0, note: 'This city is under siege and worth half.' },
+  watch:    { label: 'Watchtower', score: 0, note: 'Pays its holder for every follower near the tower when its feature closes.' },
+  rose:     { label: 'Wind rose',  score: 0, note: 'Placed in its quadrant of the map, it pays 3 on the spot.' },
+  tunnel:   { label: 'Tunnel mouth', score: 0, note: 'Roads into tunnels pair up: the next tunnel placed joins this road to it.' },
+  plague:   { label: 'Outbreak',   score: 0, note: 'Every follower in the surrounding eight tiles is sent home.' },
+
+  volcano:  { label: 'Volcano', score: 0, note: 'The dragon flies here the moment it erupts.' },
+  dragonmark: { label: 'Dragon', score: 0, note: 'The dragon rampages six tiles, eating every follower it lands on.' },
+  towerbase: { label: 'Tower foundation', score: 0, note: 'Build floors here; each floor extends the tower’s reach for capturing followers.' },
+  lakef:    { label: 'Ferry lake', score: 0, note: 'A ferry joins two of the roads that end at this lake.' },
+  special:  { label: 'Regional monastery', score: 0, note: 'Left unfinished, it pays 1 per tile in the unbroken row and column it commands.' },
+  pagoda:   { label: 'Japanese building', score: 0, note: 'Left unfinished, it pays 1 per tile in the unbroken row and column it commands.' },
+  bigtop:   { label: 'The big top', score: 0, note: 'The circus pitches here; when it moves on, everyone around the old ground gets paid.' },
+  school:   { label: 'The school', score: 0, note: 'Close the road it stands on and the teacher follows you for a while.' },
+  hillmark: { label: 'Hill', score: 0, note: 'High ground: whoever stands on more hills wins a tied majority outright.' },
+  ring:     { label: 'Acrobats’ ring', score: 0, note: 'Followers stack into a pyramid here; the third one in pays everyone 5.' },
+  bath:     { label: 'Bathhouse', score: 0, note: 'Move one of your followers from anywhere on the board to a feature on this tile.' },
+  swag:     { label: 'Robber’s bag', score: 0, note: 'Post your robber on an opponent — you take half of the next thing they score.' },
+  revolt:   { label: 'Peasant revolt', score: 0, note: 'Your lone followers on the named feature type flee home; paired ones stand firm for +2.' },
+  signpost: { label: 'Signpost', score: 0, note: 'Adds 2 to its road when the road closes.' },
+  fruit:    { label: 'Fruit tree', score: 0, note: 'The next four tiles laid beside it each pay their placer 1.' },
+
   // cloud
   turbine: { label: 'Tower turbine', score: 0, note: 'Pays 1 to whoever holds its city every time a gust runs through it.' },
   palazzo: { label: 'The Palazzo', score: 0, note: 'The seat of the kingdom. The island it sits on is worth double when a sphere closes.' },
@@ -657,12 +803,15 @@ export const TILES = Object.fromEntries(
     .map((t) => [t.id, t]));
 
 /** The river pool, spring and mouth held back to bookend it. */
-export function buildRiverDeck(rng = Math.random) {
+export function buildRiverDeck(rng = Math.random, { long = false } = {}) {
   const deck = [];
   for (const t of RIVER_TYPES) {
     if (t.id === RIVER_SPRING || t.id === RIVER_MOUTH) continue;
     for (let i = 0; i < t.n; i++) deck.push(t.id);
   }
+  // River II: the printed second river is longer and busier. The fork it adds
+  // isn't modelled yet, so this is the length without the branch.
+  if (long) deck.push('w1', 'w1', 'w2', 'w2', 'w3', 'w7');
   return shuffle(deck, rng);
 }
 

@@ -681,6 +681,9 @@ const PHASE_TEXT = {
   move: 'Move — click a figure, then a target',
   story: 'Say what is there',
   boon: 'Choose a boon',
+  magic: 'Place the figure — click an unfinished road or city',
+  crop: 'A crop circle — choose what everyone does',
+  rob: 'Post your robber on an opponent',
   'interior-place': 'Lay the next piece',
   'interior-move': 'Move, or hold',
   over: 'Game over',
@@ -746,9 +749,34 @@ function renderActions() {
     if (game.canSendKnightHome()) add('Send a knight home (princess)', '', () => game.sendKnightHome());
     if (game.canCallHome()) add('Festival — take one back', '', () => game.beginFestival());
     if (game.canPlacePig()) add('Turn out the pig', '', () => game.placePig());
+    if (game.canPlaceBuilding()) add('Raise a little building', '', () => { game.placeBuilding(); syncPanel(); });
+    if (game.shepherdExtended?.()) {
+      add('Grow the flock', '', () => game.growFlock());
+      add('Herd the flock home', '', () => game.herdFlock());
+    }
+    if (game.canPlaceBarn?.()) add('Raise a barn on the farm', '', () => game.placeBarn());
+    if (game.canJoinPyramid?.()) add('Join the acrobats', '', () => game.joinPyramid());
+    if (game.canBathe?.()) add('Send a follower to the baths', '', () => game.bathe());
+    if (game.canCallFairy?.()) add('Call the fairy to a follower', '', () => game.callFairy());
+    if (game.canBuildTower?.()) add(`Build a tower floor (${game.player.floors})`, '', () => game.buildTower());
     if (game.canRecall()) add('Recall a follower', '', () => game.beginRecall());
   }
   if (game.phase === 'walk') add('Send it home instead', 'Space', () => game.declineWalk());
+  if (game.phase === 'magic') {
+    add(game.magicPick === 'mage' ? 'Placing the MAGE' : 'Place the mage', '', () => game.pickMagic('mage'));
+    add(game.magicPick === 'witch' ? 'Placing the WITCH' : 'Place the witch', '', () => game.pickMagic('witch'));
+    add('Set the figure aside', '', () => game.magicSkip());
+  }
+  if (game.phase === 'rob') {
+    game.players.forEach((p, i) => {
+      if (i !== game.current) add(`Rob ${p.name}`, '', () => game.robPlace(i));
+    });
+    add('Keep the robber home', '', () => game.robSkip());
+  }
+  if (game.phase === 'crop') {
+    add('Everyone adds a follower', '', () => game.cropChoose('add'), false, true);
+    add('Everyone takes one back', '', () => game.cropChoose('remove'), false, true);
+  }
   if (game.phase === 'move') {
     add('Hold position', 'Space', () => game.holdPosition());
   }
@@ -883,6 +911,9 @@ function signature() {
     game.walker ? (game.walker.selected?.id ?? '-') : '-',
     game.m.piece ? game.m.piece.cells.map((c) => `${c.dx}${c.dy}${c.rot}`).join('') : '-',
     game.tilesLeft, game.useKind || '-', game.usingPhantom ? 'P' : '-',
+    game.magicPick, game.mage ? 'M' : '-', game.witch ? 'W' : '-', game.ingots,
+    game.dragon ? `${game.dragon.x},${game.dragon.y}` : '-',
+    game.fairy ? `${game.fairy.x},${game.fairy.y}` : '-', game.prisoners.length,
     game.usingAbbey ? 'A' : '-', bots.size,
     game.players.map((p) => `${p.big}${p.mayors}${p.abbots}${p.phantoms}${p.pigs}`).join(''),
     game.pendingWalk ? game.pendingWalk.targets.length : '-',

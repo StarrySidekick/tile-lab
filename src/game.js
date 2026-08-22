@@ -31,7 +31,7 @@ import {
   disabledFeatures, tileAllowed,
   canLift, liftableCells, coverProblem,
   claimableFeatures, walkTargets, innsAndCathedrals, goodsOn, crownAndRoad,
-  farmPayouts, pigsByField, FIGURES, FIGURE_BY_ID,
+  farmPayouts, pigsByField, citiesFed, FIGURES, FIGURE_BY_ID,
   hasMark, vineyardBonus, portalTargets,
   WATER, MAX_STACK,
 } from './mechanics.js';
@@ -83,7 +83,11 @@ export class Game {
     if (seed == null && spec.seedFor) seed = spec.seedFor();
     this.rng = seed == null ? Math.random : mulberry32(seed);
     this.seed = seed;
-    this.board = new Board({ bounds: spec.bounds || null });
+    // The Maps: play within a fixed border rather than out across the table.
+    // A mode with its own bounds keeps them; the mechanic only fills silence.
+    const mapBounds = this.has('maps') && !spec.bounds
+      ? { minX: -5, maxX: 5, minY: -5, maxY: 5 } : null;
+    this.board = new Board({ bounds: spec.bounds || mapBounds || null });
     this.players = Array.from({ length: players }, (_, i) => ({
       id: i,
       name: spec.playerName ? spec.playerName(i) : PLAYER_NAMES[i],
@@ -95,6 +99,13 @@ export class Game {
       phantoms: this.has('phantom') ? 1 : 0,
       pigs: this.has('pig') ? 1 : 0,
       abbeys: this.has('abbey') ? 1 : 0,
+      ingots: 0,
+      buildings: this.has('littleBuildings') ? { shed: 1, house: 1, tower: 1 } : null,
+      robbers: this.has('robbers') ? 1 : 0,
+      shepherds: this.has('sheep') ? 1 : 0,
+      barns: this.has('barn') ? 1 : 0,
+      floors: this.has('tower') ? [0, 10, 10, 9, 7, 6][players] || 6 : 0,
+      wonders: 0,
       goods: { wine: 0, grain: 0, cloth: 0 },
     }));
 
@@ -123,6 +134,19 @@ export class Game {
     this.builderUsed = false;
     this.pendingWalk = null;
     this.crown = { city: null, cityBy: null, road: null, roadBy: null };
+    this.mage = null;             // {x, y, feat} — where the mage is standing
+    this.witch = null;            // …and the witch
+    this.magicPick = 'mage';      // which of the two the next magic click places
+    this.ingots = 16;             // the shared gold supply, as printed
+    this.tunnelOpen = null;       // a tunnel mouth waiting for its pair
+    this.thieves = [];            // outstanding robbers: {thief, victim}
+    this.giftDrawn = false;       // one gift a turn, however generous the tile
+    this.flockBag = this.has('sheep') ? shuffleBag(this.rng) : null;
+    this.dragon = null;           // {x, y} once a volcano has erupted
+    this.fairy = null;            // {x, y} — the one figure that protects
+    this.prisoners = [];          // tower captives: {holder, owner, big, kind}
+    this.bigTop = null;           // {x, y} — where the circus is pitched
+    this.teacher = null;          // which player the teacher follows
 
     this.m = new spec.Mode(this);
     this.deck = this.cull(this.m.deck());
@@ -212,7 +236,7 @@ export class Game {
    * reversal is illegal, which is the official reading.
    */
   startRiver() {
-    const deck = buildRiverDeck(this.rng);
+    const deck = buildRiverDeck(this.rng, { long: this.has('riverII') });
     deck.unshift(RIVER_MOUTH);          // drawn last, since we pop from the end
     return { deck, end: null, lastTurn: 0, done: false };
   }
@@ -274,6 +298,14 @@ export class Game {
   // --- turn structure -------------------------------------------------------
 
   startTurn() {
+    if (this.has('fairy') && this.fairy) {
+      const c = this.board.get(this.fairy.x, this.fairy.y);
+      if (c?.meeple?.player === this.current) {
+        this.player.score += 1;
+        this.say(`The fairy's blessing — ${this.player.name} +1.`);
+      }
+    }
+    this.payRansoms();
     if (this.phase === 'over') return;
     const inv = this.interior;
     if (inv) {
@@ -540,8 +572,128 @@ export class Game {
     this.emit('place', { cells: [cell] });
     if (this.riverActive) this.advanceRiver(cell);
     this.checkBuilder(cell);
+    // Tile symbols with an opinion about what happens next. An instant one
+    // (gold, plague, a wind rose) resolves in place; an interactive one (the
+    // magic figures, a crop circle) interposes its own phase, and the turn
+    // continues into `afterPlace` when it is answered.
+    if (!this.riverActive) {
+      if (this.has('orchards')) this.checkFruit(cell);
+      if (this.has('gifts')) this.checkGift(cell);
+    }
+    const interpose = this.riverActive ? null : this.onMarks(cell);
+    if (interpose) { this.phase = interpose; return true; }
     this.afterPlace(cell);
     return true;
+  }
+
+  // --- tile symbols ----------------------------------------------------------
+
+  /** Resolve the marks on a just-laid tile. Returns a phase to interpose, or null. */
+  onMarks(cell) {
+    const kinds = cell.type.marks.map((m) => m.kind);
+
+    if (this.has('windRoses') && kinds.includes('rose')) this.windRose(cell);
+    if (this.has('plague') && kinds.includes('plague')) this.outbreak(cell);
+    if (this.has('goldmines') && kinds.includes('ingot')) this.dropIngots(cell);
+    if (this.has('tunnel') && kinds.includes('tunnel')) this.pairTunnel(cell);
+
+    if (this.has('peasantRevolts') && kinds.includes('revolt')) this.revolt(cell);
+    if (this.has('orchards') && kinds.includes('fruit')) cell.fruitLeft = 4;
+
+    if (this.has('volcano') && kinds.includes('volcano')) {
+      this.dragon = { x: cell.x, y: cell.y };
+      this.say('The volcano erupts — the dragon wheels down onto it.');
+    }
+    if (this.has('dragon') && kinds.includes('dragonmark') && this.dragon) this.rampage();
+    if (this.has('ferries') && kinds.includes('lakef')) this.placeFerry(cell);
+    if (this.has('circus') && kinds.includes('bigtop')) this.moveBigTop(cell);
+
+    if (this.has('robbers') && kinds.includes('swag')
+      && this.player.robbers > 0 && this.players.length > 1) return 'rob';
+    if (this.has('cropCircles') && kinds.includes('crop')) return 'crop';
+    if (this.has('mageWitch') && kinds.includes('magic')
+      && this.magicTargets().length) return 'magic';
+    return null;
+  }
+
+  /** A wind rose pays 3 on the spot — but only laid in its own quadrant. */
+  windRose(cell) {
+    const q = cell.type.quad;
+    if (!q) return;
+    const ok = (q.includes('N') ? cell.y < 0 : cell.y > 0)
+      && (q.includes('E') ? cell.x > 0 : cell.x < 0);
+    if (!ok) return;
+    this.player.score += 3;
+    this.say(`${this.player.name} lays the ${q} wind rose in its own quadrant — +3.`);
+    this.emit('score', { points: 3, players: [this.current], at: { x: cell.x + 0.5, y: cell.y + 0.5 } });
+  }
+
+  /** The plague: every follower in the surrounding eight tiles goes home. */
+  outbreak(cell) {
+    let swept = 0;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const c = this.board.get(cell.x + dx, cell.y + dy);
+        if (!c?.meeple) continue;
+        this.sendHome(c);
+        swept++;
+      }
+    }
+    if (swept) this.say(`Plague at (${cell.x}, ${cell.y}) — ${swept} follower${swept > 1 ? 's' : ''} flee home.`);
+  }
+
+  /** One follower off the board and back into the right supply, scoring nothing. */
+  sendHome(c) {
+    const m = c.meeple;
+    const d = m.feat != null ? this.board.featureOf(c.x, c.y, m.feat) : null;
+    if (d) d.meeples = d.meeples.filter((o) => !(o.x === c.x && o.y === c.y));
+    c.meeple = null;
+    const owner = this.players[m.player];
+    if (m.kind === 'phantom') owner.phantoms++; else owner.meeples++;
+    if (m.big) owner.big++;
+    if (m.kind === 'mayor') owner.mayors++;
+    if (m.kind === 'abbot') owner.abbots++;
+    if (m.kind === 'shepherd') owner.shepherds++;
+  }
+
+  /**
+   * Gold: one ingot on the tile, one on a neighbour — the engine picks the
+   * neighbour, preferring one on a feature the placer holds. (The printed rule
+   * lets the placer choose; that choice is folded in here for now.)
+   */
+  dropIngots(cell) {
+    const put = (c) => { if (this.ingots > 0) { c.gold = (c.gold || 0) + 1; this.ingots--; } };
+    put(cell);
+    const around = [];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (!dx && !dy) continue;
+        const c = this.board.get(cell.x + dx, cell.y + dy);
+        if (c) around.push(c);
+      }
+    }
+    if (!around.length) return;
+    const mine = around.find((c) => c.type.feats.some((f, i) => {
+      const d = this.board.featureOf(c.x, c.y, i);
+      return d && d.meeples.some((m) => m.player === this.current);
+    }));
+    put(mine || around[Math.floor(this.rng() * around.length)]);
+    this.say(`Gold surfaces at (${cell.x}, ${cell.y}).`);
+  }
+
+  /** The second tunnel mouth joins its road to the one still waiting. */
+  pairTunnel(cell) {
+    const feat = cell.type.feats.findIndex((f) => f.type === 'road');
+    if (feat < 0) return;
+    const open = this.tunnelOpen;
+    if (open && this.board.get(open.x, open.y)) {
+      this.board.addLink(`${open.x},${open.y}#${open.feat}`, `${cell.x},${cell.y}#${feat}`);
+      this.tunnelOpen = null;
+      this.say('The tunnel breaks through — two roads are one.');
+    } else {
+      this.tunnelOpen = { x: cell.x, y: cell.y, feat };
+      this.say('A tunnel mouth opens, waiting for its far end.');
+    }
   }
 
   /**
@@ -582,6 +734,7 @@ export class Game {
       case 'lift': return this.m.onCellClick ? this.m.onCellClick(x, y) : this.liftAt(x, y);
       case 'recall': return this.recallAt(x, y);
       case 'walk': return this.walkTo(x, y);
+      case 'magic': return this.magicAt(x, y);
       default: return this.m.onCellClick?.(x, y) ?? false;
     }
   }
@@ -652,6 +805,8 @@ export class Game {
     if (spend) this.player[spend.supply]--;
     this.useKind = null;
 
+    if (spend?.id === 'shepherd') this.drawFlock(cell);
+
     const what = cell.type.feats[featIdx].type;
     const who = phantom ? 'their phantom' : (spend ? `their ${spend.name}` : null);
     this.say(spot.flying
@@ -702,6 +857,634 @@ export class Game {
     else if (this.useKind === 'big') this.useKind = null;
   }
 
+  // --- the big top -------------------------------------------------------------
+
+  /**
+   * The circus moves on, and the old pitch pays out on its way: 2 for every
+   * follower in the eight tiles around where the tent stood.
+   */
+  moveBigTop(cell) {
+    const old = this.bigTop;
+    this.bigTop = { x: cell.x, y: cell.y };
+    if (!old) { this.say('The circus pitches its tent.'); return; }
+    const paid = new Map();
+    for (const c of this.cellsAround(old)) {
+      if (!c.meeple) continue;
+      paid.set(c.meeple.player, (paid.get(c.meeple.player) || 0) + 2);
+    }
+    for (const [seat, pts] of paid) {
+      this.players[seat].score += pts;
+      this.say(`The circus moves on — ${this.players[seat].name} +${pts} for the crowd it drew.`);
+      this.onPaid(seat, pts);
+    }
+    if (!paid.size) this.say('The circus moves on to fresher ground.');
+  }
+
+  // --- the dragon --------------------------------------------------------------
+
+  /**
+   * Six tiles of rampage. The printed game hands each step to the players in
+   * turn; here the beast hunts on its own — always toward the nearest
+   * follower, never doubling back, never onto the fairy's tile.
+   */
+  rampage() {
+    const visited = new Set([`${this.dragon.x},${this.dragon.y}`]);
+    let ate = 0;
+    for (let step = 0; step < 6; step++) {
+      const opts = [];
+      for (let sdir = 0; sdir < 4; sdir++) {
+        const nb = this.board.neighbor(this.dragon.x, this.dragon.y, sdir);
+        if (!nb || visited.has(`${nb.x},${nb.y}`)) continue;
+        if (this.fairy && nb.x === this.fairy.x && nb.y === this.fairy.y) continue;
+        opts.push(nb);
+      }
+      if (!opts.length) break;
+      const dist = (c) => {
+        let best = 99;
+        for (const o of this.board.cells.values()) {
+          if (!o.meeple) continue;
+          best = Math.min(best, Math.abs(o.x - c.x) + Math.abs(o.y - c.y));
+        }
+        return best;
+      };
+      opts.sort((a, b) => dist(a) - dist(b));
+      const to = opts[0];
+      this.dragon = { x: to.x, y: to.y };
+      visited.add(`${to.x},${to.y}`);
+      if (to.meeple) { this.sendHome(to); ate++; }
+      if (to.pig) { this.players[to.pig.player].pigs++; to.pig = null; ate++; }
+    }
+    this.say(`The dragon rampages${ate ? ` and devours ${ate} figure${ate > 1 ? 's' : ''}` : ', finding nobody'}.`);
+    this.emit('warp', { at: { x: this.dragon.x + 0.5, y: this.dragon.y + 0.5 } });
+  }
+
+  // --- the fairy ---------------------------------------------------------------
+
+  canCallFairy() {
+    if (!this.has('fairy') || this.phase !== 'meeple') return false;
+    return this.myMeeples().length > 0;
+  }
+
+  /** The fairy goes to stand guard beside one of your followers. */
+  callFairy() {
+    if (!this.canCallFairy()) return false;
+    const mine = this.myMeeples();
+    // She guards whoever is nearest the dragon; with no dragon, the first.
+    const pick = this.dragon
+      ? mine.sort((a, b) => (Math.abs(a.x - this.dragon.x) + Math.abs(a.y - this.dragon.y))
+        - (Math.abs(b.x - this.dragon.x) + Math.abs(b.y - this.dragon.y)))[0]
+      : mine[0];
+    this.fairy = { x: pick.x, y: pick.y };
+    this.say(`The fairy alights beside ${this.player.name}'s follower.`);
+    this.endTurn();
+    return true;
+  }
+
+  // --- the tower ---------------------------------------------------------------
+
+  towerBases() {
+    if (!this.has('tower') || this.phase !== 'meeple' || this.player.floors <= 0) return [];
+    return [...this.board.cells.values()].filter((c) => hasMark(c, 'towerbase'));
+  }
+
+  canBuildTower() { return this.towerBases().length > 0; }
+
+  /**
+   * A floor on a tower, and a capture with its new reach: the tower's own
+   * tile plus as many tiles as it has floors, straight out in each of the four
+   * directions. The engine takes the most valuable enemy follower in range.
+   */
+  buildTower(at = null) {
+    const bases = this.towerBases();
+    if (!bases.length) return false;
+    let cell = at ? bases.find((c) => c.x === at.x && c.y === at.y) : null;
+    if (!cell) {
+      // Build where it hurts: the base with the most enemies in future reach.
+      cell = bases.sort((a, b) => this.towerThreat(b) - this.towerThreat(a))[0];
+    }
+    cell.tower = (cell.tower || 0) + 1;
+    this.player.floors--;
+
+    const reach = [cell];
+    for (let sdir = 0; sdir < 4; sdir++) {
+      let c = cell;
+      for (let step = 0; step < cell.tower; step++) {
+        c = this.board.neighbor(c.x, c.y, sdir);
+        if (!c) break;
+        reach.push(c);
+      }
+    }
+    const prey = reach.filter((c) => c.meeple && c.meeple.player !== this.current
+      && (!this.fairy || c.x !== this.fairy.x || c.y !== this.fairy.y));
+    if (prey.length) {
+      const victim = prey.sort((a, b) => (b.meeple.big ? 2 : 1) - (a.meeple.big ? 2 : 1))[0];
+      const m = victim.meeple;
+      const d = m.feat != null ? this.board.featureOf(victim.x, victim.y, m.feat) : null;
+      if (d) d.meeples = d.meeples.filter((o) => !(o.x === victim.x && o.y === victim.y));
+      victim.meeple = null;
+      this.prisoners.push({ holder: this.current, owner: m.player, big: m.big, kind: m.kind });
+      this.say(`${this.player.name}'s tower (${cell.tower} floor${cell.tower > 1 ? 's' : ''}) seizes ${this.players[m.player].name}'s follower.`);
+    } else {
+      this.say(`${this.player.name} adds a floor to the tower.`);
+    }
+    this.endTurn();
+    return true;
+  }
+
+  towerThreat(cell) {
+    const h = (cell.tower || 0) + 1;
+    let n = 0;
+    for (let sdir = 0; sdir < 4; sdir++) {
+      let c = cell;
+      for (let step = 0; step < h; step++) {
+        c = this.board.neighbor(c.x, c.y, sdir);
+        if (!c) break;
+        if (c.meeple && c.meeple.player !== this.current) n++;
+      }
+    }
+    return n;
+  }
+
+  /** Ransoms come due at the start of your turn: 3 points a head, paid across. */
+  payRansoms() {
+    if (!this.has('tower')) return;
+    for (let i = this.prisoners.length - 1; i >= 0; i--) {
+      const pr = this.prisoners[i];
+      if (pr.owner !== this.current || this.player.score < 3) continue;
+      this.player.score -= 3;
+      this.players[pr.holder].score += 3;
+      if (pr.kind === 'phantom') this.player.phantoms++; else this.player.meeples++;
+      if (pr.big) this.player.big++;
+      if (pr.kind === 'mayor') this.player.mayors++;
+      if (pr.kind === 'abbot') this.player.abbots++;
+      if (pr.kind === 'shepherd') this.player.shepherds++;
+      this.prisoners.splice(i, 1);
+      this.say(`${this.player.name} pays 3 ransom to ${this.players[pr.holder].name}.`);
+    }
+  }
+
+  // --- the ferries -------------------------------------------------------------
+
+  /** The ferry joins two of the lake's road ends — the pair that does the most. */
+  placeFerry(cell) {
+    const stubs = cell.type.feats
+      .map((f, i) => ({ f, i }))
+      .filter(({ f }) => f.type === 'road');
+    if (stubs.length < 2) return;
+    // Prefer joining two stubs that each continue into placed neighbours; the
+    // printed choice belongs to the placer, folded into this preference.
+    const continues = ({ f, i }) => {
+      const side = (f.sides[0] + cell.rot) % 4;
+      return this.board.neighbor(cell.x, cell.y, side) ? 1 : 0;
+    };
+    stubs.sort((a, b) => continues(b) - continues(a));
+    const [a, b] = stubs;
+    this.board.addLink(`${cell.x},${cell.y}#${a.i}`, `${cell.x},${cell.y}#${b.i}`);
+    cell.ferry = [a.i, b.i];
+    this.say('The ferry casts off, joining two roads across the lake.');
+  }
+
+  // --- shepherds & sheep -------------------------------------------------------
+
+  /** Pull a token from the bag: sheep join the flock, a wolf scatters it. */
+  drawFlock(cell) {
+    if (!this.flockBag?.length) return;
+    const tok = this.flockBag.pop();
+    if (tok === 'wolf') {
+      const flock = cell.flock || [];
+      this.flockBag.push(...flock, 'wolf');
+      // A rough reshuffle: the bag is opaque, not ordered.
+      for (let i = this.flockBag.length - 1; i > 0; i--) {
+        const j = Math.floor(this.rng() * (i + 1));
+        [this.flockBag[i], this.flockBag[j]] = [this.flockBag[j], this.flockBag[i]];
+      }
+      cell.flock = [];
+      if (cell.meeple?.kind === 'shepherd') this.sendHome(cell);
+      this.say('A wolf! The flock scatters and the shepherd runs for home.');
+    } else {
+      cell.flock = [...(cell.flock || []), tok];
+      this.say(`The flock grows by ${tok} — ${cell.flock.reduce((a, b) => a + b, 0)} sheep in all.`);
+    }
+  }
+
+  /** Your shepherd, if the tile just laid extended the field he stands in. */
+  shepherdExtended() {
+    if (!this.has('sheep') || this.phase !== 'meeple' || !this.lastPlaced || this.sheepActed) return null;
+    for (const c of this.board.cells.values()) {
+      if (!c.meeple || c.meeple.player !== this.current || c.meeple.kind !== 'shepherd') continue;
+      const d = this.board.featureOf(c.x, c.y, c.meeple.feat);
+      if (d && this.board.cellsOf(d).some((o) => o.x === this.lastPlaced.x && o.y === this.lastPlaced.y)) return c;
+    }
+    return null;
+  }
+
+  growFlock() {
+    const c = this.shepherdExtended();
+    if (!c) return false;
+    this.sheepActed = true;
+    this.drawFlock(c);
+    return true;
+  }
+
+  herdFlock() {
+    const c = this.shepherdExtended();
+    if (!c) return false;
+    this.sheepActed = true;
+    const pts = (c.flock || []).reduce((a, b) => a + b, 0);
+    this.flockBag.push(...(c.flock || []));
+    c.flock = [];
+    if (pts > 0) {
+      this.player.score += pts;
+      this.emit('score', { points: pts, players: [this.current], at: { x: c.x + 0.5, y: c.y + 0.5 } });
+    }
+    this.sendHome(c);
+    this.say(`${this.player.name} herds the flock home — +${pts}.`);
+    return true;
+  }
+
+  // --- the barn ----------------------------------------------------------------
+
+  /** Fields you farm, where a barn could go. */
+  barnSpots() {
+    if (!this.has('barn') || this.phase !== 'meeple' || this.player.barns <= 0) return [];
+    return [...this.board.cells.values()].filter((c) => c.meeple
+      && c.meeple.player === this.current && !c.meeple.kind && !c.barn
+      && c.type.feats[c.meeple.feat]?.type === 'field');
+  }
+
+  canPlaceBarn() { return this.barnSpots().length > 0; }
+
+  /**
+   * The barn pays the field out immediately at today's rate and sends every
+   * farmer home — then keeps the field for good, at a point more per city,
+   * settled at the end.
+   */
+  placeBarn(at = null) {
+    const spots = this.barnSpots();
+    const c = at ? spots.find((o) => o.x === at.x && o.y === at.y) : spots[0];
+    if (!c) return false;
+    const field = this.board.featureOf(c.x, c.y, c.meeple.feat);
+    if (!field) return false;
+    this.player.barns--;
+    c.barn = { player: this.current };
+
+    const per = this.rules.farmPerCity;
+    const pigs = this.has('pig') ? pigsByField(this.board) : null;
+    for (const pay of farmPayouts(this.board, per, pigs)) {
+      if (pay.field !== field) continue;
+      this.players[pay.player].score += pay.points;
+      this.say(`The barn settles the farm early — ${this.players[pay.player].name} +${pay.points}.`);
+      this.onPaid(pay.player, pay.points);
+    }
+    for (const cell of this.board.cellsOf(field)) {
+      if (cell.meeple && cell.type.feats[cell.meeple.feat]?.type === 'field'
+        && cell.meeple.kind !== 'shepherd') this.sendHome(cell);
+      if (cell.pig) { this.players[cell.pig.player].pigs++; cell.pig = null; }
+    }
+    this.say(`${this.player.name} raises a barn over the field.`);
+    this.endTurn();
+    return true;
+  }
+
+  // --- the acrobats ------------------------------------------------------------
+
+  /** Rings on or beside the tile just laid, with room in the pyramid. */
+  pyramidSpots() {
+    if (!this.has('acrobats') || this.phase !== 'meeple' || !this.lastPlaced) return [];
+    if (this.player.meeples <= 0) return [];
+    const { x, y } = this.lastPlaced;
+    const spots = [this.board.get(x, y)];
+    for (let sdir = 0; sdir < 4; sdir++) spots.push(this.board.neighbor(x, y, sdir));
+    return spots.filter((c) => c && hasMark(c, 'ring') && (c.pyramid?.length || 0) < 3);
+  }
+
+  canJoinPyramid() { return this.pyramidSpots().length > 0; }
+
+  /** Climb on. The third acrobat completes the pyramid and everybody scores 5. */
+  joinPyramid(at = null) {
+    const spots = this.pyramidSpots();
+    const c = at ? spots.find((o) => o.x === at.x && o.y === at.y) : spots[0];
+    if (!c) return false;
+    c.pyramid = [...(c.pyramid || []), this.current];
+    this.player.meeples--;
+    this.say(`${this.player.name} climbs onto the pyramid.`);
+    if (c.pyramid.length >= 3) {
+      for (const seat of c.pyramid) {
+        this.players[seat].score += 5;
+        this.players[seat].meeples++;
+        this.emit('score', { points: 5, players: [seat], at: { x: c.x + 0.5, y: c.y + 0.5 } });
+      }
+      this.say('The pyramid stands three high — 5 apiece, and the troupe bows out.');
+      c.pyramid = [];
+    }
+    this.endTurn();
+    return true;
+  }
+
+  // --- the bathhouse -----------------------------------------------------------
+
+  canBathe() {
+    if (!this.has('barbers') || this.phase !== 'meeple' || !this.lastPlaced) return false;
+    const cell = this.board.get(this.lastPlaced.x, this.lastPlaced.y);
+    if (!cell || !hasMark(cell, 'bath')) return false;
+    return this.myMeeples().some((c) => !c.meeple.kind)
+      && this.meepleOptions().some((o) => o.x === this.lastPlaced.x && o.y === this.lastPlaced.y);
+  }
+
+  /** Move one of your followers from wherever it is to the baths' own tile. */
+  bathe() {
+    if (!this.canBathe()) return false;
+    const from = this.myMeeples().find((c) => !c.meeple.kind);
+    const to = this.meepleOptions().find((o) => o.x === this.lastPlaced.x && o.y === this.lastPlaced.y);
+    if (!from || !to) return false;
+    this.sendHome(from);
+    this.player.meeples--;
+    this.board.addMeeple(to.x, to.y, to.i, this.current);
+    this.say(`${this.player.name}'s follower takes the waters and comes out somewhere better.`);
+    this.endTurn();
+    return true;
+  }
+
+  // --- the robbers ------------------------------------------------------------
+
+  /** Post your robber on an opponent; half of the next thing they score is yours. */
+  robPlace(victim) {
+    if (this.phase !== 'rob') return false;
+    if (victim === this.current || !this.players[victim]) return false;
+    if (this.player.robbers <= 0) return false;
+    this.player.robbers--;
+    this.thieves.push({ thief: this.current, victim });
+    this.say(`${this.player.name} posts a robber on ${this.players[victim].name}'s trail.`);
+    this.phase = 'place';
+    this.afterPlace(this.lastPlaced);
+    return true;
+  }
+
+  robSkip() {
+    if (this.phase !== 'rob') return false;
+    this.phase = 'place';
+    this.afterPlace(this.lastPlaced);
+    return true;
+  }
+
+  robAuto() {
+    if (this.phase !== 'rob') return false;
+    const marks = this.players
+      .map((p, i) => ({ i, score: p.score }))
+      .filter((o) => o.i !== this.current
+        && !this.thieves.some((t) => t.thief === this.current && t.victim === o.i))
+      .sort((a, b) => b.score - a.score);
+    return marks.length ? this.robPlace(marks[0].i) : this.robSkip();
+  }
+
+  /**
+   * A player has just been paid during play. The robbers on their trail take
+   * half each (the victim keeps everything), and a score that lands exactly on
+   * a multiple of five brings a message.
+   */
+  onPaid(who, pts) {
+    if (pts <= 0) return;
+    if (this.has('robbers')) {
+      const due = this.thieves.filter((t) => t.victim === who);
+      this.thieves = this.thieves.filter((t) => t.victim !== who);
+      for (const t of due) {
+        const cut = Math.ceil(pts / 2);
+        this.players[t.thief].score += cut;
+        this.players[t.thief].robbers++;
+        this.say(`${this.players[t.thief].name}'s robber takes ${cut} from ${this.players[who].name}'s winnings.`);
+      }
+    }
+    if (this.has('wonders')) {
+      for (const gate of [15, 20, 25]) {
+        if (this.players[who].score < gate) continue;
+        if (this.wondersTaken?.has(gate)) continue;
+        (this.wondersTaken ??= new Set()).add(gate);
+        this.players[who].wonders++;
+        this.say(`${this.players[who].name} passes ${gate} first and raises a wonder.`);
+      }
+    }
+    if (this.has('messengers') && this.players[who].score > 0
+      && this.players[who].score % 5 === 0) {
+      // The engine reads the message and takes the better of the printed
+      // choices: a flat 2, or 2 per coat of arms in cities you hold.
+      let shields = 0;
+      for (const d of this.board.allComponents()) {
+        if (d.type !== 'city' || !d.meeples.some((m) => m.player === who)) continue;
+        shields += d.shields;
+      }
+      const gain = Math.max(2, 2 * shields);
+      this.players[who].score += gain;
+      this.say(`A message reaches ${this.players[who].name} — +${gain}.`);
+    }
+  }
+
+  // --- gifts, revolts and fruit -----------------------------------------------
+
+  /** Lengthening somebody else's feature is worth a small thank-you. */
+  checkGift(cell) {
+    if (this.giftDrawn) return;
+    const generous = cell.type.feats.some((f, i) => {
+      if (f.type !== 'road' && f.type !== 'city') return false;
+      const d = this.board.featureOf(cell.x, cell.y, i);
+      return d && d.tiles.size > 1 && d.meeples.length
+        && !d.meeples.some((m) => m.player === this.current);
+    });
+    if (!generous) return;
+    this.giftDrawn = true;
+    if (this.rng() < 0.5) {
+      this.player.score += 2;
+      this.say(`${this.player.name} opens a gift — +2.`);
+    } else {
+      this.tilesLeft++;
+      this.say(`${this.player.name} opens a gift — an extra tile this turn.`);
+    }
+  }
+
+  /**
+   * A revolt names a feature type. The active player's lone followers on it
+   * flee home; any standing in pairs weather it for 2 apiece.
+   */
+  revolt(cell) {
+    const kind = cell.type.marks.find((m) => m.kind === 'revolt')?.revolt;
+    if (!kind) return;
+    const mine = [...this.board.cells.values()].filter((c) => c.meeple
+      && c.meeple.player === this.current
+      && c.type.feats[c.meeple.feat]?.type === kind);
+    let fled = 0, stood = 0;
+    for (const c of mine) {
+      const d = this.board.featureOf(c.x, c.y, c.meeple.feat);
+      const allies = d ? d.meeples.filter((m) => m.player === this.current).length : 1;
+      if (allies >= 2) { this.player.score += 2; stood++; } else { this.sendHome(c); fled++; }
+    }
+    if (fled || stood) {
+      this.say(`Revolt in the ${kind === 'monastery' ? 'cloisters' : `${kind}s`} — `
+        + `${fled ? `${fled} of ${this.player.name}'s followers flee` : ''}`
+        + `${fled && stood ? ', ' : ''}${stood ? `${stood} stand firm for +${2 * stood}` : ''}.`);
+    }
+  }
+
+  /** Fruit ripens: a tile laid beside a tree pays its placer, four times over. */
+  checkFruit(cell) {
+    for (let sdir = 0; sdir < 4; sdir++) {
+      const nb = this.board.neighbor(cell.x, cell.y, sdir);
+      if (!nb || !nb.fruitLeft) continue;
+      nb.fruitLeft--;
+      this.player.score += 1;
+      this.say(`${this.player.name} picks fruit from the tree at (${nb.x}, ${nb.y}) — +1.`);
+    }
+  }
+
+  // --- the mage and the witch -------------------------------------------------
+
+  /**
+   * Every unfinished road or city the chosen figure could stand on, occupied
+   * or not — the magic figures don't care whose feature it is, only that it
+   * is still open and that the other figure isn't already there.
+   */
+  magicTargets() {
+    const other = this.magicPick === 'mage' ? this.witch : this.mage;
+    const otherD = other && this.board.featureOf(other.x, other.y, other.feat);
+    const out = [];
+    const seen = new Set();
+    for (const cell of this.board.cells.values()) {
+      cell.type.feats.forEach((f, i) => {
+        if (f.type !== 'road' && f.type !== 'city') return;
+        const d = this.board.featureOf(cell.x, cell.y, i);
+        if (!d || d.scored || d.open === 0 || d === otherD) return;
+        const root = this.board.find(d.parts[0]);
+        if (seen.has(root)) return;
+        seen.add(root);
+        out.push({ x: cell.x, y: cell.y, feat: i, type: f.type, d });
+      });
+    }
+    return out;
+  }
+
+  /** Choose which figure the next magic click places. */
+  pickMagic(kind) {
+    if (this.phase !== 'magic') return false;
+    this.magicPick = kind === 'witch' ? 'witch' : 'mage';
+    return true;
+  }
+
+  /** Put the chosen figure on the unfinished road or city at (x, y). */
+  magicAt(x, y) {
+    if (this.phase !== 'magic') return false;
+    const cell = this.board.get(x, y);
+    if (!cell) return false;
+    const spot = this.magicTargets().find((t) => {
+      const d = this.board.featureOf(t.x, t.y, t.feat);
+      return d && this.board.cellsOf(d).some((c) => c.x === x && c.y === y);
+    });
+    if (!spot) return false;
+    this[this.magicPick] = { x: spot.x, y: spot.y, feat: spot.feat };
+    this.say(`The ${this.magicPick} settles on the ${spot.type}.`);
+    this.phase = 'meeple';
+    this.afterMagic();
+    return true;
+  }
+
+  /** No eligible home, or none wanted: the figure steps off the board. */
+  magicSkip() {
+    if (this.phase !== 'magic') return false;
+    this[this.magicPick] = null;
+    this.say(`The ${this.magicPick} is set aside.`);
+    this.afterMagic();
+    return true;
+  }
+
+  afterMagic() {
+    this.phase = 'place';                // afterPlace decides the real next phase
+    this.afterPlace(this.lastPlaced);
+  }
+
+  /**
+   * The default: witch on an opponent's best feature, mage on your own, and
+   * always SOME resolution — the eligible set depends on which figure is being
+   * placed (the other one's feature is out of bounds), so each figure is tried
+   * against its own set and the fallback is to stand a figure down.
+   */
+  magicAuto() {
+    if (this.phase !== 'magic') return false;
+    const mine = (d) => d.meeples.some((m) => m.player === this.current);
+    const biggest = (list) => list.sort((a, b) => b.d.tiles.size - a.d.tiles.size)[0];
+    for (const pick of ['witch', 'mage']) {
+      this.magicPick = pick;
+      const targets = this.magicTargets();
+      if (!targets.length) continue;
+      const wanted = pick === 'witch'
+        ? targets.filter((t) => t.d.meeples.length && !mine(t.d))
+        : targets.filter((t) => mine(t.d));
+      const t = biggest(wanted.length ? wanted : targets);
+      if (this.magicAt(t.x, t.y)) return true;
+    }
+    return this.magicSkip();
+  }
+
+  // --- crop circles -----------------------------------------------------------
+
+  /** The feature type this circle is about — 'field', 'road' or 'city'. */
+  cropKind() {
+    const cell = this.lastPlaced && this.board.get(this.lastPlaced.x, this.lastPlaced.y);
+    return cell?.type.marks.find((m) => m.kind === 'crop')?.crop || 'field';
+  }
+
+  /**
+   * The circle resolves for every player at once, starting with whoever laid
+   * it: each may add a follower beside one they already have of this kind, or
+   * each must take one back. The choice belongs to the layer of the tile.
+   */
+  cropChoose(which) {
+    if (this.phase !== 'crop') return false;
+    const kind = this.cropKind();
+    const seats = this.players.map((_, i) => (this.current + i) % this.players.length);
+    for (const seat of seats) {
+      const p = this.players[seat];
+      const standing = [...this.board.cells.values()].filter((c) => c.meeple
+        && c.meeple.player === seat
+        && c.type.feats[c.meeple.feat]?.type === kind);
+      if (which === 'add') {
+        if (p.meeples <= 0 || !standing.length) continue;
+        // Beside one of theirs: another tile of the same component with room.
+        const c = standing[0];
+        const d = this.board.featureOf(c.x, c.y, c.meeple.feat);
+        const spot = d && this.board.cellsOf(d).find((o) => !o.meeple
+          && this.board.featIndexOn(o, d) != null);
+        if (!spot) continue;
+        const idx = this.board.featIndexOn(spot, d);
+        this.board.addMeeple(spot.x, spot.y, idx, seat);
+        p.meeples--;
+        this.say(`${p.name} slips another follower into the ${kind}.`);
+      } else if (standing.length) {
+        this.sendHome(standing[0]);
+        this.say(`${p.name} takes a follower back from the ${kind}.`);
+      }
+    }
+    this.phase = 'place';
+    this.afterPlace(this.lastPlaced);
+    return true;
+  }
+
+  cropAuto() {
+    if (this.phase !== 'crop') return false;
+    const kind = this.cropKind();
+    const count = (seat) => [...this.board.cells.values()].filter((c) => c.meeple
+      && c.meeple.player === seat && c.type.feats[c.meeple.feat]?.type === kind).length;
+    const me = count(this.current);
+    const best = Math.max(...this.players.map((_, i) => count(i)));
+    return this.cropChoose(me > 0 && me >= best ? 'add' : 'remove');
+  }
+
+  /** Resolve whatever special phase is open, with the engine's defaults. */
+  autoAct() {
+    switch (this.phase) {
+      case 'magic': return this.magicAuto();
+      case 'crop': return this.cropAuto();
+      case 'rob': return this.robAuto();
+      default: return false;
+    }
+  }
+
   // --- the princess -----------------------------------------------------------
 
   /**
@@ -737,6 +1520,7 @@ export class Game {
     if (m.big) owner.big++;
     if (m.kind === 'mayor') owner.mayors++;
     if (m.kind === 'abbot') owner.abbots++;
+    if (m.kind === 'shepherd') owner.shepherds++;
     this.say(`The princess sends ${owner.name}'s knight out of the city.`);
     this.endTurn();
     return true;
@@ -796,6 +1580,28 @@ export class Game {
     this.say(`${this.player.name} calls the abbot home — the monastery pays ${pts}.`);
     this.emit('score', { points: pts, players: [this.current], at: { x: cell.x + 0.5, y: cell.y + 0.5 } });
     this.endTurn();
+    return true;
+  }
+
+  // --- little buildings -------------------------------------------------------
+
+  /** One building per tile, on the tile you just laid, on top of everything else. */
+  canPlaceBuilding() {
+    if (!this.has('littleBuildings') || this.phase !== 'meeple' || !this.lastPlaced) return false;
+    const b = this.player.buildings;
+    if (!b || (b.shed + b.house + b.tower) <= 0) return false;
+    const cell = this.board.get(this.lastPlaced.x, this.lastPlaced.y);
+    return !!cell && !cell.building;
+  }
+
+  placeBuilding() {
+    if (!this.canPlaceBuilding()) return false;
+    const b = this.player.buildings;
+    const kind = b.tower > 0 ? 'tower' : b.house > 0 ? 'house' : 'shed';
+    b[kind]--;
+    const cell = this.board.get(this.lastPlaced.x, this.lastPlaced.y);
+    cell.building = { player: this.current, kind };
+    this.say(`${this.player.name} raises a little ${kind}.`);
     return true;
   }
 
@@ -1027,6 +1833,8 @@ export class Game {
       return this.startTurn();
     }
     this.tilesLeft = 0;
+    this.giftDrawn = false;
+    this.sheepActed = false;
     this.m.endTurn();
     this.nextPlayer();
   }
@@ -1171,6 +1979,46 @@ export class Game {
       pts += lakes * WATER.lake + rivers * WATER.river;
     }
     if (this.has('vineyards')) pts += vineyardBonus(this.board, d);
+    // A regional monastery left unfinished commands its row and column: 1 per
+    // tile in the unbroken runs, plus itself — taken when that beats the
+    // ordinary count, since the printed prior would have chosen it.
+    if (final && d.type === 'monastery' && d.open === 0
+      && (this.has('monasteries') || this.has('japanese'))) {
+      const cell = this.board.get(d.at.x, d.at.y);
+      if (cell && ((this.has('monasteries') && hasMark(cell, 'special'))
+        || (this.has('japanese') && hasMark(cell, 'pagoda')))) {
+        let runs = 0;
+        for (let sdir = 0; sdir < 4; sdir++) {
+          let c = cell;
+          for (;;) {
+            c = this.board.neighbor(c.x, c.y, sdir);
+            if (!c) break;
+            runs++;
+          }
+        }
+        pts = Math.max(pts, 1 + runs);
+      }
+    }
+    if (this.has('signposts') && d.type === 'road') {
+      pts += 2 * this.board.marksOn(d).filter((m) => m.kind === 'signpost').length;
+    }
+
+    // The magic figures: the mage adds a point per tile to whatever he stands
+    // on, the witch halves whatever she does. A besieged city is halved too —
+    // and the witch's arithmetic on top of a siege is exactly as brutal as it
+    // sounds, which is why nobody plays them together twice.
+    if (this.has('mageWitch')) {
+      const md = this.mage && this.board.featureOf(this.mage.x, this.mage.y, this.mage.feat);
+      if (md === d) pts += d.tiles.size;
+    }
+    if (this.has('besiegers') && d.type === 'city'
+      && this.board.marksOn(d).some((m) => m.kind === 'siege')) {
+      pts = Math.ceil(pts / 2);
+    }
+    if (this.has('mageWitch')) {
+      const wd = this.witch && this.board.featureOf(this.witch.x, this.witch.y, this.witch.feat);
+      if (wd === d) pts = Math.ceil(pts / 2);
+    }
     return pts;
   }
 
@@ -1178,11 +2026,24 @@ export class Game {
   award(d, final, closer = null) {
     const pts = this.valueOf(d, final);
     let winners;
-    if (this.useMeeples) winners = this.board.majority(d);
+    if (this.useMeeples) winners = this.board.majority(d, { hills: this.has('hills') });
     else winners = final || closer == null ? [] : [closer];
 
     if (winners.length && pts > 0) {
       for (const p of winners) this.players[p].score += pts;
+      // The teacher: rides whoever last earned him, pays 2 on their next
+      // scored feature, and retires to the schoolhouse.
+      if (!final && this.has('school') && this.teacher != null && winners.includes(this.teacher)) {
+        this.players[this.teacher].score += 2;
+        this.say(`The teacher's lesson pays ${this.players[this.teacher].name} +2, and he returns to the school.`);
+        this.teacher = null;
+      }
+      if (!final && this.has('school') && d.type === 'road'
+        && this.board.marksOn(d).some((m) => m.kind === 'school')) {
+        this.teacher = winners[0];
+        this.say(`${this.players[winners[0]].name} closes the school road and the teacher follows them out.`);
+      }
+      if (!final) for (const p of winners) this.onPaid(p, pts);
       const who = winners.map((p) => this.players[p].name).join(' & ');
       const n = d.tiles.size;
       this.say(`${final ? 'Endgame: ' : ''}${d.type} of ${n} tile${n > 1 ? 's' : ''} → ${who} +${pts}`);
@@ -1190,6 +2051,27 @@ export class Game {
     } else if (!final && !winners.length) {
       this.say(`A ${d.type} closed with nobody on it.`);
     }
+    if (!final && this.has('fairy') && this.fairy) {
+      const fc = this.board.get(this.fairy.x, this.fairy.y);
+      const fd = fc?.meeple && fc.meeple.feat != null
+        ? this.board.featureOf(fc.x, fc.y, fc.meeple.feat) : null;
+      if (fd === d && fc.meeple) {
+        this.players[fc.meeple.player].score += 3;
+        this.say(`The fairy's favour — ${this.players[fc.meeple.player].name} +3.`);
+      }
+    }
+
+    // The tile-symbol payouts ride on the closure, before the followers go
+    // home — the watchtower in particular counts the crowd still standing.
+    if (!final) {
+      if (this.has('goldmines')) this.collectGold(d, winners);
+      if (this.has('watchtowers')) this.watchBonus(d);
+      if (this.has('cult') && d.type === 'monastery') this.resolveCult(d);
+    }
+    // A magic figure's feature has scored: the figure steps off.
+    if (this.mage && this.board.featureOf(this.mage.x, this.mage.y, this.mage.feat) === d) this.mage = null;
+    if (this.witch && this.board.featureOf(this.witch.x, this.witch.y, this.witch.feat) === d) this.witch = null;
+
     if (!final && this.useMeeples) {
       for (const m of this.board.reclaim(d)) {
         // A phantom goes back to being a phantom; everything else gives back a
@@ -1199,6 +2081,7 @@ export class Game {
         if (m.big) this.players[m.player].big++;
         if (m.kind === 'mayor') this.players[m.player].mayors++;
         if (m.kind === 'abbot') this.players[m.player].abbots++;
+        if (m.kind === 'shepherd') this.players[m.player].shepherds++;
       }
     }
   }
@@ -1211,7 +2094,23 @@ export class Game {
   scoreFarms() {
     const per = this.rules.farmPerCity;
     const pigs = this.has('pig') ? pigsByField(this.board) : null;
+    const barned = new Set();
+    if (this.has('barn')) {
+      for (const cell of this.board.cells.values()) {
+        if (!cell.barn) continue;
+        const i = cell.type.feats.findIndex((f) => f.type === 'field');
+        const d = i >= 0 && this.board.featureOf(cell.x, cell.y, i);
+        if (!d) continue;
+        barned.add(d);
+        const cities = citiesFed(this.board, d).size;
+        if (!cities) continue;
+        const pts = cities * (per + 1);
+        this.players[cell.barn.player].score += pts;
+        this.say(`The barn's field feeds ${cities} cit${cities === 1 ? 'y' : 'ies'} at ${per + 1} each → ${this.players[cell.barn.player].name} +${pts}.`);
+      }
+    }
     for (const { field, player, points, cities, per: rate } of farmPayouts(this.board, per, pigs)) {
+      if (barned.has(field)) continue;
       this.players[player].score += points;
       this.say(`Farm of ${field.tiles.size} feeding ${cities} cit${cities === 1 ? 'y' : 'ies'}`
         + `${rate > per ? ' (pig)' : ''}`
@@ -1219,6 +2118,95 @@ export class Game {
       const spot = this.spotOf(field);
       if (spot) this.emit('score', { points, players: [player], ...spot });
     }
+  }
+
+  /** The ingots on a closed feature go to whoever held it, dealt round. */
+  collectGold(d, winners) {
+    if (!winners.length) return;
+    const cells = d.type === 'monastery' ? this.cellsAround(d.at) : this.board.cellsOf(d);
+    let pot = 0;
+    for (const c of cells) { pot += c.gold || 0; c.gold = 0; }
+    if (!pot) return;
+    for (let i = 0; i < pot; i++) this.players[winners[i % winners.length]].ingots++;
+    this.say(`${winners.map((w) => this.players[w].name).join(' & ')} take${winners.length > 1 ? '' : 's'} ${pot} gold ingot${pot > 1 ? 's' : ''}.`);
+  }
+
+  cellsAround(at) {
+    const out = [];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const c = this.board.get(at.x + dx, at.y + dy);
+        if (c) out.push(c);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Watchtowers: a follower standing on the tower tile of the feature that
+   * just closed is paid 2 for every follower in sight of the tower — itself
+   * included, whoever they belong to.
+   */
+  watchBonus(d) {
+    for (const cell of this.board.cellsOf(d)) {
+      if (!hasMark(cell, 'watch') || !cell.meeple) continue;
+      if (this.board.featureOf(cell.x, cell.y, cell.meeple.feat) !== d) continue;
+      const seen = this.cellsAround({ x: cell.x, y: cell.y }).filter((c) => c.meeple).length;
+      const pts = 2 * seen;
+      if (!pts) continue;
+      this.players[cell.meeple.player].score += pts;
+      this.say(`The watchtower pays ${this.players[cell.meeple.player].name} +${pts}.`);
+      this.emit('score', { points: pts, players: [cell.meeple.player], at: { x: cell.x + 0.5, y: cell.y + 0.5 } });
+    }
+  }
+
+  /**
+   * The cult race: a shrine and a monastery within sight of each other are
+   * rivals, and the one that closes first takes everything — the loser is
+   * voided on the spot, its keeper going home with nothing.
+   */
+  resolveCult(d) {
+    const winner = this.board.get(d.at.x, d.at.y);
+    if (!winner) return;
+    const isShrine = hasMark(winner, 'cult');
+    for (const c of this.cellsAround(d.at)) {
+      if (c === winner) continue;
+      const i = c.type.feats.findIndex((f) => f.type === 'monastery');
+      if (i < 0 || hasMark(c, 'cult') === isShrine) continue;
+      const rival = this.board.featureOf(c.x, c.y, i);
+      if (!rival || rival.scored) continue;
+      this.board.markScored(rival);
+      const lost = rival.meeples.length;
+      for (const m of this.board.reclaim(rival)) {
+        if (m.kind === 'phantom') this.players[m.player].phantoms++;
+        else this.players[m.player].meeples++;
+        if (m.big) this.players[m.player].big++;
+        if (m.kind === 'abbot') this.players[m.player].abbots++;
+      }
+      this.say(`The ${isShrine ? 'shrine' : 'monastery'} closes first — the ${isShrine ? 'monastery' : 'shrine'} next door pays nothing${lost ? ' and its keeper goes home empty-handed' : ''}.`);
+    }
+  }
+
+  /** What the collected ingots are worth: the more you mined, the purer. */
+  scoreIngots() {
+    for (const p of this.players) {
+      if (!p.ingots) continue;
+      const per = p.ingots <= 3 ? 1 : p.ingots <= 6 ? 2 : p.ingots <= 9 ? 3 : 4;
+      const pts = p.ingots * per;
+      p.score += pts;
+      this.say(`${p.name}'s ${p.ingots} ingot${p.ingots > 1 ? 's' : ''} assay at ${per} each → +${pts}.`);
+    }
+  }
+
+  /** Little buildings: what each one placed is worth at the end. */
+  scoreBuildings() {
+    const worth = { shed: 1, house: 2, tower: 3 };
+    for (const cell of this.board.cells.values()) {
+      if (!cell.building) continue;
+      const pts = worth[cell.building.kind] || 1;
+      this.players[cell.building.player].score += pts;
+    }
+    this.say('The little buildings are counted.');
   }
 
   scoreGoods() {
@@ -1250,6 +2238,15 @@ export class Game {
     this.market = null;
     this.m.finish();
     if (this.has('fields')) this.scoreFarms();
+    if (this.has('goldmines')) this.scoreIngots();
+    if (this.has('littleBuildings')) this.scoreBuildings();
+    if (this.has('wonders')) {
+      for (const p of this.players) {
+        if (!p.wonders) continue;
+        p.score += 8 * p.wonders;
+        this.say(`${p.name}'s wonder${p.wonders > 1 ? 's' : ''} of humanity → +${8 * p.wonders}.`);
+      }
+    }
     if (this.has('goods')) this.scoreGoods();
     if (this.has('king') || this.has('robberBaron')) this.scoreCrown();
     if (this.has('agendas')) this.scoreAgendas();
@@ -1260,6 +2257,19 @@ export class Game {
     }
     this.emit('over');
   }
+}
+
+/**
+ * The shepherd's bag, as printed: sixteen flock tokens and two wolves. Drawn
+ * tokens go back only when a flock is herded — a wolf eats its way back in.
+ */
+function shuffleBag(rng) {
+  const bag = [1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 'wolf', 'wolf'];
+  for (let i = bag.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [bag[i], bag[j]] = [bag[j], bag[i]];
+  }
+  return bag;
 }
 
 /** Small seeded PRNG so a layout can be replayed while iterating. */

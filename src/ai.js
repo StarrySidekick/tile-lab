@@ -138,7 +138,11 @@ export class Bot {
       case 'story': case 'boon': return void this.pickAction();
       case 'interior-place': return this.exploreLay();
       case 'interior-move': return this.exploreStep();
-      default: return this.improvise();
+      // The tile-symbol phases carry their own sensible defaults; a bot that
+      // second-guessed them would need the whole rulebook in its head.
+      default:
+        if (g.autoAct()) return;
+        return this.improvise();
     }
   }
 
@@ -418,6 +422,7 @@ export class Bot {
 
   claim() {
     const g = this.game;
+    if (g.canPlaceBuilding?.()) g.placeBuilding();
     const options = g.meepleOptions();
     if (!options.length) return void g.skipMeeple();
 
@@ -635,7 +640,9 @@ export class Bot {
       case 'recall': return void g.skipMeeple();
       case 'interior-move': return void g.interiorHold();
       case 'interior-place': return void g.interiorHold();
-      default: return this.modeAction();
+      default:
+        if (g.autoAct()) return;
+        return this.modeAction();
     }
   }
 

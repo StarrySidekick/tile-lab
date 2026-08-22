@@ -585,6 +585,275 @@ const MARK_ART = {
     ctx.strokeStyle = THEME.timber;
     ctx.lineWidth = 0.055;
   },
+  bigtop(ctx) {                                 // the striped tent
+    ctx.fillStyle = '#b8452f';
+    ctx.beginPath();
+    ctx.moveTo(-0.40, 0.30); ctx.lineTo(0, -0.38); ctx.lineTo(0.40, 0.30);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.plaster;
+    for (const x of [-0.20, 0.08]) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0.30); ctx.lineTo(x + 0.10, -0.06); ctx.lineTo(x + 0.16, 0.30);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = THEME.gold;
+    ctx.lineWidth = 0.06;
+    ctx.beginPath(); ctx.moveTo(0, -0.38); ctx.lineTo(0, -0.52); ctx.stroke();
+    ctx.strokeStyle = THEME.timber; ctx.lineWidth = 0.055;
+  },
+  school(ctx) {                                 // the schoolhouse and its bell
+    district(ctx, '#5b7a8a', (c) => {
+      c.fillStyle = THEME.gold;
+      c.beginPath(); c.arc(0, -0.30, 0.07, 0, Math.PI * 2); c.fill(); c.stroke();
+    });
+  },
+  hillmark(ctx) {                               // the high ground itself
+    ctx.fillStyle = '#8a955c';
+    ctx.beginPath();
+    ctx.moveTo(-0.44, 0.30);
+    ctx.quadraticCurveTo(-0.10, -0.34, 0.20, 0.02);
+    ctx.quadraticCurveTo(0.36, -0.12, 0.46, 0.30);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(60,70,35,0.5)';
+    ctx.lineWidth = 0.045;
+    ctx.beginPath(); ctx.moveTo(-0.26, 0.10); ctx.quadraticCurveTo(-0.10, -0.02, 0.04, 0.08); ctx.stroke();
+    ctx.strokeStyle = THEME.timber; ctx.lineWidth = 0.055;
+  },
+  ring(ctx) {                                   // the acrobats' ground ring
+    ctx.strokeStyle = '#b8452f';
+    ctx.lineWidth = 0.10;
+    ctx.beginPath(); ctx.arc(0, 0.06, 0.34, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = THEME.gold;                 // a star where the base stands
+    for (const a of [0, 2.1, 4.2]) {
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * 0.14, 0.06 + Math.sin(a) * 0.14, 0.06, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = THEME.timber; ctx.lineWidth = 0.055;
+  },
+  bath(ctx) {                                   // the bathhouse: steam over a tub
+    district(ctx, '#4a6f8a', (c) => {
+      c.strokeStyle = 'rgba(255,255,255,0.6)';
+      c.lineWidth = 0.05;
+      for (const x of [-0.10, 0.04, 0.18]) {
+        c.beginPath();
+        c.moveTo(x, 0.16);
+        c.quadraticCurveTo(x + 0.05, 0.06, x, -0.04);
+        c.stroke();
+      }
+    });
+  },
+  volcano(ctx) {                                // the cone, mid-eruption
+    ctx.fillStyle = THEME.rockDark;
+    ctx.beginPath();
+    ctx.moveTo(-0.42, 0.34); ctx.lineTo(-0.10, -0.24);
+    ctx.lineTo(0.10, -0.24); ctx.lineTo(0.42, 0.34);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#c1652f';
+    ctx.beginPath();
+    ctx.moveTo(-0.10, -0.24);
+    ctx.quadraticCurveTo(0, -0.52, 0.10, -0.24);
+    ctx.quadraticCurveTo(0.22, -0.40, 0.16, -0.18);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  },
+  dragonmark(ctx) {                             // the sign of the beast
+    ctx.strokeStyle = '#8e3b32';
+    ctx.lineWidth = 0.09;
+    ctx.beginPath();
+    ctx.moveTo(-0.34, 0.18);
+    ctx.quadraticCurveTo(-0.10, -0.38, 0.18, -0.06);
+    ctx.quadraticCurveTo(0.34, 0.12, 0.16, 0.26);
+    ctx.stroke();
+    ctx.fillStyle = '#8e3b32';                  // the head
+    ctx.beginPath(); ctx.arc(0.20, 0.24, 0.10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = THEME.timber; ctx.lineWidth = 0.055;
+  },
+  towerbase(ctx) {                              // the empty foundation, waiting
+    ctx.strokeStyle = THEME.cityWall;
+    ctx.lineWidth = 0.08;
+    ctx.strokeRect(-0.26, -0.26, 0.52, 0.52);
+    ctx.setLineDash([0.10, 0.08]);
+    ctx.strokeRect(-0.14, -0.14, 0.28, 0.28);
+    ctx.setLineDash([]);
+    ctx.strokeStyle = THEME.timber; ctx.lineWidth = 0.055;
+  },
+  lakef(ctx) {                                  // the lake the roads end at
+    ctx.fillStyle = THEME.water;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 0.40, 0.30, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#8a6b43';                  // the ferry itself
+    ctx.beginPath();
+    ctx.moveTo(-0.16, 0.02); ctx.lineTo(0.16, 0.02);
+    ctx.lineTo(0.10, 0.12); ctx.lineTo(-0.10, 0.12);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  },
+  special(ctx) {                                // the regional banner on a pole
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.07;
+    ctx.beginPath(); ctx.moveTo(0.30, 0.36); ctx.lineTo(0.30, -0.36); ctx.stroke();
+    ctx.fillStyle = '#8e3b32';
+    ctx.beginPath();
+    ctx.moveTo(0.30, -0.36); ctx.lineTo(0.02, -0.28); ctx.lineTo(0.30, -0.20);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = 0.055;
+  },
+  pagoda(ctx) {                                 // stacked eaves
+    ctx.fillStyle = THEME.roofDark;
+    for (const [y, w] of [[0.16, 0.62], [-0.06, 0.46], [-0.28, 0.30]]) {
+      ctx.beginPath();
+      ctx.moveTo(-w / 2, y); ctx.quadraticCurveTo(0, y - 0.16, w / 2, y);
+      ctx.lineTo(w / 2 - 0.08, y + 0.08); ctx.lineTo(-w / 2 + 0.08, y + 0.08);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.strokeStyle = THEME.timber;
+    ctx.beginPath(); ctx.moveTo(0, 0.24); ctx.lineTo(0, 0.36); ctx.stroke();
+  },
+  magic(ctx) {                                  // a conjurer's star
+    ctx.strokeStyle = '#8a5fbf';
+    ctx.lineWidth = 0.07;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = -Math.PI / 2 + i * (4 * Math.PI / 5);
+      const x = Math.cos(a) * 0.34, y = Math.sin(a) * 0.34;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath(); ctx.stroke();
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.055;
+  },
+  ingot(ctx) {                                  // bars of gold in the ground
+    ctx.fillStyle = THEME.gold;
+    for (const [x, y] of [[-0.14, 0.02], [0.12, -0.10], [0.02, 0.18]]) {
+      ctx.beginPath();
+      ctx.moveTo(x - 0.16, y + 0.08); ctx.lineTo(x - 0.10, y - 0.08);
+      ctx.lineTo(x + 0.16, y - 0.08); ctx.lineTo(x + 0.10, y + 0.08);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+  },
+  crop(ctx) {                                   // rings flattened into the ground
+    ctx.strokeStyle = 'rgba(60,70,35,0.55)';
+    ctx.lineWidth = 0.09;
+    for (const r of [0.34, 0.20]) {
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(0.0, 0.0, 0.06, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.055;
+  },
+  siege(ctx) {                                  // a camp outside the walls
+    ctx.fillStyle = '#7d4229';
+    for (const [x, y] of [[-0.20, 0.10], [0.16, 0.16]]) {
+      ctx.beginPath();
+      ctx.moveTo(x - 0.16, y + 0.14); ctx.lineTo(x, y - 0.16); ctx.lineTo(x + 0.16, y + 0.14);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.strokeStyle = THEME.timber;               // a trebuchet arm
+    ctx.lineWidth = 0.06;
+    ctx.beginPath(); ctx.moveTo(-0.02, -0.06); ctx.lineTo(0.22, -0.34); ctx.stroke();
+    ctx.lineWidth = 0.055;
+  },
+  watch(ctx) {                                  // a lone tower with a brazier
+    ctx.fillStyle = THEME.city;
+    ctx.beginPath(); ctx.rect(-0.13, -0.20, 0.26, 0.54); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.cityShade;
+    ctx.beginPath(); ctx.rect(-0.18, -0.30, 0.36, 0.12); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.gold;
+    ctx.beginPath(); ctx.arc(0, -0.38, 0.08, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  },
+  rose(ctx) {                                   // the compass painted on the grass
+    ctx.strokeStyle = THEME.gold;
+    ctx.lineWidth = 0.06;
+    ctx.beginPath(); ctx.arc(0, 0, 0.30, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = THEME.gold;
+    for (let i = 0; i < 4; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * 0.42, Math.sin(a) * 0.42);
+      ctx.lineTo(Math.cos(a + 2.6) * 0.10, Math.sin(a + 2.6) * 0.10);
+      ctx.lineTo(Math.cos(a - 2.6) * 0.10, Math.sin(a - 2.6) * 0.10);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.055;
+  },
+  tunnel(ctx) {                                 // the hill the road dives into
+    ctx.fillStyle = THEME.rock;
+    ctx.beginPath();
+    ctx.moveTo(-0.40, 0.30);
+    ctx.quadraticCurveTo(0, -0.42, 0.40, 0.30);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#1c1723';                    // the mouth itself
+    ctx.beginPath();
+    ctx.moveTo(-0.14, 0.30);
+    ctx.quadraticCurveTo(0, -0.02, 0.14, 0.30);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  },
+  plague(ctx) {                                  // the warning cross on the door
+    ctx.strokeStyle = '#8e3b32';
+    ctx.lineWidth = 0.11;
+    ctx.beginPath();
+    ctx.moveTo(-0.24, -0.24); ctx.lineTo(0.24, 0.24);
+    ctx.moveTo(0.24, -0.24); ctx.lineTo(-0.24, 0.24);
+    ctx.stroke();
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.055;
+    ctx.beginPath(); ctx.arc(0, 0, 0.36, 0, Math.PI * 2); ctx.stroke();
+  },
+  swag(ctx) {                                   // the robber's sack, tied at the neck
+    ctx.fillStyle = '#6b5233';
+    ctx.beginPath();
+    ctx.moveTo(-0.06, -0.30);
+    ctx.quadraticCurveTo(-0.40, -0.10, -0.28, 0.22);
+    ctx.quadraticCurveTo(0, 0.44, 0.28, 0.22);
+    ctx.quadraticCurveTo(0.40, -0.10, 0.06, -0.30);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = THEME.gold;
+    ctx.lineWidth = 0.07;
+    ctx.beginPath(); ctx.moveTo(-0.12, -0.26); ctx.lineTo(0.12, -0.26); ctx.stroke();
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.055;
+  },
+  revolt(ctx) {                                 // pitchforks over a torch
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.07;
+    for (const a of [-0.5, 0.5]) {
+      ctx.beginPath(); ctx.moveTo(a * 0.4, 0.34); ctx.lineTo(-a * 0.16, -0.28); ctx.stroke();
+    }
+    ctx.fillStyle = '#c1652f';                   // the flame
+    ctx.beginPath();
+    ctx.moveTo(0, -0.42);
+    ctx.quadraticCurveTo(0.14, -0.20, 0, -0.06);
+    ctx.quadraticCurveTo(-0.14, -0.20, 0, -0.42);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = 0.055;
+  },
+  signpost(ctx) {                               // fingers pointing two ways
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.08;
+    ctx.beginPath(); ctx.moveTo(0, 0.36); ctx.lineTo(0, -0.36); ctx.stroke();
+    ctx.fillStyle = THEME.plaster;
+    for (const [y, flip] of [[-0.28, 1], [-0.08, -1]]) {
+      ctx.beginPath();
+      ctx.moveTo(0, y - 0.08); ctx.lineTo(flip * 0.34, y - 0.08);
+      ctx.lineTo(flip * 0.44, y); ctx.lineTo(flip * 0.34, y + 0.08);
+      ctx.lineTo(0, y + 0.08);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.lineWidth = 0.055;
+  },
+  fruit(ctx) {                                  // a tree heavy with fruit
+    ctx.strokeStyle = THEME.timber;
+    ctx.lineWidth = 0.09;
+    ctx.beginPath(); ctx.moveTo(0, 0.36); ctx.lineTo(0, 0.02); ctx.stroke();
+    ctx.fillStyle = '#5c7040';
+    ctx.beginPath(); ctx.arc(0, -0.12, 0.30, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#b8452f';
+    for (const [x, y] of [[-0.13, -0.18], [0.12, -0.06], [0.02, -0.28]]) {
+      ctx.beginPath(); ctx.arc(x, y, 0.06, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.lineWidth = 0.055;
+  },
   garden(ctx) {                                 // a low wall with beds inside it
     ctx.fillStyle = '#6f7a46';
     ctx.beginPath(); ctx.rect(-0.34, -0.24, 0.68, 0.56); ctx.fill(); ctx.stroke();
@@ -1654,7 +1923,11 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     if (f.type === 'forest' && f.shield) drawLog(ctx, type.spots[i], L);
   });
   for (const f of type.feats) if (f.type === 'sfera') drawSfera(ctx, f, L);
-  for (const f of type.feats) if (f.type === 'monastery') drawAbbey(ctx, L);
+  for (const f of type.feats) {
+    if (f.type !== 'monastery') continue;
+    if (type.marks?.some((m) => m.kind === 'cult')) drawCultShrine(ctx, L);
+    else drawAbbey(ctx, L);
+  }
   for (const f of type.feats) if (f.type === 'temple') drawTemple(ctx, f, L);
 
   // A swinging tile made of CITY can't show a gap the way a road vane can —
@@ -1856,6 +2129,30 @@ export function drawMeeple(ctx, x, y, size, color, opts = {}) {
  * follower — it sits beside the farmer rather than replacing him, so the tile
  * still reads as "this player farms here, and has a pig on it".
  */
+/**
+ * The heretic shrine — the same footprint as the abbey it races, but pointed
+ * where the abbey is square, so the two read as rivals at a glance.
+ */
+function drawCultShrine(ctx, L) {
+  ctx.save();
+  ctx.translate(0.5, 0.5);
+  ctx.scale(0.46, 0.46);
+  ctx.lineWidth = 0.055;
+  ctx.strokeStyle = THEME.timber;
+  ctx.lineJoin = 'round';
+  shadow(ctx, L, 0.07, 0.10, 'rgba(13,11,17,0.50)');
+  ctx.fillStyle = THEME.plaster;
+  ctx.beginPath(); ctx.rect(-0.30, -0.06, 0.60, 0.42); ctx.fill(); ctx.stroke();
+  noShadow(ctx);
+  ctx.fillStyle = '#6d2f45';                     // the heterodox roof
+  ctx.beginPath();
+  ctx.moveTo(-0.38, -0.06); ctx.lineTo(0, -0.56); ctx.lineTo(0.38, -0.06);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = THEME.gold;                    // the icon over the door
+  ctx.beginPath(); ctx.arc(0, 0.12, 0.09, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
 export function drawPig(ctx, x, y, size, color) {
   ctx.save();
   ctx.translate(x, y);
@@ -1882,5 +2179,49 @@ export function drawPig(ctx, x, y, size, color) {
   ctx.ellipse(0.64, -0.04, 0.07, 0.06, 0, 0, Math.PI * 2); // snout
   ctx.fill();
 
+  ctx.restore();
+}
+
+
+/** A little stack of gold on a tile, with a count when it grows. */
+export function drawIngots(ctx, x, y, size, n) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size, size);
+  ctx.lineWidth = 0.10;
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillStyle = THEME.gold;
+  for (let i = 0; i < Math.min(n, 3); i++) {
+    const dy = -i * 0.34;
+    ctx.beginPath();
+    ctx.moveTo(-0.55, 0.25 + dy); ctx.lineTo(-0.35, -0.15 + dy);
+    ctx.lineTo(0.55, -0.15 + dy); ctx.lineTo(0.35, 0.25 + dy);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  if (n > 3) {
+    ctx.fillStyle = '#1c1723';
+    ctx.font = '0.8px ui-sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(n), 0.9, 0.3);
+  }
+  ctx.restore();
+}
+
+/** A little building — shed, house or tower — with its owner's colour at the door. */
+export function drawBuilding(ctx, x, y, size, kind, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size, size);
+  ctx.lineWidth = 0.08;
+  ctx.strokeStyle = THEME.timber;
+  const h = kind === 'tower' ? 1.1 : kind === 'house' ? 0.7 : 0.45;
+  ctx.fillStyle = THEME.plaster;
+  ctx.beginPath(); ctx.rect(-0.32, 0.4 - h, 0.64, h); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = THEME.roof;
+  ctx.beginPath();
+  ctx.moveTo(-0.42, 0.4 - h); ctx.lineTo(0, 0.05 - h); ctx.lineTo(0.42, 0.4 - h);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.rect(-0.10, 0.16, 0.20, 0.24); ctx.fill(); ctx.stroke();
   ctx.restore();
 }

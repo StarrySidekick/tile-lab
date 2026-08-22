@@ -7,7 +7,7 @@ A sandbox for experimenting with tile mechanics and game modes, built to be
 **fast to iterate on**. No build step, no dependencies, no image assets — plain
 ES modules and a canvas. Edit a file, hit refresh, keep playing.
 
-Twelve modes and a catalogue of 79 Carcassonne rules — 33 of them playable —
+Twelve modes and a catalogue of 79 Carcassonne rules — 66 of them playable —
 all sharing one board engine. Each mode exists to answer a specific question
 about what makes tile-laying good; [MODES.md](MODES.md) is where that
 reasoning lives, and [docs/EDITIONS.md](docs/EDITIONS.md) is where the printed
@@ -274,6 +274,27 @@ The computer player values a farm at what its cities will probably be worth by
 the end, and treats a farmer as costing about twice an ordinary follower, since
 it is spent for the rest of the game.
 
+### What stays on the shelf, and why
+
+Thirteen rules are catalogued but deliberately not built, each for a stated
+reason rather than neglect:
+
+| rule | why not |
+|---|---|
+| **The Catapult** | A physical dexterity game — flicking wooden discs across a table. There is no honest digital version of it |
+| **The Count** | Needs the separate 2×3 City of Carcassonne board and its district-redeploy economy |
+| **Bridges** | A road carried *over* a field tile means per-cell edge overrides — real board surgery |
+| **Castles** | Converting a closed city into a token that scores off its neighbours' future needs an interposed choice at scoring time |
+| **Bazaars** | A live auction; against bots an auto-bid would gut the point of it |
+| **Ringmaster** | Rides the circus events; worth doing once the big top has more than one trick |
+| **Mists over Carcassonne** | A co-operative game — a mode, not a mechanic |
+| **Halflings** | Triangular tiles on a square-cell engine |
+| **Wheel of Fortune** | Replaces the start tile with a whole apparatus of its own |
+| **Markets of Leipzig** | Four off-board market quarters bidding for cities |
+| **The Bets** | Secret simultaneous choices — nothing honest survives automating them |
+| **Castles in Germany** | Double-width personal tiles placed from supply |
+| **The Maps' start squares** | The border is in (the Maps toggle); the printed multi-start layouts are not |
+
 ### The edition switch
 
 Carcassonne has been revised twice and the revisions are not cosmetic — the
@@ -293,7 +314,7 @@ by `tools/wikicarpedia.mjs`.
 
 ### What's implemented
 
-Of the 79 rules catalogued, 33 are live. The rest are named, described, dated
+Of the 79 rules catalogued, 66 are playable — 34 to the letter, 32 marked as honest approximations whose tooltips say exactly what was simplified. The rest are named, described, dated
 and linked, waiting for an implementation.
 
 **Workshop originals** — things this sandbox invented, or lifted out of one of
