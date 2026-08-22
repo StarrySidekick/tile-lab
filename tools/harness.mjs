@@ -692,13 +692,136 @@ function checkGirando() {
     if (!b.get(0, 0).meeple) return fail('a follower stays in the city it finished', 'it went home');
     if (b.get(0, 0).anchored) return fail('nothing crystallises any more', 'the tile turned to stone');
 
-    b.remove(0, -1);                          // the cap blows away
+    // The wind shoves the cap four squares away — the same tile, somewhere
+    // else, which is what a gust actually does to one.
+    b.shift({ x: 0, y: -1 }, { x: 4, y: -4 });
+    b.rebuild();
     h.m.reopen();
-    if (h.players[1].score !== 0) {
-      return fail('a city blown open gives back 2 a tile', `left holding ${h.players[1].score}`);
+    if (h.players[1].score !== 2) {
+      return fail('a city blown open gives back ONE a tile', `left holding ${h.players[1].score} of 4`);
     }
     if (h.players[0].score !== 2) {
       return fail('a windmill\'s 2 survives the city being blown open', `left holding ${h.players[0].score}`);
+    }
+
+    // …and shoved back, closing it again brings back that one a tile — not the
+    // full rate, because neither of these tiles is new country any more.
+    b.shift({ x: 4, y: -4 }, { x: 0, y: -1 });
+    b.rebuild();
+    h.m.settle(0);
+    if (h.players[1].score !== 4) {
+      return fail('closing a city again pays one a tile', `holding ${h.players[1].score}, expected 4`);
+    }
+    // The windmill pays again too — it is a bounty on closing, not on the city.
+    if (h.players[0].score !== 4) {
+      return fail('a windmill pays every time its city closes', `holding ${h.players[0].score}`);
+    }
+  }
+
+  // A city that never closed at all pays 1 a tile at the end. One that closed
+  // and was blown open pays nothing more: it was paid in full and gave a point
+  // a tile back, and that is the whole of its account.
+  {
+    const h = fresh(18);
+    const b = h.board;
+    lay(b, 0, 0, 'Ktb');                      // a city facing north
+    lay(b, 0, -1, 'Ca');                      // …carried on north, and left open
+    b.addMeeple(0, 0, 0, 0);
+    b.rebuild();
+    h.m.openCities();
+    const first = h.players[0].score;
+    if (first !== 2) {
+      return fail('an unfinished city pays 1 a tile at the end', `paid ${first} for two tiles`);
+    }
+    // Mark it as having closed once and been blown open; now it pays nothing.
+    for (const c of [b.get(0, 0), b.get(0, -1)]) {
+      c.cityPaid = { 0: { players: [0], live: false } };
+    }
+    h.players[0].score = 0;
+    h.m.openCities();
+    if (h.players[0].score !== 0) {
+      return fail('a city that already closed pays nothing at the end', `paid ${h.players[0].score}`);
+    }
+  }
+
+  // The three sferas. One board, three colours, three different numbers: the
+  // field is three tiles, it feeds one finished city, and two temples stand on
+  // it — so green pays 3, blue pays 2 and red pays 4 for exactly the same
+  // ground. That is the whole of what the colours are for.
+  {
+    const cases = [
+      { hue: 'green', span: 'Ksx', half: 'Kso', want: 3 },   // 1 a tile, over 3
+      { hue: 'blue', span: 'Kbx', half: 'Kbo', want: 2 },    // 2 a finished city, over 1
+      { hue: 'red', span: 'Krx', half: 'Kro', want: 4 },     // 2 a temple, over 2
+    ];
+    for (const { hue, span, half, want } of cases) {
+      const h = fresh(20 + want);
+      const b = h.board;
+      lay(b, 0, 0, span);                     // sfera north, cities east and west
+      lay(b, 0, -1, half, 2);                 // …meeting its other half
+      lay(b, 1, 0, 'Kce', 3);                 // the city, capped both ways
+      lay(b, -1, 0, 'Kce', 1);
+      lay(b, 0, 1, 'Kt');                     // two temples out on the same field
+      lay(b, 0, 2, 'Kt');
+      const field = TILES[span].feats.findIndex((f) => f.type === 'field');
+      b.addMeeple(0, 0, field, 0);
+      b.rebuild();
+      h.players[0].meeples = 6;
+      h.m.joinSferas();
+      if (h.players[0].score !== want) {
+        return fail(`a ${hue} sphere harvests its own way`,
+          `paid ${h.players[0].score}, expected ${want}`);
+      }
+      if (h.players[0].meeples !== 7) {
+        return fail('a harvested farmer walks home whatever the colour', `${h.players[0].meeples} in hand`);
+      }
+    }
+  }
+
+  // …and a colour only ever meets its own. Half a green ball does not fit half
+  // a red one, which is what makes a sphere unambiguously one thing.
+  {
+    const h = fresh(24);
+    const b = h.board;
+    lay(b, 0, 0, 'Kso', 2);                   // green, facing south
+    if (b.canPlace(0, 1, TILES.Kro, 0, {})) {
+      return fail('a green sfera does not meet a red one', 'the seam was legal');
+    }
+    if (!b.canPlace(0, 1, TILES.Kso, 0, {})) {
+      return fail('a green sfera meets a green one', 'the seam was refused');
+    }
+  }
+
+  // The last harvest: a field still being farmed when the wind drops is scored
+  // as though a sphere had closed on it, taking its colour from any sfera
+  // lying in it and falling back to blue.
+  {
+    const h = fresh(25);
+    const b = h.board;
+    lay(b, 0, 0, 'Kro');                      // an unpaired RED half, in the field
+    lay(b, -1, 0, 'Kt');                      // one temple on that field
+    const field = TILES.Kro.feats.findIndex((f) => f.type === 'field');
+    b.addMeeple(0, 0, field, 0);
+    b.rebuild();
+    h.m.lastHarvest();
+    if (h.players[0].score !== 2) {
+      return fail('the last harvest takes the colour of a sfera lying in the field',
+        `paid ${h.players[0].score}, expected 2 for one temple under red`);
+    }
+    // …and a field with no sfera in it is counted BLUE, per finished city.
+    const k = fresh(26);
+    const kb = k.board;
+    lay(kb, 0, 0, 'Ktb');                     // a city facing north…
+    lay(kb, 0, -1, 'E', 2);                   // …capped, so it is finished
+    const kf = TILES.Ktb.feats.findIndex((f) => f.type === 'field');
+    kb.addMeeple(0, 0, kf, 0);
+    kb.rebuild();
+    k.m.settle(0);                            // close the city so the farm feeds one
+    k.players[0].score = 0;
+    k.m.lastHarvest();
+    if (k.players[0].score !== 2) {
+      return fail('a field with no sfera in it is harvested blue',
+        `paid ${k.players[0].score}, expected 2 for one finished city`);
     }
   }
 
@@ -725,29 +848,22 @@ function checkGirando() {
     }
   }
 
-  // A sphere closing harvests the field it is lying in — 3 a finished city,
-  // and the farmers walk home, which no other figure in the mode ever does.
+  // A sphere is harvested exactly once, however many times the board is asked.
   {
     const h = fresh(13);
     const b = h.board;
-    lay(b, 0, 0, 'Ksc');                      // sfera north, city south
-    lay(b, 0, -1, 'Kso', 2);                  // …meeting a sfera facing south
-    lay(b, 0, 1, 'E');                        // the city, capped and finished
-    const field = TILES.Ksc.feats.findIndex((f) => f.type === 'field');
+    lay(b, 0, 0, 'Kso');                      // green sfera, facing north
+    lay(b, 0, -1, 'Kso', 2);                  // …meeting its other half
+    const field = TILES.Kso.feats.findIndex((f) => f.type === 'field');
     b.addMeeple(0, 0, field, 0);
     b.rebuild();
-    h.players[0].meeples = 6;
     h.m.joinSferas();
-    if (h.players[0].score !== 3) {
-      return fail('a farm pays 3 for each finished city in its field', `paid ${h.players[0].score}`);
+    const once = h.players[0].score;
+    if (!once) return fail('a closing sphere harvests its field', 'it paid nothing');
+    h.m.joinSferas();
+    if (h.players[0].score !== once) {
+      return fail('a sphere is harvested once', `paid ${h.players[0].score - once} again`);
     }
-    if (h.players[0].meeples !== 7) {
-      return fail('a scored farmer walks home', `${h.players[0].meeples} in hand`);
-    }
-    if (b.get(0, 0).meeple) return fail('a scored farmer leaves the board', 'it is still lying there');
-    h.players[0].score = 0;
-    h.m.joinSferas();                         // …and never a second time
-    if (h.players[0].score !== 0) return fail('a sphere is harvested once', `paid ${h.players[0].score} again`);
   }
 
   // Everything out on an island is worth half again as much.
@@ -837,8 +953,9 @@ function checkGirando() {
     }
   }
 
-  console.log('  ✓ mainland and islands, city pay and clawback, windmills, road tolls,'
-    + ' the sfera harvest, island rates, the Balena, towed islands, long flights, the archipelago');
+  console.log('  ✓ mainland and islands, city pay/clawback/reclose, unfinished cities, windmills,'
+    + ' road tolls, three sfera colours, the last harvest, island rates, the Balena, towed islands,'
+    + ' long flights, the archipelago');
 }
 
 // --- runs -------------------------------------------------------------------
