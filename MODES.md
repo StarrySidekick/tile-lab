@@ -188,6 +188,27 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 >
 > One lesson worth recording. Restructuring the renderer spliced out four methods including `drawCellOverlay`, and because the frame is now wrapped in a try/catch, the result was a board that silently drew one tile instead of a tab that froze — logged once to the console and then invisible. The net did its job and it also hid the bug for two screenshots. If a frame ever *keeps* throwing, read the console before you read the code.
 
+> **Eighth pass: take the floor out and put a whale on it.** The mode had accumulated three separate ways of nailing tiles down — crystallisation, the locked sfera pair, the anchored ship — and every one of them was a rule that made the board *stop*. All three are gone. Every tile on the board can be pushed, finished or not, and the only brake left is a piece anybody can pick up and carry.
+>
+> - **The Balena.** A sky whale the size of a district. Whatever tile it lies on cannot be moved by any wind — zephyrs included, which nothing else in the engine has ever outranked — and no gust passes through it, so everything in its lee is sheltered. On your turn, *instead of* placing a follower, you may move it three squares wherever you like. Trading a follower for a turn of shelter is a real price: the follower earns for the rest of the game and the whale only stops things happening.
+> - **The ships are out, and with them the hand.** The sky ship was a good idea in a mode that has run out of room for it, and the hand it made necessary — tiles blown off the board landing in your fingers, dealt back as a face-up row — turned every turn into a small draft. Fallen tiles go to the bottom of the deck now, you draw one like anywhere else, and the catch-and-throw-back bonus survives as a second *placement* rather than a second *choice*. That is most of the UI weight gone from the mode.
+> - **The Palazzo means something.** It used to be a tile with a scoring modifier stapled to it. Now it defines the **mainland**: whatever piece of country the seat stands on is the kingdom, and every other group of two or more tiles is an *island*. You may not build onto an island and you may not walk a follower onto one — placement is filtered by a new `onto` option on `Board.canPlace`, which is one set lookup and which every path that asks "can this tile go anywhere" already runs through. And when the wind gets hold of the Palazzo itself, every island slides one square the way the seat went, which is how you close a gap you were never allowed to build across.
+> - **Islands pay half again as much** — roads 2 a tile, cities 3, farms 5 a city — and ten flat points at the end go to whoever stands on more separate islands than anybody else. Since you can't *choose* to be on one, every one of those points was paid for by having been blown somewhere, or by a flying machine.
+> - **Cities pay, and un-pay.** 2 a tile, only ever to somebody standing in the city, and the followers **stay** — a city here is a thing that can be blown open and finished again, and the figure in it is the only record of whose it was. Blowing one open reverses the payment exactly. That needed a numbered book entry per closure, stamped on every tile of the city: refunding the *surviving tiles* gives back the wrong number the moment a tile of the city has fallen off the edge of the world, and "effectively reversing the points gained" is what the rule says. The windmill is the counterweight — 2 to whoever closes the city, per turbine standing in it, and no wind ever takes that back. It is the only durable point in the mode.
+> - **Roads are nobody's.** You don't claim one, you finish it, for 1 a tile. What makes a road worth building is what it *arrives* at: every city or temple it runs into pays 2 to whoever holds it, which is as often as not the player across the table. It's the first thing in the game you build in order to pay somebody else, and it is by some distance the most interesting new decision.
+> - **Farmers, at last, and harvested rather than counted.** The sfera stopped scoring islands and became one thing: closing a sphere harvests the field the sfera is lying in, at 3 a finished city, and the farmers walk home. That is the only figure in the mode that ever leaves a scored feature under its own steam. It also meant giving every cloud tile a field, worked out the same way the base set's are — a pool where half the tiles had no ground on them would be a pool where farms stopped at the weather.
+>
+> **Two wind bugs, both visible at the table.** A zephyr blowing the same way as the gust was boosting the wind and then being moved by the *boosted* figure — a tile blown two squares by its own breath. The boost now applies beyond the absorbed zephyr and never to it. And a zephyr caught head-on used to do nothing at all, on the theory that the two brace; that was a patch for a runaway chain the once-per-storm rule already prevents. Every zephyr the wind reaches now fires in its own direction, so a storm rebounds and turns corners, and a line of zephyrs is the chain reaction it looked like it should be.
+>
+> **Where it landed.** Thirty sharp-bot games, two players, per game: temple 49.2, city 20.4 *gross*, farm 15.9, road 13.2, archipelago 12.7, turbine gusts 10.3, windmill 6.9, road tolls 3.2 — and **city clawback −17.7**. Scores 20–120, mean 57.8, about 94 tiles laid, 6.2 spheres harvested, 4.7 islands standing at the end, the Palazzo towing the archipelago 6.7 times and the whale moved 18 times.
+>
+> The number to argue about is that clawback. **Eighty-four per cent of everything cities pay gets taken straight back**, which leaves a city worth about 3 points net over a whole game — for a follower you never get back, because a follower stays in the city it finished. That is exactly what the rules say and it may well be the point: the windmill is the durable half, and 6.9 a game of unloseable windmill income next to 3 a game of net city is a clear statement about which of the two you should be building for. But if cities want to be worth claiming at all, the knob is the clawback rate rather than the payout — giving back one a tile instead of two would leave the reversal legible and the city worth garrisoning.
+>
+> The temple is still 43% of the economy, unchanged from the pass before and still the thing most worth pointing a knob at next.
+>
+> **And one in the harness**, worth writing down because it was a false positive that would have hidden real ones. The stuck-detector compares a coarse fingerprint of the game before and after each move. In a mode where the country moves, a real move can lay a tile, have the wind blow a *different* one out of the sky, put that one back in the deck and deal it straight back — a completely rearranged board with every coarse counter where it started. `board.seq`, which only ever goes up, is now in the fingerprint.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 
@@ -433,7 +454,7 @@ difficulty setting.
 
 ## 8. Market — a drafting layer (best ratio on the list)
 
-> **Built as a modifier** — `Drafting market`, and it works everywhere. Duel's open pool and Girando's hand reuse the same row and the same picker, with the discard rule switched off.
+> **Built as a modifier** — `Drafting market`, and it works everywhere. Duel's open pool reuses the same row and the same picker with the discard rule switched off; Girando did too, until the eighth pass took the hand out and went back to a single drawn tile.
 
 **Question:** how much of the game is the randomness of the draw?
 
@@ -579,7 +600,7 @@ be better as switches than as places.
 | **Builder** | Extend what you hold, get another tile | ✔ (simplified) |
 | **Trade goods** | Wine / grain / cloth, 10 for each majority | ✔ |
 | **Oracle dice** | Uncertainty the table resolves narratively | ✔, inside The Chronicle |
-| **Hand of tiles** | Choice instead of fate | ✔, inside Girando |
+| **Hand of tiles** | Choice instead of fate | ✔, as the `Drafting market` modifier |
 | **Asymmetric powers** | Each player breaks one rule | not built |
 | **Turn timer** | Kills analysis paralysis, changes the whole feel | not built |
 | **Co-op vs the deck** | The deck plays events against the table | not built |
@@ -710,14 +731,17 @@ A few things the harness noticed that are worth watching for at the table:
   is healthy — it means the draft and the bounded board are doing work. If it's
   *not* fun, that's the single most useful negative result in the whole
   document, because everything else assumes it is.
-- **Girando** scores *low* — a mean of 3 across random play, 10 across bot
-  games, where Classic runs 28 and 45. That's the thesis working (nothing pays
-  until it closes, and the wind keeps things from closing) but it's close to
-  the edge: if a game can end with everyone on 4, the wind is winning too
-  often. *Four passes later it scores 48 a player and the question has
-  inverted* — see the Girando entry above for where the points now come from,
-  and note that the new risk is the opposite one: a sky that shatters into
-  eight islands and pays mostly for standing on them.
+- **Girando** scored *low* at first — a mean of 3 across random play, 10 across
+  bot games, where Classic runs 28 and 45. That was the thesis working (nothing
+  pays until it closes, and the wind keeps things from closing) but it sat close
+  to the edge: if a game can end with everyone on 4, the wind is winning too
+  often. *Several passes later it runs 20 across random play and 51 across bot
+  games*, and the question has inverted twice over — see the Girando entry above
+  for where the points come from now. The gap between the two numbers is the
+  thing worth watching: it is a mode where knowing what you are doing is worth
+  two and a half times as much as not, which is a wider gap than Classic's, and
+  it comes from a board that pays you for being somewhere you couldn't have
+  chosen to be.
 - **Marches** is capped at twelve rounds because uncapped income compounds into
   meaningless numbers. If the campaign feels short, raise the cap before you
   touch the scoring — the round count is the tuning knob, not the points.

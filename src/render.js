@@ -192,7 +192,7 @@ export class Renderer {
     }
 
     if (game.phase === 'lift') this.drawCellTargets(game.m.allLiftable ? game.m.allLiftable() : liftableCells(game.board), THEME.violet, '107,90,140');
-    if (game.m.sailing) this.drawCellTargets(game.m.moorings(), THEME.teal, '95,191,174');
+    if (game.phase === 'balena') this.drawCellTargets(game.m.balenaTargets(), THEME.teal, '95,191,174');
     if (game.phase === 'recall') this.drawCellTargets(game.myMeeples(), MOVE_COSTLY.line, MOVE_COSTLY.rgb);
     if (game.phase === 'walk') this.drawCellTargets(game.pendingWalk?.targets || [], MOVE_OK.line, MOVE_OK.rgb);
     if (game.phase === 'place') this.drawPlacementHints(game);
@@ -514,13 +514,15 @@ export class Renderer {
       ctx.lineWidth = 2;
       ctx.strokeRect(sx + 1, sy + 1, z - 2, z - 2);
     }
-    // A crystallised CITY is solid all the way up and stops a gust; a
-    // crystallised road doesn't. That is the single most consequential thing
-    // about a square in this mode, so it gets a heavier rim than the crystal.
-    if (overlay.rampart) {
+    // Girando: country adrift from the mainland. You cannot build onto it and
+    // you cannot walk a follower onto it — and everything that closes out
+    // there is worth half again as much. That is the single most consequential
+    // thing about a square in the mode, so it gets a rim of its own.
+    if (overlay.island) {
       ctx.save();
-      ctx.strokeStyle = 'rgba(198,181,147,0.85)';
-      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(212,175,95,0.55)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([z * 0.10, z * 0.07]);
       ctx.strokeRect(sx + 2, sy + 2, z - 4, z - 4);
       ctx.restore();
     }
@@ -542,6 +544,77 @@ export class Renderer {
     // A ship flies its owner's colours. The sprite is the hull and the mast;
     // the sail is the half that says whose it is, so it's painted here.
     if (overlay.ship != null) this.drawSail(cell, sx, sy, z, PLAYER_COLORS[overlay.ship]);
+
+    // The whale. It belongs to nobody and it sits ABOVE the country rather
+    // than on it, so it is drawn last and drawn big — it overhangs its square,
+    // because a thing that shelters a whole lee ought to look like it could.
+    if (overlay.balena) this.drawBalena(sx, sy, z);
+  }
+
+  /**
+   * The Balena: a sky whale, breathing. Nothing under it can be moved by any
+   * wind and no gust passes through it, so it wants to read as MASS — a dark
+   * body with a pale underside, drifting a little so it never looks like a
+   * static token somebody forgot to clear.
+   */
+  drawBalena(sx, sy, z) {
+    const ctx = this.ctx;
+    const t = performance.now() / 1000;
+    const bob = Math.sin(t * 0.9) * 0.035;
+    const fluke = Math.sin(t * 1.7) * 0.09;
+    ctx.save();
+    ctx.translate(sx + z * 0.5, sy + z * (0.5 + bob));
+    // A shade under full size: the whale has to read as the heaviest thing on
+    // the board without hiding which tile it is pinning, and the tile under it
+    // is exactly the tile you most want to be able to identify.
+    ctx.scale(z * 0.88, z * 0.88);
+
+    ctx.fillStyle = 'rgba(13,11,17,0.28)';                 // the shadow it throws
+    ctx.beginPath();
+    ctx.ellipse(0.02, 0.30, 0.44, 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const skin = ctx.createLinearGradient(0, -0.30, 0, 0.24);
+    skin.addColorStop(0, '#4a5570');
+    skin.addColorStop(0.62, '#2b3247');
+    skin.addColorStop(1, '#c9d4e4');
+    ctx.fillStyle = skin;
+    ctx.strokeStyle = 'rgba(13,11,17,0.7)';
+    ctx.lineWidth = 0.02;
+
+    ctx.beginPath();                                        // body, nose east
+    ctx.moveTo(0.52, 0.02);
+    ctx.bezierCurveTo(0.30, -0.26, -0.16, -0.30, -0.34, -0.14);
+    ctx.bezierCurveTo(-0.44, -0.06, -0.44, 0.06, -0.34, 0.14);
+    ctx.bezierCurveTo(-0.14, 0.30, 0.28, 0.26, 0.52, 0.02);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+
+    ctx.beginPath();                                        // tail, flicking
+    ctx.moveTo(-0.32, 0.00);
+    ctx.quadraticCurveTo(-0.50, -0.02 + fluke, -0.60, -0.20 + fluke);
+    ctx.quadraticCurveTo(-0.46, -0.10, -0.42, 0.00);
+    ctx.quadraticCurveTo(-0.46, 0.10, -0.60, 0.22 + fluke);
+    ctx.quadraticCurveTo(-0.50, 0.04 + fluke, -0.32, 0.02);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+
+    ctx.beginPath();                                        // pectoral fin
+    ctx.moveTo(0.06, 0.10);
+    ctx.quadraticCurveTo(0.02, 0.30, -0.14, 0.30);
+    ctx.quadraticCurveTo(-0.06, 0.18, -0.06, 0.08);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = '#e8ded0';                              // the eye
+    ctx.beginPath();
+    ctx.arc(0.33, -0.05, 0.028, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#12101a';
+    ctx.beginPath();
+    ctx.arc(0.335, -0.05, 0.013, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   /**
@@ -716,15 +789,15 @@ export class Renderer {
       ctx.lineDashOffset = (performance.now() / 60) % (z * 0.23);
       ctx.strokeRect(px + 2, py + 2, z - 4, z - 4);
       ctx.restore();
-      // A quiet count of the ways it still fits, so "turn it" has a number.
-      if (p.rots.length > 1) {
-        ctx.save();
-        ctx.fillStyle = THEME.gold;
-        ctx.font = `600 ${Math.max(10, z * 0.18)}px ui-sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.fillText(`${p.rots.length} ways`, px + z / 2, py - z * 0.10);
-        ctx.restore();
-      }
+      // What a tap on it does now, so the gesture doesn't have to be guessed.
+      // The checkmark in the confirm panel is the only thing that commits.
+      ctx.save();
+      ctx.fillStyle = THEME.gold;
+      ctx.font = `600 ${Math.max(10, z * 0.16)}px ui-sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(p.rots.length > 1 ? `tap to turn · ${p.rots.length} ways fit` : 'only one way fits',
+        px + z / 2, py - z * 0.10);
+      ctx.restore();
       return;                                 // the ghost would only fight it
     }
 

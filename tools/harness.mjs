@@ -74,9 +74,19 @@ function playOut(opts) {
  * didn't put a tile down" — taking out the abbey or toggling the big follower
  * are real moves that leave the board untouched.
  */
+/**
+ * A fingerprint of everything a legal move could change, used only to notice
+ * that a move changed nothing at all.
+ *
+ * `board.seq` is the load-bearing field. Board SIZE is not enough in a mode
+ * where the country moves: Girando can lay a tile, have the wind blow a
+ * different one out of the sky, put that one back in the deck and deal it
+ * straight back — a real move, a completely rearranged board, and every coarse
+ * counter back where it started. The placement counter only ever goes up.
+ */
 function state(game) {
   return [
-    game.phase, game.turn, game.board.size, game.deck.length,
+    game.phase, game.turn, game.board.size, game.board.seq, game.deck.length,
     game.tile?.id, game.usingAbbey, game.useBig, game.tilesLeft,
     game.market?.length, game.player.meeples, game.player.abbeys,
     game.river?.deck.length, game.pendingWalk ? 1 : 0,
@@ -100,17 +110,28 @@ function step(game, rng) {
       while (game.rot !== spot.rot && game.m.rotate === undefined) game.rotate(1);
       if (game.m.rotate) for (let i = 0; i < spot.rot; i++) game.rotate(1);
       if (!game.placeAt(spot.x, spot.y)) {
-        // Rotation-sensitive modes may have moved the piece under us; retry once.
+          // Rotation-sensitive modes may have moved the piece under us; retry once.
         const again = legalSpots(game);
         if (!again.length) return game.finish();
         game.placeAt(again[0].x, again[0].y);
       }
       return;
     }
+    // Girando's whale: three squares, instead of a follower.
+    case 'balena': {
+      const spots = game.m.balenaTargets();
+      if (!spots.length) return void game.m.cancelSwim();
+      const t = pick(spots);
+      if (!game.cellClick(t.x, t.y)) game.m.cancelSwim();
+      return;
+    }
     case 'magic': { game.magicAuto(); return; }
     case 'rob': { if (rng() < 0.5) game.robAuto(); else game.robSkip(); return; }
     case 'crop': { game.cropChoose(rng() < 0.5 ? 'add' : 'remove'); return; }
     case 'meeple': {
+      // A mode may offer something INSTEAD of a follower; Girando's whale is
+      // the only one, and it never gets exercised unless something picks it.
+      if (game.m.canSwim?.() && rng() < 0.15) return void game.m.beginSwim();
       if (game.canPlaceBuilding?.() && rng() < 0.5) game.placeBuilding();
       if (game.canBuildBridge?.() && rng() < 0.4) game.buildBridge();
       const opts = game.meepleOptions();
@@ -411,16 +432,34 @@ function checkWind() {
     if (reports.length < 2) return fail('a blown zephyr fires in its turn', `${reports.length} gust(s)`);
   }
 
-  // …but a zephyr caught HEAD ON does nothing: the two brace against each
-  // other. Left to retrigger, a facing pair takes turns shoving the same lane
-  // apart until both ends of it have fallen out of the sky.
+  // …and so does one caught HEAD ON. Every zephyr the wind reaches fires in
+  // its own direction; there is no bracing. What stops a facing pair shoving
+  // the same lane apart forever is the once-per-storm rule below, not the
+  // gust refusing to wake them.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');                     // north
     lay(b, 0, -1, 'Kz', 2);                 // straight back at it, south
-    lay(b, 1, -1, 'U');                     // a neighbour so nothing falls
+    lay(b, 1, -1, 'U');                     // neighbours, so nothing falls out
+    lay(b, 1, -2, 'U');
     const reports = storm(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (reports.length !== 1) return fail('a facing zephyr does not retrigger', `${reports.length} gust(s)`);
+    if (reports.length !== 2) return fail('a facing zephyr rebounds the storm', `${reports.length} gust(s)`);
+    if (reports[1].dir !== 2) return fail('the rebound goes the facing zephyr\'s way', `dir ${reports[1].dir}`);
+  }
+
+  // A zephyr blowing the SAME way is absorbed — and the harder wind that comes
+  // of it applies BEYOND it, never to it. A tile is never blown along by its
+  // own breath, which is exactly what a second square of travel looked like.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // the one we set off, north
+    const rider = lay(b, 0, -1, 'Kz');      // another pointing the same way
+    lay(b, 0, -2, 'U');                     // …and the tile the boost is for
+    lay(b, 1, -2, 'U');                     // somewhere for them both to land beside
+    lay(b, 1, -4, 'U');
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (rider.y !== -2) return fail('an absorbed zephyr moves one square', `it went to y ${rider.y}`);
+    if (!b.get(0, -4)) return fail('the wind beyond it blows two', 'the far tile moved one');
   }
 
   // And no zephyr blows twice in one storm, however the chain comes back round.
@@ -570,118 +609,207 @@ function checkWind() {
     if (road.tiles.size !== 1) return fail('a mismatched seam joins nothing', `road spans ${road.tiles.size}`);
   }
 
-  console.log('  ✓ lanes, corners, ramparts, paving, loose zephyrs, turbines, vanes, straight roads, chains, head-on, once-per-storm, the rose, stacking, followers, temples, locks, Abbazias, bad seams');
+  // The whale outranks everything, zephyrs included: a gust stops at it, and
+  // the tile under it does not move even when that tile is weather itself.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // north
+    const whale = lay(b, 0, -1, 'Kz', 1);   // a zephyr of its own, under the whale
+    whale.balena = true;
+    lay(b, 0, -2, 'U');
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (whale.y !== -1) return fail('the whale pins even a zephyr', `it moved to y ${whale.y}`);
+    if (!b.get(0, -2)) return fail('the whale shelters its lee from a zephyr', 'the lee blew away');
+  }
+
+  console.log('  ✓ lanes, corners, ramparts, paving, loose zephyrs, turbines, vanes, straight roads,'
+    + ' chains, rebounds, absorbed zephyrs, the whale, once-per-storm, the rose, stacking, followers,'
+    + ' temples, locks, Abbazias, bad seams');
 }
 
 /**
- * Girando's own pieces, which the wind engine knows nothing about: the ship,
- * the hand the sky keeps refilling, and the sphere that counts the island it
- * is standing on. All three are cheap to assert and expensive to notice
- * missing — the sphere in particular shipped twice paying the wrong islands.
+ * Girando's own rules, which the wind engine knows nothing about: what the
+ * mainland is, what a city pays and un-pays, what a road pays other people,
+ * when the farms are harvested, and the whale. Every one of these is cheap to
+ * assert and expensive to notice missing — the city clawback in particular is
+ * invisible until somebody's score goes down for the wrong reason.
  */
 function checkGirando() {
   console.log('girando');
-  const g = new Game({ mode: 'girando', players: 2, seed: 7 });
-  const m = g.m;
 
-  // The hand IS the face-up row, so taking a tile has to empty the hand slot.
-  if (g.phase !== 'market' || g.market !== m.hands[0]) {
-    return fail('the hand is the row', `phase ${g.phase}`);
-  }
-  const held = g.market.length;
-  g.takeFromMarket(0);
-  if (m.hands[0].length !== held - 1) {
-    return fail('taking a tile takes it out of your hand', `${m.hands[0].length} left of ${held}`);
-  }
-
-  // A ship moors on the outside of the country and never in a hole.
-  {
-    const b = g.board;
-    for (const [x, y] of [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]]) {
-      if (!b.get(x, y)) b.place(x, y, TILES.Kz, 0, { free: true });
-    }
-    b.remove(0, 0);                            // a courtyard, walled all round
-    const spots = m.moorings();
-    if (spots.some((s) => s.x === 0 && s.y === 0)) {
-      return fail('a ship does not moor in an internal hole', 'it offered the courtyard');
-    }
-    if (!spots.length) return fail('a ship has somewhere to moor', 'no moorings offered');
-
-    const at = spots[0];
-    m.beginSail();
-    g.placeAt(at.x, at.y);
-    const ship = b.get(at.x, at.y);
-    if (!ship || ship.type.id !== 'SHIP') return fail('the ship moors where it was sent', 'nothing there');
-    if (m.ships[0].charged) return fail('a moored ship is becalmed', 'it is still free to move');
-
-    // …and it caps nothing. A road running into a ship is still open.
-    const road = b.place(at.x + 1, at.y, TILES.U, 0, { free: true });
-    const open = b.featureOf(road.x, road.y, 0).open;
-    if (open !== 2) return fail('a ship caps nothing it moors against', `road open ${open}`);
-  }
-
-  // A sphere counts EVERY island, at a flat three points each — so two separate
-  // pieces of country pay twice, and neither pays more for being bigger.
-  {
-    const h = new Game({ mode: 'girando', players: 2, seed: 3 });
-    const b = h.board;
-    for (const c of [...b.cells.values()]) b.remove(c.x, c.y);
-    b.place(0, 0, TILES.Kso, 2, { free: true });   // sfera facing south
-    b.place(0, 1, TILES.Kso, 0, { free: true });   // …meeting one facing north
-    for (const [x, y] of [[1, 0], [2, 0], [1, 1]]) b.place(x, y, TILES.Kz, 0, { free: true });
-    // The zephyr has no features to stand in, so the follower simply lies on
-    // it — which is exactly the state the wind leaves figures in, and it still
-    // counts for the island.
-    b.get(1, 0).meeple = { player: 0, feat: null, big: false };
-    // …and a second island, far away, with one figure each on it.
-    b.place(9, 9, TILES.Kz, 0, { free: true });
-    b.place(10, 9, TILES.Kz, 0, { free: true });
-    b.get(9, 9).meeple = { player: 1, feat: null, big: false };
-    b.rebuild();
+  const fresh = (seed) => {
+    const h = new Game({ mode: 'girando', players: 2, seed });
+    for (const c of [...h.board.cells.values()]) h.board.remove(c.x, c.y);
     h.players[0].score = 0;
     h.players[1].score = 0;
-    h.m.joinSferas();
-    h.m.endTurn();
-    if (h.players[0].score !== 3) {
-      return fail('an island pays a flat three, whatever its size', `the five-tile one paid ${h.players[0].score}`);
+    return h;
+  };
+  const lay = (b, x, y, id, rot = 0) => b.place(x, y, TILES[id], rot);
+
+  // The Palazzo is the mainland, and the mainland is the only thing you may
+  // build onto. Everything adrift is still on the board and still scoring; it
+  // is simply out of reach of a tile in your hand.
+  {
+    const h = fresh(11);
+    const b = h.board;
+    lay(b, 0, 0, 'Kpz');
+    lay(b, 5, 5, 'Kz');
+    lay(b, 5, 6, 'Kz');                       // two tiles adrift: an island
+    b.rebuild();
+    const opts = h.m.placeOpts();
+    if (!opts.onto.has('0,0')) return fail('the Palazzo is the mainland', 'the seat is not in it');
+    if (opts.onto.has('5,5')) return fail('an island is not the mainland', 'it was offered anyway');
+    if (b.canPlace(6, 5, TILES.Kz, 0, opts)) {
+      return fail('you may not build onto an island', 'a square beside one was legal');
     }
-    if (h.players[1].score !== 3) {
-      return fail('every island is counted, not just the sphere\'s', `the far one paid ${h.players[1].score}`);
+    if (!b.canPlace(0, 1, TILES.Kz, 0, opts)) {     // the seat's open south side
+      return fail('you may build onto the mainland', 'a square beside the seat was refused');
     }
-    if (!b.get(0, 0).fixed || !b.get(0, 1).fixed) {
-      return fail('a joined sphere locks both tiles', 'they are still loose');
+    // A lone tile adrift is not an island — it is a tile adrift.
+    lay(b, 9, 9, 'Kz');
+    b.rebuild();
+    if (h.m.onIsland(b.get(9, 9))) return fail('one tile alone is not an island', 'it counted as one');
+    if (!h.m.onIsland(b.get(5, 5))) return fail('two tiles adrift are an island', 'it did not count');
+  }
+
+  // A city pays 2 a tile to whoever is STANDING IN IT, the followers stay put,
+  // the windmill pays the closer 2 — and blowing the city open again takes the
+  // 2 a tile straight back off, while the windmill's 2 stays paid.
+  {
+    const h = fresh(4);
+    const b = h.board;
+    lay(b, 0, 0, 'Ktb');                      // a turbine in a city facing north
+    lay(b, 0, -1, 'E', 2);                    // …capped from the north
+    b.addMeeple(0, 0, 0, 1);                  // seat 1 garrisons it
+    b.rebuild();
+    h.m.settle(0);                            // seat 0 laid the closing tile
+    if (h.players[1].score !== 4) {
+      return fail('a city pays 2 a tile to whoever stands in it', `paid ${h.players[1].score} for two tiles`);
+    }
+    if (h.players[0].score !== 2) {
+      return fail('a windmill pays 2 to whoever closes its city', `paid ${h.players[0].score}`);
+    }
+    if (!b.get(0, 0).meeple) return fail('a follower stays in the city it finished', 'it went home');
+    if (b.get(0, 0).anchored) return fail('nothing crystallises any more', 'the tile turned to stone');
+
+    b.remove(0, -1);                          // the cap blows away
+    h.m.reopen();
+    if (h.players[1].score !== 0) {
+      return fail('a city blown open gives back 2 a tile', `left holding ${h.players[1].score}`);
+    }
+    if (h.players[0].score !== 2) {
+      return fail('a windmill\'s 2 survives the city being blown open', `left holding ${h.players[0].score}`);
     }
   }
 
-  // A turbine keeps paying after its city closes. Closing hands the followers
-  // back, so there is nobody left to read a majority off — the holder at the
-  // moment of closing is written onto the tile instead.
+  // A road is nobody's to claim, and finishing one pays its finisher 1 a tile
+  // — plus 2 to the holder of every city it runs into, whoever that is.
   {
-    const h = new Game({ mode: 'girando', players: 2, seed: 4 });
+    const h = fresh(12);
     const b = h.board;
-    for (const c of [...b.cells.values()]) b.remove(c.x, c.y);
-    b.place(0, 0, TILES.Ktb, 0, { free: true });     // turbine in a city facing north
-    b.place(0, -1, TILES.E, 2, { free: true });      // a cap facing south, closing it
-    b.addMeeple(0, 0, 0, 1);
+    lay(b, 0, 0, 'D');                        // city north, road east-west
+    lay(b, -1, 0, 'Rb', 1);                   // a road stub facing east
+    lay(b, 1, 0, 'Rb', 3);                    // …and one facing west
+    b.addMeeple(0, 0, 0, 1);                  // seat 1 holds the city
+    b.rebuild();
+    const roadIdx = TILES.D.feats.findIndex((f) => f.type === 'road');
+    if (h.m.claimAllowed({ x: 0, y: 0, i: roadIdx, f: { type: 'road' } })) {
+      return fail('a road cannot be claimed', 'it was offered');
+    }
+    h.m.settle(0);
+    if (h.players[0].score !== 3) {
+      return fail('finishing a road pays 1 a tile', `paid ${h.players[0].score} for three tiles`);
+    }
+    if (h.players[1].score !== 2) {
+      return fail('a road pays 2 to the holder of the city it reaches', `paid ${h.players[1].score}`);
+    }
+  }
+
+  // A sphere closing harvests the field it is lying in — 3 a finished city,
+  // and the farmers walk home, which no other figure in the mode ever does.
+  {
+    const h = fresh(13);
+    const b = h.board;
+    lay(b, 0, 0, 'Ksc');                      // sfera north, city south
+    lay(b, 0, -1, 'Kso', 2);                  // …meeting a sfera facing south
+    lay(b, 0, 1, 'E');                        // the city, capped and finished
+    const field = TILES.Ksc.feats.findIndex((f) => f.type === 'field');
+    b.addMeeple(0, 0, field, 0);
+    b.rebuild();
+    h.players[0].meeples = 6;
+    h.m.joinSferas();
+    if (h.players[0].score !== 3) {
+      return fail('a farm pays 3 for each finished city in its field', `paid ${h.players[0].score}`);
+    }
+    if (h.players[0].meeples !== 7) {
+      return fail('a scored farmer walks home', `${h.players[0].meeples} in hand`);
+    }
+    if (b.get(0, 0).meeple) return fail('a scored farmer leaves the board', 'it is still lying there');
+    h.players[0].score = 0;
+    h.m.joinSferas();                         // …and never a second time
+    if (h.players[0].score !== 0) return fail('a sphere is harvested once', `paid ${h.players[0].score} again`);
+  }
+
+  // Everything out on an island is worth half again as much.
+  {
+    const h = fresh(14);
+    const b = h.board;
+    lay(b, 0, 0, 'Kpz');                      // the mainland, far away
+    lay(b, 5, 5, 'Ktb');                      // a two-tile city, adrift
+    lay(b, 5, 4, 'E', 2);
+    b.addMeeple(5, 5, 0, 0);
     b.rebuild();
     h.m.settle(1);
-    if (!b.get(0, 0).anchored) return fail('a finished city crystallises', 'it stayed cloud');
-    const before = h.players[1].score;
-    h.m.payTurbines([b.get(0, 0)]);
-    if (h.players[1].score === before) {
-      return fail('a turbine in a finished city still collects', 'it paid nobody');
+    // 2 tiles at the island rate of 3, plus the windmill's flat 2 to the closer.
+    if (h.players[0].score !== 6) {
+      return fail('a city on an island pays 3 a tile', `paid ${h.players[0].score} for two tiles`);
     }
+  }
+
+  // The whale. Nothing under it moves, and nothing downwind of it moves either.
+  {
+    const h = fresh(15);
+    const b = h.board;
+    lay(b, 0, 0, 'Kz');                       // pointing north
+    lay(b, 0, -1, 'U');
+    lay(b, 0, -2, 'U');
+    b.get(0, -1).balena = true;
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (!b.get(0, -1)) return fail('the whale cannot be blown', 'its tile moved');
+    if (!b.get(0, -2)) return fail('the whale shelters its lee', 'the lee blew away');
+    // …and it swims three squares, onto tiles, and nowhere further.
+    h.m.balena = { x: 0, y: 0 };
+    const reach = h.m.balenaTargets();
+    if (!reach.some((t) => t.x === 0 && t.y === -2)) {
+      return fail('the whale swims three squares', 'it could not reach two away');
+    }
+    if (reach.some((t) => t.x === 0 && t.y === 0)) {
+      return fail('the whale has to actually move', 'it offered its own square');
+    }
+  }
+
+  // The Palazzo goes with the wind, and the islands go with the Palazzo.
+  {
+    const h = fresh(16);
+    const b = h.board;
+    lay(b, 0, 0, 'Kpz');
+    lay(b, 4, 0, 'Kz');
+    lay(b, 4, 1, 'Kz');
+    b.rebuild();
+    h.m.driftIslands(1);                      // east
+    if (b.get(4, 0) || b.get(4, 1)) return fail('a towed island leaves where it was', 'a tile stayed behind');
+    if (!b.get(5, 0) || !b.get(5, 1)) return fail('the whole island is towed at once', 'it came apart');
+    if (!b.get(0, 0)) return fail('the mainland is not towed with the islands', 'the seat moved too');
   }
 
   // A flying machine crosses open sky. Reaching an island nobody has built a
   // road to is most of what the machine is for, so a gap in the country has to
   // be something the flight goes over rather than something that stops it.
   {
-    const h = new Game({ mode: 'girando', players: 2, seed: 8 });
+    const h = fresh(8);
     const b = h.board;
-    for (const c of [...b.cells.values()]) b.remove(c.x, c.y);
-    const flier = b.place(0, 0, TILES.Kfl, 0, { free: true });   // pointing north
-    b.place(0, -5, TILES.E, 0, { free: true });                  // an island, five clear
+    const flier = lay(b, 0, 0, 'Kfl');                            // pointing north
+    lay(b, 0, -5, 'E');                                           // an island, five clear
     b.rebuild();
     const path = h.m.flightPath(flier);
     if (!path || !path.some((c) => c.x === 0 && c.y === -5)) {
@@ -689,26 +817,28 @@ function checkGirando() {
     }
   }
 
-  // The Palazzo's island counts double, and the Palazzo blows about like
-  // anything else, so which island that is keeps changing.
+  // Ten points, at the end, to whoever is standing on the most islands — one
+  // follower on each of two beats two followers parked on one.
   {
-    const h = new Game({ mode: 'girando', players: 2, seed: 6 });
+    const h = fresh(17);
     const b = h.board;
-    if (b.get(0, 0)?.type.id !== 'Kpz') return fail('the kingdom starts with a Palazzo', b.get(0, 0)?.type.id);
-    for (const c of [...b.cells.values()]) b.remove(c.x, c.y);
-    b.place(0, 0, TILES.Kpz, 0, { free: true });
-    b.get(0, 0).meeple = { player: 0, feat: null, big: false };
-    b.place(9, 9, TILES.Kz, 0, { free: true });
-    b.get(9, 9).meeple = { player: 1, feat: null, big: false };
+    lay(b, 0, 0, 'Kpz');
+    for (const [x, y] of [[5, 0], [5, 1], [9, 0], [9, 1]]) lay(b, x, y, 'Kz');
     b.rebuild();
-    h.players[0].score = 0;
-    h.players[1].score = 0;
-    h.m.scoreIslands();
-    if (h.players[0].score !== 6) return fail('the Palazzo\'s island counts double', `paid ${h.players[0].score}`);
-    if (h.players[1].score !== 3) return fail('every other island counts once', `paid ${h.players[1].score}`);
+    b.get(5, 0).meeple = { player: 0, feat: null, big: false };
+    b.get(9, 0).meeple = { player: 0, feat: null, big: false };
+    b.get(9, 1).meeple = { player: 1, feat: null, big: false };
+    h.m.finish();
+    if (h.players[0].score !== 10) {
+      return fail('the archipelago pays 10 for the most islands', `paid ${h.players[0].score}`);
+    }
+    if (h.players[1].score !== 0) {
+      return fail('the archipelago pays only the most islands', `also paid ${h.players[1].score}`);
+    }
   }
 
-  console.log('  ✓ hand, moorings, dock edges, becalming, island counts, mills in stone, long flights, the Palazzo');
+  console.log('  ✓ mainland and islands, city pay and clawback, windmills, road tolls,'
+    + ' the sfera harvest, island rates, the Balena, towed islands, long flights, the archipelago');
 }
 
 // --- runs -------------------------------------------------------------------

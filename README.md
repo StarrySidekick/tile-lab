@@ -63,34 +63,39 @@ an opponent freezes them rather than erasing them**.
 
 **Girando** — the cloud kingdom, where the board itself is weather. You draw
 one tile and claim as in Carcassonne; the difference is that the country won't
-hold still, and neither will the people standing on it.
+hold still, and neither will the people standing on it. **Nothing crystallises**
+— every tile on the board can be pushed, finished or not, and the only thing
+that has ever stopped one is the whale lying on top of it.
 
 | | |
 |---|---|
-| **Zephyr** | Twenty of them in a seventy-two tile deck. Played, one blows its lane downwind — the whole length of it. Gusts **stack**, and only one thing stacks them: a wind that runs over a zephyr blowing the *same* way absorbs it and blows a square harder, up to three. One blowing *across* isn't absorbed and fires in its own turn, so a line of them is a chain; one blowing straight *back* does nothing, because the two brace. No zephyr blows twice in one storm, and no zephyr is ever nailed down — a zephyr tile never crystallises, because weather you can freeze in place stops being weather |
+| **Zephyr** | Twenty of them in a seventy-two tile deck. Played, one blows its lane downwind — the whole length of it. A gust that runs over a zephyr blowing the *same* way **absorbs** it and blows a square harder, up to three; the boost applies *beyond* it, never to it, so a tile is never shoved along by its own breath. A zephyr pointing **any other way** is woken rather than absorbed, and the storm turns and carries on down the new zephyr's lane — across the wind or straight back into it, it makes no difference. A line of zephyrs is a chain reaction that turns corners. What keeps it finite is that no zephyr contributes the same direction twice in one storm |
 | **The four winds** | One crosswind, one split wind, one trident and one compass rose — each opens two, three or four lanes at once out of the same square, in the turn it's played. One of each in the deck |
-| **Falling** | A tile that lands touching nothing **edge to edge** falls out of the sky. Corners don't hold anything up, so the sky sheds tiles readily — and they fall into the **hand** of whoever set the wind off. Better: catch one on your own turn and you may **throw it straight back down**, taking a second placement while the hole the wind just made is still open. Once a turn, or a caught zephyr would buy the placement that catches the next |
-| **Followers** | Weather too. Once a figure is on the board it never comes off by choice: a gust blows it as far as everything else in its lane and it takes up whatever it lands in — its own kind of feature if there is one, anything claimable if not, and simply lying on the tile holding nothing if there's nothing there. Blown over open sky it goes back to its owner's hand, and that is the only way home |
-| **Crystals** | Finishing a feature turns its tiles to permanent land. A crystallised **city** is solid all the way up: it stops a gust dead and shelters everything in its lee. A crystallised **road** is flat ground — it doesn't move, but the wind goes straight over it. Cities are the walls you build; roads are the floor you build them on |
-| **Temple** | A monastery with no cloisters left in the sky — every one is a temple. Claim it and it pays by the tile: **1** every time somebody *lays* a tile in the eight squares around it, **2** every time the wind *blows* one in. The sky can pick the whole building up and move it, parish, keeper and all |
-| **Tower turbine** | A mill built into a city wall. Every gust that runs through it pays **1** to whoever holds that city — the one thing on the board that wants the weather to keep coming back. Finishing the city doesn't stop it: closing hands the followers home, so the holder at the moment of closing keeps the mill |
-| **Sfera** | Twelve of them, each half a sphere on one edge, and that edge meets nothing but another sfera's. Join two and they **lock forever**, and the sky counts **every island**: most figures on each piece of country takes a flat **3**, ties paying both. Once, then and there — six spheres, six counts in a whole game. Flat is the point: paying per tile made this one rule three quarters of the game's points, so the way to win a count is now to be standing on *several* pieces of sky rather than parked on the biggest. Resolved at the end of that turn, after everything else it did |
-| **The Palazzo** | The seat of the kingdom and the tile the game starts on — same connections as an ordinary start tile, and no more rooted than anything else, so the sky shoves the seat of government around. Whichever island it has ended up on is worth **6** instead of 3 when a sphere closes |
-| **Sky ship** | One per player, in your colour, held rather than drawn. It's the one tile drawn as open sky, because it's the one tile that fits against anything. Moor it to the **outside** of a piece of country — never an internal hole — and every feature that finishes on that piece pays **2** more. It fits anywhere and does nothing to what it touches: no road ends at a ship, no city walls itself against one. Once moored it stays moored until a gust reaches it, which is the tension — the ship wants to be where the weather never goes, and it can't leave unless the weather comes |
+| **Falling** | A tile that lands touching nothing **edge to edge** falls out of the sky and goes back to the bottom of the deck. Corners don't hold anything up, so the sky sheds tiles readily — and whoever set the wind off may **catch one and throw it straight back down**, taking a second placement while the hole the wind just made is still open. Once a turn |
+| **Followers** | Weather too. Once a figure is on the board it never comes off by choice: a gust blows it as far as everything else in its lane and it takes up whatever it lands in — its own kind of feature if there is one, anything claimable if not, and simply lying on the tile holding nothing if there's nothing there. Blown over open sky it goes home, and that is the only way home for a knight. A follower **stays in a city it finished**: the city can be blown open again, and the figure in it is the record of whose it was |
+| **City** | **2 a tile** when it finishes, and only ever to somebody standing in it — an empty city is a nice piece of country worth nothing. Because the tiles move, a city can be finished several times over, so the payment **reverses**: blown open again, it gives back exactly what it paid |
+| **Windmill** | The turbine built into a city wall. Every gust through it pays **1** to whoever holds that city, and every windmill standing in a city that **finishes** pays **2** to whoever laid the last tile — and no wind ever takes that back. It is the one durable point in the mode |
+| **Road** | Nobody's. You don't claim one; you finish it, for **1 a tile**. What makes a road worth building is what it *arrives* at: every city or temple it runs into pays **2** to whoever holds that city or temple, which is as often as not the player across the table. Roads are the mode's diplomacy |
+| **Farm** | **3** for every finished city in the field, to whoever has the most farmers lying in it — and the farmers then **walk home**, which no other figure in the mode ever does. Farms are counted when a sphere closes |
+| **Sfera** | Twelve of them, each half a sphere on one edge, and that edge meets nothing but another sfera's. Joining two is the whole trigger for the harvest: it scores **the field the sfera itself is lying in**, once, there and then, and does nothing else. Six spheres, six harvests in a game |
+| **Temple** | A monastery with no cloisters left in the sky — every one is a temple. Claim it and it pays by the tile: **1** every time somebody *lays* a tile in the eight squares around it, **2** every time the wind *blows* one in. Capped at one payment per temple per tile per turn, or two facing zephyrs print money walking the same tile in and out of the parish |
+| **The Palazzo** | The seat of the kingdom, and what "mainland" *means*. Whichever piece of country it stands on is the kingdom; every other group of **two or more** tiles is an **island**. It starts the game and it is as blowable as anything else, so the mainland moves. And when a gust gets hold of the Palazzo itself, **every island slides one square** the way the seat went — which is how you close a gap you were never allowed to build across |
+| **Islands** | Pay more of everything: roads **2** a tile, cities **3**, farms **5** a city. The catch is that you may not *build* onto one and you may not walk a follower onto one — a tile only goes down where it touches the mainland. Islands are made, not chosen: you were standing there when the country came apart, or you blew a tile across the gap, or you flew somebody out. At the end of the game a flat **10** goes to whoever has a follower standing on more separate islands than anybody else |
+| **The Balena** | A sky whale the size of a district. Whatever tile it lies on cannot be moved by any wind, and no gust passes through it — everything in its lee is sheltered. On your turn, **instead of placing a follower**, you may move it three squares to wherever you want it. It is the only brake in the mode, and it is a brake anybody can pick up |
 | **Straight roads** | Are quietly weathervanes. A road hit side-on swings to lie along the wind, so a road you built is a road the weather has opinions about. Three-way junctions end their roads and carry a village; the windvane still has four ways in and two of them joined |
 | **Abbazia** | Takes any edge, and **caps** everything it touches — a road ends there, a city walls itself against it, and both can finish without meeting anything. It's drawn walled edge to edge, because that's what it does. It's an ordinary tile, so the wind can take it away again, and then everything it was holding shut is unfinished and can be **scored a second time** |
-| **Flying machine** | Points down a lane. Place one and your follower may go on **any tile out along that lane** rather than only the tile you laid — including a feature somebody already holds, but never a tile with a figure on it. It **crosses open sky**, so an island nobody has built a road to is reachable, which is most of what the machine is for. A zephyr crossed on the way is a wind you're *in*: the flight turns and follows it, and one blowing straight back at you is where the flight ends |
+| **Flying machine** | Points down a lane. Place one and your follower may go on **any tile out along that lane** rather than only the tile you laid — including a feature somebody already holds, and including an **island**, which is the one way to choose to be on one. Never a tile with a figure on it, and never a road. It **crosses open sky**, so an island nobody has built a road to is reachable, which is most of what the machine is for. A zephyr crossed on the way is a wind you're *in*: the flight turns and follows it, and one blowing straight back at you is where the flight ends |
 
 **The sky is the space, not the ground.** The gaps between tiles are open air —
 that's what a tile blown off the edge falls into, and what runs between islands
 — while the tiles themselves stay ordinary countryside. It's drawn as an old
 chart of that sky: a graticule with heavy meridians every five squares, the
 rhumb lines a portolan strikes from its compass nodes, and a rose on the origin
-with the Latin winds named round it. Cities pay the ordinary
-2 a tile, and there is no four-sided city anywhere in the pool, because a city
-with four ways in and no way to cap it is one the weather never lets you finish.
-Nothing pays until it closes, nothing unfinished pays at the end — the temple, the turbine, the ship and the island count are the
-exceptions, and all four are the sky's terms rather than yours.
+with the Latin winds named round it. There is no four-sided city anywhere in the
+pool, because a city with four ways in and no way to cap it is one the weather
+never lets you finish. **Nothing is settled**: a city is finished until the
+weather says otherwise, the mainland is wherever the Palazzo happens to be this
+turn, and the only permanent thing on the board is a whale anyone can move.
 
 **World** — the countryside gets the rest of its geography, in four families
 you can also switch on inside any other mode:
@@ -540,19 +545,28 @@ restrained on purpose.
 The default flow is drop, turn, commit. Drag the tile out of the panel (or off
 the floating HUD in lean mode) and let go over a square: it *stages* there
 rather than playing, drawn solid under a dashed gold ring. Only the rotations
-that actually fit that square are offered — the ring is labelled with how many
-there are, and **Turn it** / `R` cycles those and nothing else, so on a square
-with one legal facing there is nothing to hunt for. **Place it here** (or a
-second click on the square, or `Enter`) commits; `Escape` takes it back, and
-dropping somewhere else just moves the staging.
+that actually fit that square are offered — the ring says how many there are,
+and `R` cycles those and nothing else, so on a square with one legal facing
+there is nothing to hunt for.
+
+**Tapping the staged tile turns it.** Every tap, as many times as you like; it
+never commits. Committing is one thing and one thing only: the **✓** in the
+confirm panel, which comes up in the corner where the claim step's box appears,
+showing the tile big at the rotation it is actually going down at. `Enter` does
+the same from a keyboard, `Escape` takes it back, and dropping somewhere else
+moves the staging. Tap and tap-again used to be stage and commit, which made the
+one gesture you reach for to see a tile the other way round the same gesture
+that ended the decision.
 
 Turn the confirm step off with **Confirm before placing** in the panel and a
 click lays the tile the instant it lands, as it always did.
 
 ### Claiming
 
-With **Zoomed claim step** on, laying a tile opens a large copy of it in the
-corner with one dot per claimable feature — a bigger target than the board
+The corner box does two consecutive halves of the same turn — first "is this
+where the tile goes?", then "what do you take on it?" — so they share it rather
+than each having one. With **Zoomed claim step** on, laying a tile opens a large
+copy of it there with one dot per claimable feature — a bigger target than the board
 marker, and legible on a phone. A four-way road with its four fields piles its
 anchors within a few pixels of each other, so the dots are pushed apart until
 each is its own target and any that moved draws a thin leader back to the spot
