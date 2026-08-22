@@ -164,9 +164,10 @@ for (const mode of modes) {
 
 // The input layer itself, through real pointer events rather than by calling
 // the game — everything else in this file drives the rules directly, so a tap
-// that stopped placing tiles would sail straight past it. Three gestures, and
-// the interesting assertions are the negative ones: a drag and a pinch must
-// NOT leave a tile behind.
+// that stopped placing tiles would sail straight past it. Two passes: once with
+// the confirm step off, where a tap plays at once and the interesting
+// assertions are the negative ones (a drag and a pinch must NOT leave a tile
+// behind), and once with it on, where it takes two taps — stage, then commit.
 {
   errors.length = 0;
   await page.selectOption('#mode', 'classic');
@@ -180,15 +181,7 @@ for (const mode of modes) {
     }));
     const { renderer, game } = window.LAB;
     const out = {};
-
-    // A tap on a legal square.
-    const spot = game.board.legalPlacements(game.tile, game.placeOpts())[0];
-    const [tx, ty] = renderer.toScreen(spot.x + 0.5, spot.y + 0.5);
-    const before = game.board.size;
-    game.rot = spot.rot;
-    ev('pointerdown', 1, tx, ty);
-    ev('pointerup', 1, tx, ty);
-    out.tapped = game.board.size - before;
+    document.getElementById('confirmPlace').checked = false;
 
     // A drag: the camera moves, nothing is played.
     const laid = game.board.size;
@@ -212,8 +205,43 @@ for (const mode of modes) {
     out.spread = gesture(100, 200);
     out.pinched = gesture(400, 100);
     out.pinchLaid = game.board.size - laid;
+
+    // A tap on a legal square, confirm step off: it plays there and then.
+    const spot = game.board.legalPlacements(game.tile, game.placeOpts())[0];
+    const [tx, ty] = renderer.toScreen(spot.x + 0.5, spot.y + 0.5);
+    const before = game.board.size;
+    game.rot = spot.rot;
+    ev('pointerdown', 1, tx, ty);
+    ev('pointerup', 1, tx, ty);
+    out.tapped = game.board.size - before;
     return out;
   });
+
+  // The same tap with the confirm step on: the first stages the tile, the
+  // second commits it. Nothing reaches the board until that second tap.
+  await page.click('#newGame');
+  const c = await page.evaluate(() => {
+    const cv = document.getElementById('board');
+    const r = cv.getBoundingClientRect();
+    const ev = (type, x, y) => cv.dispatchEvent(new PointerEvent(type, {
+      pointerId: 1, clientX: r.left + x, clientY: r.top + y, pointerType: 'touch', isPrimary: true,
+    }));
+    const { renderer, game } = window.LAB;
+    const out = {};
+    document.getElementById('confirmPlace').checked = true;
+    const spot = game.board.legalPlacements(game.tile, game.placeOpts())[0];
+    const [tx, ty] = renderer.toScreen(spot.x + 0.5, spot.y + 0.5);
+    const before = game.board.size;
+    ev('pointerdown', tx, ty); ev('pointerup', tx, ty);
+    out.staged = !!renderer.pending;
+    out.rots = renderer.pending ? renderer.pending.rots.length : 0;
+    out.stagedLaid = game.board.size - before;
+    ev('pointerdown', tx, ty); ev('pointerup', tx, ty);
+    out.committed = game.board.size - before;
+    out.cleared = !renderer.pending;
+    return out;
+  });
+
   const problems = [];
   if (errors.length) problems.push(errors[0].split('\n')[0]);
   if (t.tapped !== 1) problems.push('a tap did not place a tile');
@@ -222,8 +250,13 @@ for (const mode of modes) {
   if (!(t.spread > t.start * 1.5)) problems.push(`spreading gave ${t.spread.toFixed(0)} from ${t.start.toFixed(0)}`);
   if (!(t.pinched < t.spread * 0.6)) problems.push(`pinching gave ${t.pinched.toFixed(0)} from ${t.spread.toFixed(0)}`);
   if (t.pinchLaid) problems.push('a pinch placed a tile');
+  if (!c.staged) problems.push('a tap did not stage a tile for confirming');
+  if (c.stagedLaid) problems.push('staging a tile put it straight on the board');
+  if (!c.rots) problems.push('a staged tile offered no rotations');
+  if (c.committed !== 1) problems.push('a second tap did not commit the staged tile');
+  if (!c.cleared) problems.push('committing left the tile staged');
   if (problems.length) { failures++; console.log(`  ✗ touch input: ${problems.join(' · ')}`); }
-  else console.log(`  ✓ touch input       tap places · drag pans · pinch ${t.start.toFixed(0)} → ${t.spread.toFixed(0)} → ${t.pinched.toFixed(0)}`);
+  else console.log(`  ✓ touch input       tap places · drag pans · pinch ${t.start.toFixed(0)} → ${t.spread.toFixed(0)} → ${t.pinched.toFixed(0)} · tap-tap confirms`);
 }
 
 // Score effects: a closure has to put a number on the board and a flash on the
@@ -517,6 +550,119 @@ for (const n of ['1', '3', '5']) {
   } else console.log(`  ✓ ${n} tiles/turn`);
 }
 await page.selectOption('#tilesPerTurn', '1');
+
+// --- the play surface -------------------------------------------------------
+//
+// Dragging a tile out of the hand, staging it, turning it only the ways it
+// fits, committing, then claiming on a zoomed copy of it — the whole turn as
+// a person actually performs it, which none of the checks above touch because
+// they all drive the engine directly.
+{
+  errors.length = 0;
+  await page.selectOption('#mode', 'classic');
+  await page.fill('#seed', 'ui-probe');
+  await page.click('#newGame');
+  await page.waitForTimeout(250);
+
+  const box = await page.locator('#board').boundingBox();
+  const target = await page.evaluate(() => {
+    const [sx, sy] = window.LAB.renderer.toScreen(1.5, 0.5);
+    return { sx, sy };
+  });
+  const pv = await page.locator('#preview').boundingBox();
+  await page.mouse.move(pv.x + pv.width / 2, pv.y + pv.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + target.sx, box.y + target.sy, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+
+  const staged = await page.evaluate(() => window.LAB.renderer.pending);
+  const laid = await page.evaluate(() => window.LAB.game.board.size);
+  if (!staged || staged.x !== 1 || staged.y !== 0) {
+    failures++;
+    console.log(`  ✗ drag to stage: ${errors[0] || JSON.stringify(staged)}`);
+  } else if (laid !== 1) {
+    failures++;
+    console.log(`  ✗ drag to stage: it committed instead of staging (${laid} tiles)`);
+  } else if (!staged.rots.length || staged.rots.some((r) => r < 0 || r > 3)) {
+    failures++;
+    console.log(`  ✗ drag to stage: bad rotations ${JSON.stringify(staged.rots)}`);
+  } else console.log(`  ✓ drag to stage        ${staged.rots.length} rotation(s) fit`);
+
+  // Only the legal rotations are reachable from the confirm step.
+  const legal = await page.evaluate(() => {
+    const g = window.LAB.game;
+    const p = window.LAB.renderer.pending;
+    const saved = g.rot;
+    const ok = p.rots.every((r) => { g.rot = r; return g.canPlaceAt(p.x, p.y); });
+    g.rot = saved;
+    return ok;
+  });
+  if (!legal) { failures++; console.log('  ✗ staged rotations are all legal'); }
+  else console.log('  ✓ staged rotations legal');
+
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('#actions button')].find((x) => /Place it here/.test(x.textContent));
+    b?.click();
+  });
+  await page.waitForTimeout(250);
+  const after = await page.evaluate(() => ({
+    size: window.LAB.game.board.size,
+    phase: window.LAB.game.phase,
+    pending: window.LAB.renderer.pending,
+    claim: !document.querySelector('#claim').hidden,
+  }));
+  if (errors.length || after.size !== 2 || after.pending) {
+    failures++;
+    console.log(`  ✗ confirm places: ${errors[0] || JSON.stringify(after)}`);
+  } else console.log(`  ✓ confirm places       phase "${after.phase}"`);
+
+  if (after.phase === 'meeple') {
+    if (!after.claim) { failures++; console.log('  ✗ the claim panel opens on the meeple step'); }
+    else {
+      const took = await page.evaluate(() => {
+        const c = document.querySelector('#claimTile');
+        const r = c.getBoundingClientRect();
+        const g = window.LAB.game;
+        // Claiming ends the turn, so game.player is somebody else by the time
+        // we look — count the supply of whoever is claiming, by index.
+        const who = g.current;
+        const before = g.players[who].meeples;
+        // Aim at the first spot through the real pointer path.
+        const spots = window.LAB.claimSpots();
+        if (!spots.length) return null;
+        const sc = r.width / c.width;
+        c.dispatchEvent(new PointerEvent('pointerdown', {
+          clientX: r.left + spots[0].sx * sc,
+          clientY: r.top + spots[0].sy * sc,
+          bubbles: true,
+        }));
+        const cell = g.board.get(spots[0].x, spots[0].y);
+        return { before, after: g.players[who].meeples, onTile: !!cell?.meeple };
+      });
+      if (!took || took.after !== took.before - 1 || !took.onTile) {
+        failures++;
+        console.log(`  ✗ claiming from the panel: ${JSON.stringify(took)}`);
+      } else console.log('  ✓ claim from the panel');
+    }
+  }
+
+  // Folding the panel away gives the board the whole window.
+  const wide = await page.evaluate(() => document.querySelector('#board').clientWidth);
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(200);
+  const lean = await page.evaluate(() => ({
+    lean: document.body.classList.contains('lean'),
+    hud: !document.querySelector('#hud').hidden,
+    w: document.querySelector('#board').clientWidth,
+  }));
+  if (!lean.lean || !lean.hud || lean.w <= wide) {
+    failures++;
+    console.log(`  ✗ lean mode: ${JSON.stringify(lean)}`);
+  } else console.log(`  ✓ lean mode            board ${wide} → ${lean.w}px`);
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(150);
+}
 
 await browser.close();
 server.close();

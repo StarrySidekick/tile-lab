@@ -46,6 +46,8 @@ export class Renderer {
     this.ctx = canvas.getContext('2d');
     this.cam = { x: 0.5, y: 0.5, zoom: 96 };
     this.hover = null;      // grid cell under the pointer
+    this.pending = null;    // a placement staged but not yet committed
+    this.hideMeepleTargets = false;   // the zoomed claim panel is showing them
     this.pointer = null;    // raw screen coords, needed for the cave overlay
     this.showDebug = false;
     this.showHints = true;  // highlight every square the tile could go in
@@ -196,7 +198,23 @@ export class Renderer {
     if (game.phase === 'place') this.drawPlacementHints(game);
 
     this.drawMeeples(game);
-    if (game.phase === 'meeple') this.drawMeepleTargets(game);
+    if (game.phase === 'meeple' && !this.hideMeepleTargets) this.drawMeepleTargets(game);
+    // With the claim panel doing the aiming, the board still says WHICH tile
+    // is being claimed on — otherwise the two read as unrelated things.
+    if (game.phase === 'meeple' && this.hideMeepleTargets && game.lastPlaced) {
+      const { x, y } = game.lastPlaced;
+      if (this.onScreen(x, y)) {
+        const [sx, sy] = this.toScreen(x, y);
+        const z = this.cam.zoom;
+        this.ctx.save();
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeStyle = THEME.gold;
+        this.ctx.setLineDash([z * 0.12, z * 0.08]);
+        this.ctx.lineDashOffset = (performance.now() / 70) % (z * 0.2);
+        this.ctx.strokeRect(sx + 2, sy + 2, z - 4, z - 4);
+        this.ctx.restore();
+      }
+    }
     else this.meepleSpots = [];
 
     if (game.walker) this.drawPawns(game);
@@ -681,6 +699,33 @@ export class Renderer {
       ctx.strokeStyle = 'rgba(212,175,95,0.24)';
       ctx.lineWidth = 1.5;
       ctx.strokeRect(sx + z * 0.06, sy + z * 0.06, z * 0.88, z * 0.88);
+    }
+
+    // A STAGED tile is drawn solid and ringed: it is a decision you have made,
+    // not a preview of one you are considering, and it should look settled
+    // enough that the only question left is whether to commit it.
+    const p = this.pending;
+    if (p) {
+      const [px, py] = this.toScreen(p.x, p.y);
+      const z = this.cam.zoom;
+      this.paintTile(p.x, p.y, p.rot, game.tile);
+      ctx.save();
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = THEME.gold;
+      ctx.setLineDash([z * 0.14, z * 0.09]);
+      ctx.lineDashOffset = (performance.now() / 60) % (z * 0.23);
+      ctx.strokeRect(px + 2, py + 2, z - 4, z - 4);
+      ctx.restore();
+      // A quiet count of the ways it still fits, so "turn it" has a number.
+      if (p.rots.length > 1) {
+        ctx.save();
+        ctx.fillStyle = THEME.gold;
+        ctx.font = `600 ${Math.max(10, z * 0.18)}px ui-sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`${p.rots.length} ways`, px + z / 2, py - z * 0.10);
+        ctx.restore();
+      }
+      return;                                 // the ghost would only fight it
     }
 
     const h = this.hover;

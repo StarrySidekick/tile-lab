@@ -18,9 +18,9 @@ import {
   RULESETS, RULESET_BY_ID, DEFAULT_RULESET,
 } from './mechanics.js';
 import { Renderer } from './render.js';
-import { drawTile, PLAYER_COLORS } from './art.js';
+import { drawTile, drawMeeple, PLAYER_COLORS } from './art.js';
 import { THEME } from './theme.js';
-import { TILE_TYPES, TILES, GROUPS } from './tiles.js';
+import { TILE_TYPES, TILES, GROUPS, rotPoint } from './tiles.js';
 import { Sfx, SOUND_NAMES } from './audio.js';
 import { Effects } from './fx.js';
 import { VERSION } from './version.js';
@@ -41,6 +41,19 @@ let enabledGroups = new Set(DEFAULT_GROUPS.classic);
 let mechanics = defaultMechanics();
 let ruleset = DEFAULT_RULESET;
 let game;
+
+/**
+ * A placement you have made but not yet committed.
+ *
+ * The engine has no notion of this: as far as it is concerned a tile is in
+ * your hand or on the board. The staging happens entirely up here, which is
+ * why turning it off is a checkbox rather than a branch through the rules —
+ * `commitPending` is the only thing that ever calls `placeAt`.
+ *
+ *   {x, y, rot, rots: [...]}   rots is every rotation legal at THAT square
+ */
+let pending = null;
+let dragging = null;            // a tile being dragged out of the preview
 
 /**
  * Every Game is fresh, so its listeners have to be re-subscribed each time.
@@ -178,6 +191,8 @@ function newGame() {
     tilesPerTurn: Number($('tilesPerTurn').value) || 1,
   }));
   game.free = $('freePlace').checked;
+  pending = null;
+  renderer.pending = null;
   buildBots();
   fx.clear();
   shownScores = [];
@@ -219,6 +234,65 @@ function onModeChange() {
     hint = 'No meeples — a feature pays whoever closes it.';
   }
   $('modeHint').textContent = hint;
+}
+
+/**
+ * Every rotation this tile could legally take at (x, y). The confirm step
+ * turns only through these, so a staged tile can never be rotated into an
+ * illegal position and you never have to guess which way round it will go.
+ */
+function legalRotationsAt(x, y) {
+  const out = [];
+  const saved = game.rot;
+  for (let r = 0; r < 4; r++) {
+    game.rot = r;
+    if (game.canPlaceAt(x, y) && (!game.m.canPlaceAt || game.m.canPlaceAt(x, y))) out.push(r);
+  }
+  game.rot = saved;
+  return out;
+}
+
+const confirming = () => $('confirmPlace').checked && game.phase === 'place' && !game.m.piece;
+
+/** Stage a placement at (x, y), preferring the rotation already in hand. */
+function stagePending(x, y) {
+  const rots = legalRotationsAt(x, y);
+  if (!rots.length) return false;
+  pending = { x, y, rot: rots.includes(game.rot) ? game.rot : rots[0], rots };
+  game.rot = pending.rot;
+  renderer.pending = pending;
+  sfx.play('rotate');
+  syncPanel();
+  return true;
+}
+
+function clearPending() {
+  pending = null;
+  renderer.pending = null;
+  syncPanel();
+}
+
+/** Turn a staged tile to its next legal rotation. */
+function turnPending(dir = 1) {
+  if (!pending) return false;
+  const i = pending.rots.indexOf(pending.rot);
+  pending.rot = pending.rots[(i + dir + pending.rots.length) % pending.rots.length];
+  game.rot = pending.rot;
+  sfx.play('rotate');
+  syncPanel();
+  return true;
+}
+
+/** Lock it in. This is the one place a staged tile reaches the engine. */
+function commitPending() {
+  if (!pending) return false;
+  const { x, y, rot } = pending;
+  pending = null;
+  renderer.pending = null;
+  game.rot = rot;
+  const done = game.placeAt(x, y);
+  if (!done) sfx.play('deny');
+  return done;
 }
 
 // --- pointer ----------------------------------------------------------------
@@ -359,6 +433,19 @@ canvas.addEventListener('pointerup', (e) => {
   }
 
   const c = renderer.cellAt(sx, sy);
+
+  // With the confirm step on, a tap on the board STAGES rather than plays:
+  // tapping the staged square again commits it, tapping elsewhere moves it.
+  if (confirming()) {
+    if (pending && pending.x === c.x && pending.y === c.y) return void commitPending();
+    if (stagePending(c.x, c.y)) return;
+    if (!game.board.get(c.x, c.y) && nearBoard(c)) {
+      sfx.play('deny');
+      fx.on('deny', { at: { x: c.x + 0.5, y: c.y + 0.5 } }, game);
+    }
+    return;
+  }
+
   const acted = game.cellClick(c.x, c.y);
   if (!acted && game.phase === 'place' && !game.board.get(c.x, c.y) && nearBoard(c)) {
     sfx.play('deny');
@@ -368,18 +455,26 @@ canvas.addEventListener('pointerup', (e) => {
 
 canvas.addEventListener('contextmenu', (e) => {
   e.preventDefault();
-  if (!botTurn()) game.rotate(1);
+  if (botTurn()) return;
+  if (pending) turnPending(1); else game.rotate(1);
 });
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  if (e.shiftKey) { if (!botTurn()) game.rotate(e.deltaY > 0 ? 1 : -1); return; }
+  if (e.shiftKey) {
+    if (botTurn()) return;
+    if (pending) turnPending(e.deltaY > 0 ? 1 : -1); else game.rotate(e.deltaY > 0 ? 1 : -1);
+    return;
+  }
   if (game.interior) return;
   renderer.glide = null;
   renderer.zoomAt(e.offsetX, e.offsetY, e.deltaY > 0 ? 0.9 : 1.1);
 }, { passive: false });
 
 window.addEventListener('keydown', (e) => {
+  // Tab folds the panel from anywhere — it is the one key that is about the
+  // window rather than the game.
+  if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); return void setLean(!lean); }
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   // The two view keys still work while the computer plays; nothing else does.
   if (e.key === 'd' || e.key === 'D') { renderer.showDebug = !renderer.showDebug; $('debug').checked = renderer.showDebug; }
@@ -387,7 +482,12 @@ window.addEventListener('keydown', (e) => {
     if (game.lastPlaced) renderer.centerOn(game.lastPlaced.x, game.lastPlaced.y);
   }
   if (botTurn()) return;
-  if (e.key === 'r' || e.key === 'R') game.rotate(e.shiftKey ? -1 : 1);
+  if (e.key === 'Enter' && pending) { e.preventDefault(); return void commitPending(); }
+  if (e.key === 'Escape' && pending) { e.preventDefault(); return void clearPending(); }
+  if (e.key === 'r' || e.key === 'R') {
+    if (pending) turnPending(e.shiftKey ? -1 : 1);
+    else game.rotate(e.shiftKey ? -1 : 1);
+  }
   if (e.key === 'f' || e.key === 'F') game.flipTile();
   if (e.key === ' ') {
     e.preventDefault();
@@ -404,6 +504,10 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key >= '1' && e.key <= '9' && game.phase === 'market') {
     game.takeFromMarket(Number(e.key) - 1);
+  }
+  if (e.key >= '1' && e.key <= '9' && game.phase === 'meeple' && claimSpots.length) {
+    const spot = claimSpots[Number(e.key) - 1];
+    if (spot) game.placeMeeple(spot.i, spot);
   }
 });
 
@@ -587,6 +691,8 @@ $('mechAll').onclick = () => {
 };
 
 $('hints').onchange = (e) => { renderer.showHints = e.target.checked; };
+$('confirmPlace').onchange = () => { if (pending) clearPending(); else syncPanel(); };
+$('zoomClaim').onchange = () => syncPanel();
 $('effects').checked = !stillness;
 $('effects').onchange = (e) => {
   fx.enabled = e.target.checked;
@@ -624,6 +730,257 @@ function renderGroups() {
   }
 }
 
+// --- remembering how you like to play ----------------------------------------
+//
+// Seventy-nine rules, a tile pool, an edition and a dozen preferences is a lot
+// to set up, and losing it to a refresh is the kind of small insult that stops
+// people experimenting. All of it is written to localStorage on change and
+// restored on boot. Wrapped in try/catch because a private window throws on
+// the accessor itself, and a game that won't start because it couldn't save a
+// checkbox is worse than one that forgets.
+
+const SAVE_KEY = 'tilemakers-workshop/settings';
+const SAVED_FIELDS = [
+  'mode', 'playerCount', 'botCount', 'botSkill', 'botSpeed', 'tilesPerTurn',
+  'ruleset', 'useMeeples', 'effects', 'sound', 'volume', 'hints', 'freePlace',
+  'confirmPlace', 'zoomClaim',
+];
+
+function saveSettings() {
+  try {
+    const fields = {};
+    for (const id of SAVED_FIELDS) {
+      const el = $(id);
+      if (el) fields[id] = el.type === 'checkbox' ? el.checked : el.value;
+    }
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      fields, mechanics, groups: [...enabledGroups], lean,
+    }));
+  } catch { /* private window, or storage off: play on regardless */ }
+}
+
+function loadSettings() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch { /* ignore */ }
+  if (!saved) return false;
+  for (const [id, v] of Object.entries(saved.fields || {})) {
+    const el = $(id);
+    if (!el) continue;
+    if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+  }
+  if (saved.mechanics) mechanics = { ...saved.mechanics };
+  if (saved.groups?.length) enabledGroups = new Set(saved.groups);
+  ruleset = $('ruleset').value || DEFAULT_RULESET;
+  if (saved.lean) setLean(true);
+  return true;
+}
+
+// Any change to any of them is worth remembering; one listener covers the lot.
+document.addEventListener('change', saveSettings);
+
+// --- dragging a tile out of the hand ----------------------------------------
+//
+// The preview is the tile you are holding, so the most direct thing you can do
+// with it is pick it up and put it down. A drag that starts on either preview
+// (the panel's or the HUD's) turns into the ordinary hover ghost the moment it
+// crosses the board, and drops into the same staging step a tap would.
+
+function beginTileDrag(e) {
+  if (botTurn() || game.phase !== 'place' || (!game.tile && !game.m.piece)) return;
+  dragging = { id: e.pointerId };
+  try { e.target.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
+  e.preventDefault();
+}
+
+function dragTo(e) {
+  if (!dragging) return;
+  const r = canvas.getBoundingClientRect();
+  const inside = e.clientX >= r.left && e.clientX <= r.right
+    && e.clientY >= r.top && e.clientY <= r.bottom;
+  renderer.hover = inside ? renderer.cellAt(e.clientX - r.left, e.clientY - r.top) : null;
+  renderer.pointer = inside ? { sx: e.clientX - r.left, sy: e.clientY - r.top } : null;
+}
+
+function dropTile(e) {
+  if (!dragging) return;
+  const drop = renderer.hover;
+  dragging = null;
+  renderer.hover = null;
+  if (!drop) return;
+  if (confirming()) { stagePending(drop.x, drop.y); return; }
+  const saved = game.rot;
+  const rots = legalRotationsAt(drop.x, drop.y);
+  if (rots.length && !rots.includes(saved)) game.rot = rots[0];
+  if (!game.cellClick(drop.x, drop.y)) {
+    game.rot = saved;
+    sfx.play('deny');
+    fx.on('deny', { at: { x: drop.x + 0.5, y: drop.y + 0.5 } }, game);
+  }
+}
+
+for (const id of ['preview', 'hudTile']) {
+  const el = $(id);
+  el.addEventListener('pointerdown', beginTileDrag);
+  el.addEventListener('pointermove', dragTo);
+  el.addEventListener('pointerup', dropTile);
+  el.addEventListener('pointercancel', () => { dragging = null; renderer.hover = null; });
+}
+// The pointer leaves the little canvas almost immediately, so the move and up
+// that matter arrive on the window.
+window.addEventListener('pointermove', dragTo);
+window.addEventListener('pointerup', dropTile);
+
+// --- folding the panel away --------------------------------------------------
+
+let lean = false;
+function setLean(on) {
+  lean = on;
+  document.body.classList.toggle('lean', lean);
+  $('hud').hidden = !lean;
+  renderer.resize();
+  syncPanel();
+}
+$('lean').onclick = () => setLean(true);
+$('hudExpand').onclick = () => setLean(false);
+
+// --- the claim step, up close -------------------------------------------------
+//
+// A feature spot at play zoom is a target a few pixels wide. This is the same
+// tile drawn big, with one dot per feature you could actually take, so the
+// claim is a decision you make by looking rather than by squinting.
+
+const claimCtx = $('claimTile').getContext('2d');
+let claimSpots = [];
+
+/** The options that live on the tile just laid — the ones this panel can show. */
+function claimOptions() {
+  if (game.phase !== 'meeple' || !game.lastPlaced) return [];
+  const { x, y } = game.lastPlaced;
+  return game.meepleOptions().filter((o) => o.x === x && o.y === y);
+}
+
+function renderClaim() {
+  const host = $('claim');
+  const opts = $('zoomClaim').checked ? claimOptions() : [];
+  if (!opts.length || botTurn()) {
+    host.hidden = true;
+    claimSpots = [];
+    renderer.hideMeepleTargets = false;
+    return;
+  }
+  host.hidden = false;
+  renderer.hideMeepleTargets = true;
+
+  const cell = game.board.get(game.lastPlaced.x, game.lastPlaced.y);
+  const size = $('claimTile').width;
+  claimCtx.clearRect(0, 0, size, size);
+  claimCtx.save();
+  claimCtx.translate(size / 2, size / 2);
+  claimCtx.rotate(cell.rot * Math.PI / 2);
+  claimCtx.translate(-size / 2, -size / 2);
+  claimCtx.scale(size, size);
+  drawTile(claimCtx, cell.type, { rot: cell.rot });
+  claimCtx.restore();
+
+  // The dots start where the follower itself would stand, turned with the tile.
+  // A busy tile — a four-way road with its four fields — puts several anchors
+  // within a few pixels of each other, so they are then pushed apart until
+  // each is its own target, and any that moved gets a leader back to the spot
+  // it actually means.
+  const r = size * 0.105;
+  claimSpots = opts.map((o) => {
+    const anchor = cell.type.spots[o.i] || [0.5, 0.5];
+    const [px, py] = rotPoint(anchor, cell.rot);
+    return { ...o, ax: px * size, ay: py * size, sx: px * size, sy: py * size, r };
+  });
+  for (let pass = 0; pass < 60; pass++) {
+    let moved = false;
+    for (let a = 0; a < claimSpots.length; a++) {
+      for (let b = a + 1; b < claimSpots.length; b++) {
+        const A = claimSpots[a], B = claimSpots[b];
+        let dx = B.sx - A.sx, dy = B.sy - A.sy;
+        let d = Math.hypot(dx, dy);
+        if (d > r * 2.25) continue;
+        if (d < 0.01) { dx = (a - b) || 1; dy = 1; d = Math.hypot(dx, dy); }
+        const push = (r * 2.25 - d) / 2;
+        const ux = dx / d * push, uy = dy / d * push;
+        A.sx -= ux; A.sy -= uy; B.sx += ux; B.sy += uy;
+        moved = true;
+      }
+    }
+    // Keep them all on the tile.
+    for (const sp of claimSpots) {
+      sp.sx = Math.max(r * 1.1, Math.min(size - r * 1.1, sp.sx));
+      sp.sy = Math.max(r * 1.1, Math.min(size - r * 1.1, sp.sy));
+    }
+    if (!moved) break;
+  }
+
+  const colour = PLAYER_COLORS[game.current];
+  for (const spot of claimSpots) {
+    if (Math.hypot(spot.sx - spot.ax, spot.sy - spot.ay) < 3) continue;
+    claimCtx.beginPath();
+    claimCtx.moveTo(spot.ax, spot.ay);
+    claimCtx.lineTo(spot.sx, spot.sy);
+    claimCtx.strokeStyle = 'rgba(232,222,208,0.5)';
+    claimCtx.lineWidth = 1.5;
+    claimCtx.stroke();
+    claimCtx.beginPath();
+    claimCtx.arc(spot.ax, spot.ay, 2.5, 0, Math.PI * 2);
+    claimCtx.fillStyle = 'rgba(232,222,208,0.7)';
+    claimCtx.fill();
+  }
+
+  for (const spot of claimSpots) {
+    claimCtx.beginPath();
+    claimCtx.arc(spot.sx, spot.sy, spot.r, 0, Math.PI * 2);
+    claimCtx.fillStyle = 'rgba(18,14,26,0.55)';
+    claimCtx.fill();
+    claimCtx.lineWidth = 3;
+    claimCtx.strokeStyle = colour;
+    claimCtx.stroke();
+    drawMeeple(claimCtx, spot.sx, spot.sy, spot.r * 1.5, colour,
+      { farmer: spot.f.type === 'field' });
+  }
+
+  // A number on each spot, because the keyboard should reach them too.
+  claimSpots.forEach((spot, i) => {
+    claimCtx.beginPath();
+    claimCtx.arc(spot.sx + spot.r * 0.85, spot.sy - spot.r * 0.85, spot.r * 0.52, 0, Math.PI * 2);
+    claimCtx.fillStyle = 'rgba(18,14,26,0.85)';
+    claimCtx.fill();
+    claimCtx.strokeStyle = 'rgba(212,175,95,0.7)';
+    claimCtx.lineWidth = 1.2;
+    claimCtx.stroke();
+    claimCtx.fillStyle = '#e8ded0';
+    claimCtx.font = `600 ${Math.round(spot.r * 0.8)}px ui-sans-serif`;
+    claimCtx.textAlign = 'center';
+    claimCtx.textBaseline = 'middle';
+    claimCtx.fillText(String(i + 1), spot.sx + spot.r * 0.85, spot.sy - spot.r * 0.85);
+  });
+
+  $('claimWho').textContent = `${game.player.name} — claim a feature`;
+}
+
+$('claimTile').addEventListener('pointermove', (e) => {
+  const hit = claimHit(e);
+  $('claimTile').title = hit ? `Claim the ${hit.f.type}` : '';
+  $('claimTile').style.cursor = hit ? 'pointer' : 'default';
+});
+
+function claimHit(e) {
+  const r = $('claimTile').getBoundingClientRect();
+  const scale = $('claimTile').width / r.width;
+  const px = (e.clientX - r.left) * scale;
+  const py = (e.clientY - r.top) * scale;
+  return claimSpots.find((sp) => Math.hypot(px - sp.sx, py - sp.sy) <= sp.r * 1.4);
+}
+
+$('claimTile').addEventListener('pointerdown', (e) => {
+  const hit = claimHit(e);
+  if (hit) game.placeMeeple(hit.i, hit);
+});
+
 // --- side panel -------------------------------------------------------------
 
 const previewCtx = $('preview').getContext('2d');
@@ -633,6 +990,13 @@ function currentTile() {
   if (inv && game.phase === 'interior-place') return { type: inv.tile, rot: inv.rot, terrain: inv.kind };
   if (game.m.piece) return { piece: game.m.piece };
   if (game.tile) return { type: game.tile, rot: game.rot, terrain: 'surface' };
+  // Between laying a tile and claiming on it your hand is empty, which left
+  // the preview a black square during the one step you most want to look at
+  // the tile. Show what you just laid instead.
+  if (game.lastPlaced) {
+    const c = game.board.get(game.lastPlaced.x, game.lastPlaced.y);
+    if (c) return { type: c.type, rot: c.rot, terrain: 'surface', laid: true };
+  }
   return null;
 }
 
@@ -731,6 +1095,26 @@ function renderActions() {
   const add = (label, key, fn, disabled = false, wide = false) =>
     btns.push({ label, key, fn, disabled, wide });
 
+  // A staged tile owns the turn until it is committed or taken back.
+  if (pending) {
+    add('Place it here', 'Enter', () => commitPending(), false, true);
+    if (pending.rots.length > 1) {
+      add(`Turn it (${pending.rots.length} ways fit)`, 'R', () => turnPending(1));
+    }
+    add('Put it back', 'Esc', () => clearPending());
+    const host = $('actions');
+    host.innerHTML = '';
+    for (const b of btns) {
+      const el = document.createElement('button');
+      if (b.wide) el.className = 'wide';
+      el.innerHTML = `${b.label}${b.key ? ` <kbd>${b.key}</kbd>` : ''}`;
+      el.onclick = b.fn;
+      host.appendChild(el);
+    }
+    mirrorActions(btns);
+    return;
+  }
+
   if (game.phase === 'place' || game.phase === 'interior-place') add('Rotate', 'R', () => game.rotate(1));
   if (game.canFlip()) add('Flip it over', 'F', () => game.flipTile());
   if (game.canPlayAbbey()) add(`Play your abbey (${game.player.abbeys})`, '', () => game.playAbbey());
@@ -802,6 +1186,31 @@ function renderActions() {
     host.appendChild(el);
   }
   if (!btns.length) host.innerHTML = '<span class="dim" style="font-size:11px">—</span>';
+  mirrorActions(btns);
+}
+
+/**
+ * The same buttons, again, in the HUD and on the claim panel. They are built
+ * once and rendered wherever they are needed, so a rule that adds a button
+ * never has to know how many places show it.
+ */
+function mirrorActions(btns) {
+  for (const [id, list] of [['hudActions', btns], ['claimActions', btns]]) {
+    const el = $(id);
+    if (!el) continue;
+    el.innerHTML = '';
+    // The claim panel already IS the claim, so it only carries the verbs.
+    const wanted = id === 'claimActions'
+      ? list.filter((b) => !/^Rotate$/.test(b.label))
+      : list;
+    for (const b of wanted) {
+      const btn = document.createElement('button');
+      btn.innerHTML = `${b.label}${b.key ? ` <kbd>${b.key}</kbd>` : ''}`;
+      btn.disabled = b.disabled;
+      btn.onclick = b.fn;
+      el.appendChild(btn);
+    }
+  }
 }
 
 function scoreRow(p, i) {
@@ -848,7 +1257,32 @@ function syncPanel() {
   renderMarket();
   renderActions();
   drawPreview();
+  renderHud(doing, status);
+  renderClaim();
   bumpScores();
+}
+
+/** The HUD carries the turn: what you are holding, what to do, who is winning. */
+function renderHud(doing, status) {
+  if (!lean) return;
+  $('hudPhase').textContent = doing + (status ? ` · ${status}` : '');
+  $('hudScores').innerHTML = game.players.map((p, i) => `
+    <span class="${i === game.current && game.phase !== 'over' ? 'on' : ''}">
+      <span class="swatch" style="background:${PLAYER_COLORS[i]}"></span>${p.score}
+    </span>`).join('');
+
+  const c = $('hudTile').getContext('2d');
+  const size = $('hudTile').width;
+  c.clearRect(0, 0, size, size);
+  const cur = currentTile();
+  if (!cur || !cur.type) return;
+  c.save();
+  c.translate(size / 2, size / 2);
+  c.rotate(cur.rot * Math.PI / 2);
+  c.translate(-size / 2, -size / 2);
+  c.scale(size, size);
+  drawTile(c, cur.type, { terrain: cur.terrain, rot: cur.rot });
+  c.restore();
 }
 
 /**
@@ -911,6 +1345,7 @@ function signature() {
     inv ? `${inv.deck.length}/${inv.rot}/${inv.board.size}/${inv.pos.x},${inv.pos.y}` : '-',
     game.walker ? (game.walker.selected?.id ?? '-') : '-',
     game.m.piece ? game.m.piece.cells.map((c) => `${c.dx}${c.dy}${c.rot}`).join('') : '-',
+    pending ? `${pending.x},${pending.y},${pending.rot}` : '-', lean ? 'L' : '-',
     game.tilesLeft, game.useKind || '-', game.usingPhantom ? 'P' : '-',
     game.magicPick, game.mage ? 'M' : '-', game.witch ? 'W' : '-', game.ingots,
     game.dragon ? `${game.dragon.x},${game.dragon.y}` : '-',
@@ -948,11 +1383,31 @@ function frame(now = 0) {
 }
 
 showVersion();
+// Settings first: the panel, the mode dropdown and the first game should all
+// come up the way you left them.
+const restored = loadSettings();
 setRuleset(ruleset);
 renderMechanics();
 renderGroups();
 onModeChange();
-game = bind(new Game({ players: 2, groups: [...enabledGroups] }));
+if (restored) {
+  // onModeChange resets the tile pool to the mode's default, which is right
+  // for a mode you just picked and wrong for one you are coming back to.
+  try {
+    const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (saved?.groups?.length) { enabledGroups = new Set(saved.groups); renderGroups(); }
+  } catch { /* ignore */ }
+}
+game = bind(new Game({
+  players: Number($('playerCount').value) || 2,
+  groups: [...enabledGroups],
+  options: { ...mechanics },
+  ruleset,
+  meeples: $('useMeeples').checked,
+  tilesPerTurn: Number($('tilesPerTurn').value) || 1,
+  mode: $('mode').value,
+}));
+game.free = $('freePlace').checked;
 buildBots();
 syncPanel();
 frame();
@@ -962,6 +1417,8 @@ window.LAB = {
   get game() { return game; },
   get bots() { return bots; },
   renderer, newGame, THEME, sfx, fx, MODES, MECHANICS, LIVE_MECHANICS, VERSION,
+  claimSpots: () => claimSpots,
+  setLean,
   get mechanics() { return mechanics; },
   get ruleset() { return ruleset; },
 };

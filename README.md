@@ -518,19 +518,60 @@ restrained on purpose.
 
 | | |
 |---|---|
-| Place tile | click a highlighted cell |
+| Place tile | drag the tile off the panel, or click a highlighted cell |
+| Commit a staged tile | click it again, press `Enter`, or **Place it here** |
+| Take it back | `Escape`, or drag it somewhere else |
 | Lift a placed tile | `L`, then click it |
 | Use the big follower | `B`, then claim |
 | Pick from the row | click it, or `1`–`4` |
 | Rotate | `R` (or right-click, or shift+scroll) |
 | Flip a two-faced tile | `F` |
-| Claim a feature | click the pulsing meeple marker |
+| Claim a feature | click a spot on the zoomed tile, or `1`–`9` |
 | Enter a city | stand on its gate, press `E` |
 | Skip / hold | `Space` |
 | Move a pawn | click your pawn, then a gold target |
 | Pan / zoom | drag / scroll, or one finger / two |
 | Recenter | `C` |
 | Feature overlay | `D` |
+| Hide the panel | `Tab`, or **Lean** in the header |
+
+### Laying a tile
+
+The default flow is drop, turn, commit. Drag the tile out of the panel (or off
+the floating HUD in lean mode) and let go over a square: it *stages* there
+rather than playing, drawn solid under a dashed gold ring. Only the rotations
+that actually fit that square are offered — the ring is labelled with how many
+there are, and **Turn it** / `R` cycles those and nothing else, so on a square
+with one legal facing there is nothing to hunt for. **Place it here** (or a
+second click on the square, or `Enter`) commits; `Escape` takes it back, and
+dropping somewhere else just moves the staging.
+
+Turn the confirm step off with **Confirm before placing** in the panel and a
+click lays the tile the instant it lands, as it always did.
+
+### Claiming
+
+With **Zoomed claim step** on, laying a tile opens a large copy of it in the
+corner with one dot per claimable feature — a bigger target than the board
+marker, and legible on a phone. A four-way road with its four fields piles its
+anchors within a few pixels of each other, so the dots are pushed apart until
+each is its own target and any that moved draws a thin leader back to the spot
+it means. Hovering names the feature; the dots are numbered, and `1`–`9`
+claims by number. The board rings the tile in question and stops drawing its
+own markers while the panel is up, so there is only ever one set of targets.
+
+### Lean mode
+
+`Tab` (or **Lean** in the header) hides the side panel and gives the board the
+whole window. What you still need follows you: a small HUD in the bottom-left
+carries the tile in hand, whose turn it is, the phase, the scores, and the same
+action buttons the panel would show — and the tile in it is draggable, so the
+whole turn is playable without the panel. `Tab` again brings it back. On a
+phone, where the panel is a bottom drawer rather than a column, lean mode
+collapses the drawer the same way.
+
+Panel settings — mechanics, tile groups, mode, bots, sound, motion, and the two
+switches above — are remembered in `localStorage` between visits.
 
 ## The tile pool
 

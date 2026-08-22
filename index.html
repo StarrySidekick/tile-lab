@@ -10,11 +10,37 @@
 </head>
 <body>
   <main>
-    <canvas id="board"></canvas>
+    <div id="stage">
+      <canvas id="board"></canvas>
+
+      <!-- The play HUD: everything you need mid-turn, floating over the board,
+           for when the panel is folded away. -->
+      <div id="hud" hidden>
+        <div class="hudTop">
+          <canvas id="hudTile" width="104" height="104" title="Drag me onto the board"></canvas>
+          <div class="hudMeta">
+            <div id="hudPhase" class="hudPhase">—</div>
+            <div id="hudScores" class="hudScores"></div>
+          </div>
+          <button id="hudExpand" class="leanBtn" title="Bring the panel back (Tab)">⤡</button>
+        </div>
+        <div id="hudActions" class="btns"></div>
+      </div>
+
+      <!-- The meeple step, up close: the tile you just laid, big, with a spot
+           for every feature you could claim. -->
+      <div id="claim" hidden>
+        <div class="claimHead"><span id="claimWho">Claim a feature</span></div>
+        <canvas id="claimTile" width="260" height="260"></canvas>
+        <div id="claimActions" class="btns"></div>
+      </div>
+    </div>
 
     <aside id="panel">
       <header>
-        <h1>Tilemaker&rsquo;s Workshop <span id="version" class="ver" title="build">…</span></h1>
+        <h1>Tilemaker&rsquo;s Workshop <span id="version" class="ver" title="build">…</span>
+          <button id="lean" class="leanBtn" title="Hide the panel and play on the whole screen (Tab)">⤢</button>
+        </h1>
         <p id="phase">—</p>
       </header>
 
@@ -109,6 +135,8 @@
         <h2>Sandbox</h2>
         <label><input type="checkbox" id="freePlace" /> Free placement (ignore edge matching)</label>
         <label><input type="checkbox" id="hints" checked /> Show where tiles can go</label>
+        <label title="Drop a tile, turn it, then commit — instead of laying it the instant you click."><input type="checkbox" id="confirmPlace" checked /> Confirm before placing</label>
+        <label title="On the claim step, show the tile you just laid up close with a spot for each feature."><input type="checkbox" id="zoomClaim" checked /> Zoomed claim step</label>
         <label><input type="checkbox" id="debug" /> Feature overlay <kbd>D</kbd></label>
         <label class="row">Force next tile
           <select id="forceTile"><option value="">— random —</option></select>
@@ -122,7 +150,7 @@
 
       <footer class="dim">
         drag to pan · scroll to zoom · <kbd>R</kbd> rotate · <kbd>F</kbd> flip · <kbd>1</kbd>–<kbd>4</kbd> pick
-        · <kbd>C</kbd> recenters · <a href="./atlas.html">tile atlas</a>
+        · <kbd>C</kbd> recenters · <kbd>Tab</kbd> hides the panel · <kbd>Enter</kbd> confirms · <a href="./atlas.html">tile atlas</a>
       </footer>
     </aside>
   </main>
