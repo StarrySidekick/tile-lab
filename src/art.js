@@ -373,12 +373,26 @@ function drawTemple(ctx, f, L) {
 }
 
 /**
+ * The three sfera glazes. Colour is not decoration here — it is the rule: a
+ * green edge only ever meets a green edge, and the colour of the sphere you
+ * close decides what its harvest counts. So the three have to be told apart at
+ * play zoom, from across the table, which means separating them by hue AND by
+ * value rather than by hue alone.
+ */
+const SFERA_GLAZE = {
+  green: { lit: '#d8ecd2', body: '#7cb079', shade: '#335b3c', rim: '#24422c' },
+  blue:  { lit: '#cfe0f2', body: '#6d94c9', shade: '#334a75', rim: '#243554' },
+  red:   { lit: '#f2d6cd', body: '#c1786a', shade: '#6f3730', rim: '#4d2622' },
+};
+
+/**
  * A sfera: half a sphere, cut flush with one edge of the tile, so two of them
  * meeting across a seam read as one whole ball. That's the entire visual rule —
  * a player has to be able to see the join from across the table, because the
  * join changes the game.
  */
 function drawSfera(ctx, f, L) {
+  const glaze = SFERA_GLAZE[f.hue] || SFERA_GLAZE.green;
   const side = f.sides[0] ?? 0;
   const [vx, vy] = SIDE_VEC[side];
   const cx = 0.5 + vx * 0.5, cy = 0.5 + vy * 0.5;      // centre sits ON the edge
@@ -395,15 +409,15 @@ function drawSfera(ctx, f, L) {
 
   const grad = ctx.createRadialGradient(
     cx - L.x * 0.11, cy - L.y * 0.11, r * 0.12, cx, cy, r);
-  grad.addColorStop(0, '#cfe6df');
-  grad.addColorStop(0.55, '#7fb3a8');
-  grad.addColorStop(1, '#3c5f5c');
+  grad.addColorStop(0, glaze.lit);
+  grad.addColorStop(0.55, glaze.body);
+  grad.addColorStop(1, glaze.shade);
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fillStyle = grad;
   ctx.fill();
   ctx.lineWidth = 0.028;
-  ctx.strokeStyle = '#2a4746';
+  ctx.strokeStyle = glaze.rim;
   ctx.stroke();
 
   // A meridian, so a half looks like half of something rather than a blob.

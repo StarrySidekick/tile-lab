@@ -92,11 +92,20 @@ const garden = () => ({ type: 'garden', sides: [] });
 const temple = (face = N) => ({ type: 'temple', sides: [], face });
 
 /**
- * Half of a sphere, on one edge. A sfera edge meets nothing but another sfera
- * edge, so joining two of them is a deliberate act rather than an accident —
- * and the moment two are joined, the sky starts counting islands.
+ * Half of a sphere, on one edge — and a COLOUR, because a sphere is what tells
+ * the harvest what to look for. A sfera edge meets nothing but another sfera
+ * edge OF ITS OWN COLOUR: half a green ball does not fit half a red one, so
+ * joining two is a doubly deliberate act and the sphere it makes is
+ * unambiguously one thing.
+ *
+ * That is why the colour lives on the EDGE LETTER rather than beside it. Edge
+ * matching is the whole of the board's join rule, so making green edges a
+ * different letter from red ones is all it takes — nothing downstream needs to
+ * know that sferas have colours at all.
  */
-const sfera = (side = N) => ({ type: 'sfera', sides: [side] });
+const SFERA_EDGE = { green: 'o', blue: 'p', red: 'q' };
+const sfera = (side = N, hue = 'green') =>
+  ({ type: 'sfera', sides: [side], hue, edge: SFERA_EDGE[hue] });
 
 /**
  * `dir` is a cardinal direction carried by a mark, rotated with its tile the
@@ -149,7 +158,12 @@ export const DOCK = '~';
 export const edgesMeet = (a, b) => a === b || a === CAP || b === CAP
   || a === DOCK || b === DOCK;
 
-/** Edge letter per feature type. Two edges match only if their letters do. */
+/**
+ * Edge letter per feature type. Two edges match only if their letters do — so
+ * a feature that wants sub-kinds that don't meet each other says so with its
+ * own letter, which is what the sfera's `edge` does (o/p/q for green, blue and
+ * red). This table is the fallback for everything that doesn't.
+ */
 export const EDGE_LETTER = {
   city: 'c', road: 'r', monastery: 'f', temple: 'f', garden: 'f',
   forest: 'w', mountain: 'm', lake: 'l', river: 'v', sfera: 'o',
@@ -177,7 +191,7 @@ export const GROUPS = [
   { id: 'adventure', name: 'Adventure sites', note: 'Wayshrines, ruins, campsites, merchants.', classic: false, expedition: false, adventure: true },
   { id: 'marches', name: 'War terrain', note: 'Keeps, forts, hills, fords, beacons.', classic: false, expedition: false, adventure: false },
   { id: 'descent', name: 'Dangers', note: 'Stairs down, bandits, wolves, barrows.', classic: false, expedition: false, adventure: false },
-  { id: 'cloud', name: 'Cloud kingdom', note: 'Zephyrs, sferas, temples, tower turbines, Abbazias, flying machines and windvanes.', classic: false, expedition: false, adventure: false },
+  { id: 'cloud', name: 'Cloud kingdom', note: 'Zephyrs, sferas in three colours, temples, windmill turbines, Abbazias, flying machines and windvanes.', classic: false, expedition: false, adventure: false },
   { id: 'mountains', name: 'Mountains', note: 'Pay the moment the chain grows, scaling with its size. Nothing can be claimed on them.', classic: false, expedition: false, adventure: false },
   { id: 'forests', name: 'Forests', note: '1 per tile, +1 per log. No complete/incomplete distinction — a forest is just as big as it is.', classic: false, expedition: false, adventure: false },
   { id: 'lakes', name: 'Lakes', note: 'Shores and corners, never all four sides. A city beside water is worth more.', classic: false, expedition: false, adventure: false },
@@ -342,13 +356,34 @@ export const TILE_TYPES = [
   { id: 'Ktb', n: 3, group: 'cloud', name: 'Tower turbine',  feats: [city([N])],    marks: [mark('turbine', 0)], fields: [[2, 3, 4, 5, 6, 7]] },
   { id: 'Ktc', n: 2, group: 'cloud', name: 'Turbine corner', feats: [city([N, W])], marks: [mark('turbine', 0)], fields: [[2, 3, 4, 5]] },
 
-  // The sfera: one edge is half a sphere and meets nothing but its other half.
-  // Join two and the sky starts counting islands, for the rest of the game.
-  { id: 'Kso', n: 3, group: 'cloud', name: 'Sfera',          feats: [sfera(N)], fields: [[2, 3, 4, 5, 6, 7]] },
-  { id: 'Ksr', n: 3, group: 'cloud', name: 'Sfera road',     feats: [sfera(N), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
-  { id: 'Ksc', n: 2, group: 'cloud', name: 'Sfera wall',     feats: [sfera(N), city([S])], fields: [[2, 3], [6, 7]] },
-  { id: 'Ksb', n: 2, group: 'cloud', name: 'Sfera lane',     feats: [sfera(N), road([S])], fields: [[2, 3, 4], [5, 6, 7]] },
-  { id: 'Ksx', n: 2, group: 'cloud', name: 'Sfera span',     feats: [sfera(N), city([E, W])], fields: [[4, 5]] },
+  // The sfera: one edge is half a sphere and meets nothing but its other half,
+  // in its own colour. Joining two closes a sphere, and the sphere calls in the
+  // harvest on the field it is lying in — the COLOUR deciding what that harvest
+  // counts. Green counts the ground itself, blue the cities it feeds, red the
+  // temples standing on it, so which sfera you are holding changes which farm
+  // is worth planting.
+  //
+  // Five shapes in each colour, one of each, so a colour is five halves and two
+  // spheres with one left over. The odd half is the point: you cannot pair
+  // everything, and the half you never place still tells the endgame harvest
+  // what to look for on the field it is lying in.
+  { id: 'Kso', n: 1, group: 'cloud', name: 'Green sfera',       feats: [sfera(N, 'green')], fields: [[2, 3, 4, 5, 6, 7]] },
+  { id: 'Ksr', n: 1, group: 'cloud', name: 'Green sfera road',  feats: [sfera(N, 'green'), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
+  { id: 'Ksc', n: 1, group: 'cloud', name: 'Green sfera wall',  feats: [sfera(N, 'green'), city([S])], fields: [[2, 3], [6, 7]] },
+  { id: 'Ksb', n: 1, group: 'cloud', name: 'Green sfera lane',  feats: [sfera(N, 'green'), road([S])], fields: [[2, 3, 4], [5, 6, 7]] },
+  { id: 'Ksx', n: 1, group: 'cloud', name: 'Green sfera span',  feats: [sfera(N, 'green'), city([E, W])], fields: [[4, 5]] },
+
+  { id: 'Kbo', n: 1, group: 'cloud', name: 'Blue sfera',        feats: [sfera(N, 'blue')], fields: [[2, 3, 4, 5, 6, 7]] },
+  { id: 'Kbr', n: 1, group: 'cloud', name: 'Blue sfera road',   feats: [sfera(N, 'blue'), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
+  { id: 'Kbc', n: 1, group: 'cloud', name: 'Blue sfera wall',   feats: [sfera(N, 'blue'), city([S])], fields: [[2, 3], [6, 7]] },
+  { id: 'Kbb', n: 1, group: 'cloud', name: 'Blue sfera lane',   feats: [sfera(N, 'blue'), road([S])], fields: [[2, 3, 4], [5, 6, 7]] },
+  { id: 'Kbx', n: 1, group: 'cloud', name: 'Blue sfera span',   feats: [sfera(N, 'blue'), city([E, W])], fields: [[4, 5]] },
+
+  { id: 'Kro', n: 1, group: 'cloud', name: 'Red sfera',         feats: [sfera(N, 'red')], fields: [[2, 3, 4, 5, 6, 7]] },
+  { id: 'Krr', n: 1, group: 'cloud', name: 'Red sfera road',    feats: [sfera(N, 'red'), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
+  { id: 'Krc', n: 1, group: 'cloud', name: 'Red sfera wall',    feats: [sfera(N, 'red'), city([S])], fields: [[2, 3], [6, 7]] },
+  { id: 'Krb', n: 1, group: 'cloud', name: 'Red sfera lane',    feats: [sfera(N, 'red'), road([S])], fields: [[2, 3, 4], [5, 6, 7]] },
+  { id: 'Krx', n: 1, group: 'cloud', name: 'Red sfera span',    feats: [sfera(N, 'red'), city([E, W])], fields: [[4, 5]] },
 
   // End caps. A city has to be able to stop somewhere, and in a country that
   // keeps being rearranged it needs to be able to stop more often than the
@@ -772,7 +807,7 @@ function prepare(list) {
     for (const f of t.feats) {
       if (f.shield) t.shields++;
       if (t.wild || t.dock) continue;          // an Abbazia or a ship takes anything
-      for (const s of f.sides) t.edges[s] = EDGE_LETTER[f.type] || 'r';
+      for (const s of f.sides) t.edges[s] = f.edge || EDGE_LETTER[f.type] || 'r';
     }
 
     // Fields become real features, appended AFTER the edge letters are worked
