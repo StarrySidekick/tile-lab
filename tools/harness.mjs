@@ -112,6 +112,7 @@ function step(game, rng) {
     case 'crop': { game.cropChoose(rng() < 0.5 ? 'add' : 'remove'); return; }
     case 'meeple': {
       if (game.canPlaceBuilding?.() && rng() < 0.5) game.placeBuilding();
+      if (game.canBuildBridge?.() && rng() < 0.4) game.buildBridge();
       const opts = game.meepleOptions();
       if (game.canRecall() && rng() < 0.08) return void game.beginRecall();
       if (game.has('bigMeeple') && game.player.big > 0 && rng() < 0.3) game.toggleBig();
@@ -781,6 +782,52 @@ function runMode(spec, games, extraOpts = {}, label = '') {
 /** Hills, sheep, the barn, the acrobats and the baths. */
 /** The dragon, the fairy, the tower, the ferries and the far monasteries. */
 /** The big top, the teacher and the wonders. */
+/**
+ * The bridge: an elevated road appended to a living tile. The properties that
+ * matter are exactly the ones the derived-type trick was chosen for — indexes
+ * hold still, the field underneath is never divided, and a rebuild replays it.
+ */
+function checkBridges() {
+  console.log('\nbridges');
+  const ok = (what, cond, detail = '') => {
+    if (cond) console.log(`  ✓ ${what.padEnd(46)} ${detail}`);
+    else { failures++; console.log(`  ✗ ${what}${detail ? `: ${detail}` : ''}`); }
+  };
+
+  const g = new Game({ players: 2, seed: 1, options: { bridge: true } });
+  g.board.place(20, 20, TILES.U, 1);           // road E–W
+  g.board.place(21, 20, TILES.B, 0);           // a monastery in the way
+  g.board.place(22, 20, TILES.U, 1);           // road E–W, stranded
+  const fieldsBefore = allFields(g.board).length;
+  ok('two roads stranded by a field tile',
+    g.board.featureOf(20, 20, 0) !== g.board.featureOf(22, 20, 0));
+
+  g.lastPlaced = { x: 21, y: 20, type: TILES.B };
+  g.phase = 'meeple'; g.current = 0;
+  ok('the engine offers the joining axis first',
+    g.bridgeSpots()[0]?.joins === 2);
+  g.buildBridge();
+  ok('the bridge makes them one road',
+    g.board.featureOf(20, 20, 0) === g.board.featureOf(22, 20, 0),
+    `${g.board.featureOf(20, 20, 0).tiles.size} tiles`);
+  ok('…without dividing the field beneath it',
+    allFields(g.board).length === fieldsBefore);
+  ok('…and without touching the monastery',
+    g.board.featureOf(21, 20, 0)?.type === 'monastery');
+  g.board.rebuild();
+  ok('…and it survives a rebuild',
+    g.board.featureOf(20, 20, 0) === g.board.featureOf(22, 20, 0));
+
+  // A bridge never stands on a wall: the rotated city edge refuses its axis.
+  const h = new Game({ players: 2, seed: 1, options: { bridge: true } });
+  h.board.place(30, 30, TILES.E, 1);           // city facing world east
+  h.lastPlaced = { x: 30, y: 30, type: TILES.E };
+  h.phase = 'meeple'; h.current = 0;
+  const axes = h.bridgeSpots().filter((o) => o.cell.x === 30 && o.cell.y === 30);
+  ok('a wall refuses the bridge, rotation and all',
+    axes.length === 1 && axes[0].axis.join() === '0,2');
+}
+
 function checkShowBatch() {
   console.log('\nthe travelling show');
   const ok = (what, cond, detail = '') => {
@@ -1497,6 +1544,7 @@ function main() {
     checkFlockBatch();
     checkBeastBatch();
     checkShowBatch();
+    checkBridges();
     checkBots(Math.max(4, games / 2));
     botVsRandom(Math.max(10, games * 2));
     // Classic is the plain case, Girando moves tiles around under you, and

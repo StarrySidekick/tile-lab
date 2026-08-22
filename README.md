@@ -7,7 +7,7 @@ A sandbox for experimenting with tile mechanics and game modes, built to be
 **fast to iterate on**. No build step, no dependencies, no image assets — plain
 ES modules and a canvas. Edit a file, hit refresh, keep playing.
 
-Twelve modes and a catalogue of 79 Carcassonne rules — 66 of them playable —
+Twelve modes and a catalogue of 79 Carcassonne rules — 67 of them playable —
 all sharing one board engine. Each mode exists to answer a specific question
 about what makes tile-laying good; [MODES.md](MODES.md) is where that
 reasoning lives, and [docs/EDITIONS.md](docs/EDITIONS.md) is where the printed
@@ -274,16 +274,40 @@ The computer player values a farm at what its cities will probably be worth by
 the end, and treats a farmer as costing about twice an ordinary follower, since
 it is spent for the rest of the game.
 
+### Bridges
+
+The one rule that looked like board surgery and turned out to be a tile trick.
+
+The blocker was real: the engine derives a cell's edges from its tile type, so
+a road carried *over* a field tile seemed to need per-cell edge overrides
+threaded through everything. The way in was to notice what a bridge physically
+is — not an edit to the landscape but a road held above it. So building a
+bridge **replaces the cell's tile with a derived copy of itself**: the same
+tile with one extra road feature appended after everything it already had,
+and two edges relettered. The same primitive the two-faced flip already uses.
+
+Appending *after* the fields is what makes it safe — every feature index,
+meeple reference and scored-part key stays exactly where it was. And it makes
+it accurate: the fields underneath are **never divided**, because the bridge
+is up in the air. That's the printed rule, falling out of the implementation.
+
+Three bridges each. After placing a tile, throw one across it or a neighbour —
+both spanned edges must be open country on the tile itself (a bridge stands on
+the field, never on a wall), and whatever its ends meet must be something a
+road can meet. The bridge road is claimable, scores as road, and survives
+rebuilds because it lives in the cell's type like everything else. The printed
+trick of using a bridge to legalise an otherwise-impossible placement isn't
+modelled, which is why it's marked approximate.
+
 ### What stays on the shelf, and why
 
-Thirteen rules are catalogued but deliberately not built, each for a stated
+Twelve rules are catalogued but deliberately not built, each for a stated
 reason rather than neglect:
 
 | rule | why not |
 |---|---|
 | **The Catapult** | A physical dexterity game — flicking wooden discs across a table. There is no honest digital version of it |
 | **The Count** | Needs the separate 2×3 City of Carcassonne board and its district-redeploy economy |
-| **Bridges** | A road carried *over* a field tile means per-cell edge overrides — real board surgery |
 | **Castles** | Converting a closed city into a token that scores off its neighbours' future needs an interposed choice at scoring time |
 | **Bazaars** | A live auction; against bots an auto-bid would gut the point of it |
 | **Ringmaster** | Rides the circus events; worth doing once the big top has more than one trick |
@@ -314,7 +338,7 @@ by `tools/wikicarpedia.mjs`.
 
 ### What's implemented
 
-Of the 79 rules catalogued, 66 are playable — 34 to the letter, 32 marked as honest approximations whose tooltips say exactly what was simplified. The rest are named, described, dated
+Of the 79 rules catalogued, 67 are playable — 34 to the letter, 33 marked as honest approximations whose tooltips say exactly what was simplified. The rest are named, described, dated
 and linked, waiting for an implementation.
 
 **Workshop originals** — things this sandbox invented, or lifted out of one of

@@ -346,9 +346,11 @@ export const MECHANICS = [
   {
     id: 'bridge', layer: 'exp', pack: 'Exp. 8 — Bridges, Castles & Bazaars (2010) · C3.1: Castles & Bridges (barns replace bazaars)',
     name: 'Bridges',
-    note: 'Lay a bridge straight across a field tile to carry a road over ground '
-      + 'that has no road on it.',
-    status: 'planned', needs: ['roads'], wiki: wiki('Bridges,_Castles_and_Bazaars'), since: 'all',
+    note: 'Three bridges each. After placing, throw one across the tile just '
+      + 'laid or a neighbour — it carries a road high over the field, which '
+      + 'is never divided, and joins whatever its two ends meet. The printed '
+      + 'trick of legalising an otherwise-impossible placement isn’t modelled.',
+    status: 'partial', needs: ['roads'],
   },
   {
     id: 'castle', layer: 'exp', pack: 'Exp. 8 — Bridges, Castles & Bazaars (2010) · C3.1: Castles & Bridges (barns replace bazaars)',

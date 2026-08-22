@@ -866,6 +866,29 @@ function featureSpot(f) {
   return [0.5 + vx * push, 0.5 + vy * push];
 }
 
+/**
+ * The same tile, with a bridge across it.
+ *
+ * A bridge is not an edit to the landscape — it is a road held OVER it, which
+ * is why this is a derived type rather than a mutation: the extra road feature
+ * is appended after everything the tile already had (fields included), so
+ * every feature index, meeple reference and scored-part key stays exactly
+ * where it was, and the fields underneath are never divided. `sides` is in the
+ * tile's own canonical frame.
+ */
+export function bridgedType(type, sides) {
+  const span = { type: 'road', sides, bridge: true };
+  const t = {
+    ...type,
+    feats: [...type.feats, span],
+    edges: [...type.edges],
+    spots: [...type.spots, [0.5, 0.5]],
+    bridged: true,
+  };
+  for (const s of sides) t.edges[s] = 'r';
+  return t;
+}
+
 /** Rotate a point in unit tile space by `rot` quarter-turns clockwise. */
 export function rotPoint([x, y], rot) {
   const a = (rot & 3) * Math.PI / 2;

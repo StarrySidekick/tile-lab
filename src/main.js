@@ -759,6 +759,7 @@ function renderActions() {
     if (game.canBathe?.()) add('Send a follower to the baths', '', () => game.bathe());
     if (game.canCallFairy?.()) add('Call the fairy to a follower', '', () => game.callFairy());
     if (game.canBuildTower?.()) add(`Build a tower floor (${game.player.floors})`, '', () => game.buildTower());
+    if (game.canBuildBridge?.()) add(`Build a bridge (${game.player.bridges})`, '', () => { game.buildBridge(); syncPanel(); });
     if (game.canRecall()) add('Recall a follower', '', () => game.beginRecall());
   }
   if (game.phase === 'walk') add('Send it home instead', 'Space', () => game.declineWalk());

@@ -1895,7 +1895,7 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
   // A swinging tile's stubs stop short of the middle: they are the ways in
   // that this tile is currently refusing.
   type.feats.forEach((f) => {
-    if (f.type === 'road') drawRoad(ctx, f, terrain, !!type.swing && f.sides.length === 1);
+    if (f.type === 'road' && !f.bridge) drawRoad(ctx, f, terrain, !!type.swing && f.sides.length === 1);
   });
 
   // Two or more dead-end road stubs meeting = a junction, not a through road.
@@ -1929,6 +1929,38 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     else drawAbbey(ctx, L);
   }
   for (const f of type.feats) if (f.type === 'temple') drawTemple(ctx, f, L);
+
+  // A bridge is drawn dead last: it stands OVER everything on the tile — the
+  // field it never divides, and the walls and roads it crosses. Stone deck,
+  // parapets, and the shadow that says it is up in the air.
+  for (const f of type.feats) {
+    if (f.type !== 'road' || !f.bridge) continue;
+    const [a, b] = f.sides;
+    const [ax, ay] = SIDE_MID[a];
+    const [bx, by] = SIDE_MID[b];
+    ctx.save();
+    ctx.lineCap = 'butt';
+    // The cast shadow, offset toward the ground.
+    ctx.strokeStyle = 'rgba(13,11,17,0.30)';
+    ctx.lineWidth = 0.20;
+    ctx.beginPath(); ctx.moveTo(ax + 0.03, ay + 0.045); ctx.lineTo(bx + 0.03, by + 0.045); ctx.stroke();
+    // The deck.
+    ctx.strokeStyle = THEME.city;
+    ctx.lineWidth = 0.19;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.strokeStyle = THEME.roadCore;
+    ctx.lineWidth = 0.10;
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    // Parapets either side.
+    const nx = (by - ay), ny = -(bx - ax);
+    const len = Math.hypot(nx, ny) || 1;
+    const px = nx / len * 0.085, py = ny / len * 0.085;
+    ctx.strokeStyle = THEME.cityWall;
+    ctx.lineWidth = 0.035;
+    ctx.beginPath(); ctx.moveTo(ax + px, ay + py); ctx.lineTo(bx + px, by + py); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ax - px, ay - py); ctx.lineTo(bx - px, by - py); ctx.stroke();
+    ctx.restore();
+  }
 
   // A swinging tile made of CITY can't show a gap the way a road vane can —
   // city art merges into one silhouette — so the sides it ISN'T joined to get a

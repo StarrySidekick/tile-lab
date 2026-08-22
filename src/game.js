@@ -18,7 +18,7 @@
 
 import { Board } from './board.js';
 import {
-  TILES, GROUPS, BACKS, ABBEY_TILE, NO_MEEPLE, MARKS,
+  TILES, GROUPS, BACKS, ABBEY_TILE, NO_MEEPLE, MARKS, bridgedType,
   buildDeck, buildRiverDeck, opposite, SIDE_STEP,
   RIVER_MOUTH, RIVER_SPRING,
 } from './tiles.js';
@@ -106,6 +106,7 @@ export class Game {
       barns: this.has('barn') ? 1 : 0,
       floors: this.has('tower') ? [0, 10, 10, 9, 7, 6][players] || 6 : 0,
       wonders: 0,
+      bridges: this.has('bridge') ? 3 : 0,
       goods: { wine: 0, grain: 0, cloth: 0 },
     }));
 
@@ -855,6 +856,69 @@ export class Game {
   set useBig(v) {
     if (v) this.useKind = 'big';
     else if (this.useKind === 'big') this.useKind = null;
+  }
+
+  // --- bridges -----------------------------------------------------------------
+
+  /**
+   * Where a bridge could stand: the tile just laid or one of its four
+   * neighbours, spanning N–S or E–W. Both spanned edges must be open country
+   * on the tile itself (a bridge stands on the field, never on a wall), and a
+   * neighbour across either end has to be something a road can meet.
+   */
+  bridgeSpots() {
+    if (!this.has('bridge') || this.phase !== 'meeple' || !this.lastPlaced) return [];
+    if (this.player.bridges <= 0) return [];
+    const out = [];
+    const { x, y } = this.lastPlaced;
+    const cells = [this.board.get(x, y)];
+    for (let sdir = 0; sdir < 4; sdir++) cells.push(this.board.neighbor(x, y, sdir));
+    for (const cell of cells) {
+      if (!cell || cell.type.bridged) continue;
+      for (const axis of [[0, 2], [1, 3]]) {
+        if (!axis.every((w) => this.board.edgeAt(cell, w) === 'f')) continue;
+        let joins = 0, blocked = false;
+        for (const w of axis) {
+          const nb = this.board.neighbor(cell.x, cell.y, w);
+          if (!nb) continue;
+          const theirs = this.board.edgeAt(nb, (w + 2) % 4);
+          if (theirs === 'r') joins++;
+          else if (theirs !== '*' && theirs !== '~') blocked = true;
+        }
+        if (blocked) continue;
+        out.push({ cell, axis, joins });
+      }
+    }
+    return out.sort((a, b) => b.joins - a.joins);
+  }
+
+  canBuildBridge() { return this.bridgeSpots().length > 0; }
+
+  /**
+   * Raise the bridge. The cell keeps its identity — the bridge is a derived
+   * copy of its tile with one elevated road appended after everything else,
+   * so nothing standing on the tile moves and the field underneath is never
+   * divided. `replace` rebuilds connectivity, which is what joins the new
+   * road to whatever its two ends meet.
+   */
+  buildBridge(at = null) {
+    const spots = this.bridgeSpots();
+    const spot = at
+      ? spots.find((o) => o.cell.x === at.x && o.cell.y === at.y)
+      : spots[0];
+    if (!spot) return false;
+    const { cell, axis } = spot;
+    const canon = axis.map((w) => (w - cell.rot + 4) % 4);
+    this.player.bridges--;
+    this.board.replace(cell.x, cell.y, bridgedType(cell.type, canon));
+    this.say(`${this.player.name} throws a bridge ${axis[0] === 0 ? 'north to south' : 'east to west'} across (${cell.x}, ${cell.y}).`);
+    this.emit('place', { cells: [cell] });
+    // The bridge can close the road it just completed, there and then.
+    for (const d of this.board.completedBy(cell.x, cell.y)) {
+      this.noteClosure(d, this.current);
+      this.m.onClosed(d, this.current);
+    }
+    return true;
   }
 
   // --- the big top -------------------------------------------------------------
