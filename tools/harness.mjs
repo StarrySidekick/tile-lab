@@ -776,6 +776,22 @@ function checkGirando() {
     }
   }
 
+  // A temple pays NOTHING for a tile arriving beside it. It used to take an
+  // offering per arrival, which was the one income in the mode that came in
+  // without anything closing; red is now its only source.
+  {
+    const h = fresh(30);
+    const b = h.board;
+    lay(b, 0, 0, 'Kt');
+    b.addMeeple(0, 0, 0, 0);
+    b.rebuild();
+    h.m.afterPlace(lay(b, 1, 0, 'Kz'));       // a tile laid in the parish
+    h.m.weather([{ dir: 3, from: { x: 4, y: 0 } }], 1);   // …and one blown through it
+    if (h.players[0].score !== 0) {
+      return fail('a temple takes no offering for an arriving tile', `paid ${h.players[0].score}`);
+    }
+  }
+
   // RED — the temples, a point for every tile standing around one.
   {
     const h = fresh(31);

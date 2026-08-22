@@ -54,11 +54,11 @@
 // while I am still standing in it" — and finishing a city is not a payday, it
 // is a rate change on every blue sphere still to come.
 //
-// Two things still pay outside the spheres, both small and both deliberate. A
-// TEMPLE takes an offering for every tile that arrives in its parish — 1 for
-// one a player laid, 2 for one the wind blew in. And a WINDMILL pays 2 to
-// whoever lays the tile that closes its city, which is the one guaranteed
-// point on the board.
+// Two things still pay outside the spheres, both attached to a BUILDING rather
+// than to a feature, and both deliberately small: a WINDMILL pays 2 to whoever
+// lays the tile that closes its city, and 1 to whoever holds that city for
+// every gust that runs through it. Everything else — every farm, every city,
+// every temple, every road — waits for a sphere.
 //
 // AN ISLAND pays exactly DOUBLE, all of it — and at the end a flat 10 goes to
 // whoever has a follower standing on more separate islands than anybody else.
@@ -85,6 +85,12 @@
 // THE WINDVANE has four ways in and only two of them joined, and the wind picks
 // which two. Straight roads do the same thing, quietly: a road hit side-on
 // swings to lie along the wind.
+//
+// A TEMPLE is a monastery with no cloister left in it, and it is the one thing
+// on the board whose value is its NEIGHBOURS: red pays its keeper a point for
+// every tile standing in the eight squares around it, so a temple laid early
+// and garrisoned is worth more every time somebody builds near it — and worth
+// something to your rival every time you do.
 //
 // THE ABBAZIA takes any edge and CAPS everything it touches: a road running
 // into one ends there, a city walls itself off against it, and both can finish
@@ -128,9 +134,14 @@ const DECK_SIZE = 88;
  * one sits a third above the deck.
  */
 const STORM_LIMIT = 96;
-const TEMPLE_LAID = 1;       // to its keeper, per tile placed in the ring
-const TEMPLE_BLOWN = 2;      // …and per tile the wind puts there
 const TURBINE = 1;           // to the city's holder, per gust through it
+/**
+ * Roughly how many more times one sfera colour will fire, from the middle of a
+ * game — eight spheres, two halves each, four colours. It is only ever used to
+ * price a claim for the computer player, and only the ratio between the four
+ * matters, but the absolute size decides how eagerly it spends followers.
+ */
+const SPHERES_AHEAD = 2;
 const WINDMILL = 2;          // …and per windmill, to whoever closes its city
 const ROAD_LINK = 2;         // to the holder of every city or temple a road reaches
 const MAX_CHAIN = 6;         // storms raised while a storm is still landing
@@ -198,10 +209,8 @@ const listTally = (things, label = (t) => t) =>
  */
 const SWAPS = { W: 'Gw', L: 'Gl', A: 'Kta', B: 'Kt', C: 'E' };
 
-/** The eight squares around a tile — a temple's parish. */
+/** The eight squares around a tile — a temple's parish, and what red counts. */
 const RING = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
-const inRing = (a, b) => a && b && Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1
-  && !(a.x === b.x && a.y === b.y);
 
 const isPalazzo = (cell) => cell?.type.id === 'Kpz';
 const hasPalazzo = (cells) => cells.some(isPalazzo);
@@ -262,7 +271,6 @@ export class Girando extends Mode {
     this.queued = [];
     this.caught = false;       // a tile fell into our hands this turn
     this.balenaMoved = false;  // …and the whale has already swum this turn
-    this.paidRing = new Set(); // "temple|tile" pairs already paid this turn
     // The whale starts asleep over the seat of government. Nothing else is on
     // the board yet for it to lie on, and the first player who wants the
     // Palazzo blowable has only to move it.
@@ -338,7 +346,6 @@ export class Girando extends Mode {
   afterPlace(cell) {
     cell.round = this.game.round;
     this.laid++;
-    this.payTemples([{ cell, from: null }], TEMPLE_LAID);
     const dirs = zephyrDirs(cell);
     if (dirs.length) {
       this.game.say(dirs.length > 1
@@ -357,7 +364,6 @@ export class Girando extends Mode {
   endTurn() {
     this.flight = null;
     this.lifted = null;
-    this.paidRing.clear();
     this.caught = false;
     this.balenaMoved = false;
     if (this.laid >= STORM_LIMIT) {
@@ -366,44 +372,34 @@ export class Girando extends Mode {
     }
   }
 
-  // --- temples --------------------------------------------------------------
-
   /**
-   * A temple is worth exactly what happens next to it. Every tile that arrives
-   * in its eight squares pays whoever is standing in it — one for a tile a
-   * player laid there, two for one the wind put there.
-   *
-   * Paid at most once per temple per tile per turn. Without that, two zephyrs
-   * pointed at each other could walk the same tile in and out of the same
-   * parish all turn and print money doing it.
-   */
-  payTemples(arrivals, rate) {
-    const g = this.game;
-    for (const { cell, from } of arrivals) {
-      if (!cell || g.board.get(cell.x, cell.y) !== cell) continue;
-      for (const [dx, dy] of RING) {
-        const temple = g.board.get(cell.x + dx, cell.y + dy);
-        if (!temple || !isTemple(temple) || !temple.meeple) continue;
-        if (from && inRing(from, temple)) continue;     // it was already in the parish
-        const k = `${temple.x},${temple.y}|${cell.seq}`;
-        if (this.paidRing.has(k)) continue;
-        this.paidRing.add(k);
-        this.pay(temple.meeple.player, rate,
-          `${g.players[temple.meeple.player].name}'s temple at (${temple.x}, ${temple.y}) takes an offering`,
-          [{ x: temple.x, y: temple.y }, { x: cell.x, y: cell.y }]);
-      }
-    }
-  }
-
-  /**
-   * A temple pays nothing when it closes; it pays all the way there. Nothing
-   * in the engine scores one, so this exists purely to tell anyone pricing the
-   * board — the computer player, mostly — what standing in it is worth.
+   * What a feature is worth to a computer player. Everything in Girando is
+   * paid by the sferas, over the whole board, several times a game — so the
+   * price of standing in something is what its colour pays TIMES the number of
+   * times that colour is still likely to fire. Without this the bot reads the
+   * board's ordinary Carcassonne values, which price a field at nothing at all
+   * and a temple at nothing at all, and those are two of the four things
+   * actually worth holding here.
    */
   valueOf(d) {
-    if (d.type !== 'temple') return null;
-    const left = 8 - this.game.board.surroundCount(d.at.x, d.at.y);
-    return Math.round(left * (TEMPLE_LAID + TEMPLE_BLOWN) / 2);
+    const board = this.game.board;
+    const cells = d.type === 'temple'
+      ? [board.get(d.at.x, d.at.y)].filter(Boolean) : board.cellsOf(d);
+    if (!cells.length) return null;
+    const isle = this.onIsland(cells[0]);
+    const per = (kind) => (isle ? RATE[kind].isle : RATE[kind].main);
+    switch (d.type) {
+      case 'field':
+        return Math.floor(d.tiles.size / RATE.farm.per) * per('farm') * SPHERES_AHEAD;
+      case 'city':
+        return d.tiles.size * per(d.open === 0 ? 'cityDone' : 'cityOpen') * SPHERES_AHEAD;
+      case 'road':
+        return d.tiles.size * per('road') * SPHERES_AHEAD;
+      case 'temple':
+        return board.surroundCount(d.at.x, d.at.y) * per('temple') * SPHERES_AHEAD;
+      default:
+        return null;
+    }
   }
 
   // --- turbines -------------------------------------------------------------
@@ -900,11 +896,6 @@ export class Girando extends Mode {
       g.say(`${r.swung.length} road${r.swung.length > 1 ? 's swing' : ' swings'} onto the wind.`);
     }
 
-    // Tiles the wind has just parked next to a temple pay double. A tile that
-    // was already in the parish and only shuffled along inside it doesn't:
-    // arriving is the thing that's worth something.
-    this.payTemples(r.moved, TEMPLE_BLOWN);
-
     // …and if the seat of government itself has just been shoved, the whole
     // archipelago is towed along behind it.
     if (r.moved.some((m) => isPalazzo(m.cell))) this.driftIslands(r.dir);
@@ -1032,14 +1023,14 @@ export class Girando extends Mode {
   }
 
   /**
-   * A temple's arrival income stops when the parish is full: eight tiles have
-   * come, eight offerings have been paid, and there is nowhere for a ninth to
-   * arrive from. The keeper STAYS — every figure in Girando stays where it is
-   * put — and goes on being paid by every red sphere that closes.
+   * A temple with all eight squares around it filled is a temple at its
+   * ceiling: red pays a point a tile of the parish, and eight is as many tiles
+   * as a parish holds. The keeper STAYS — every figure in Girando stays where
+   * it is put — and goes on being paid by every red sphere that closes.
    */
   templeCloses(d) {
-    this.game.say(`The temple at (${d.at.x}, ${d.at.y}) is enclosed — no more offerings, `
-      + 'but its keeper keeps the parish.');
+    this.game.say(`The temple at (${d.at.x}, ${d.at.y}) is enclosed — a full parish, `
+      + 'and as much as red will ever pay for it.');
     this.game.emit('landmark');
   }
 
@@ -1120,7 +1111,7 @@ export class Girando extends Mode {
   botPlaceBonus(cells, player) {
     let value = 0;
     for (const cell of cells) {
-      value += this.templeValue(cell, player, TEMPLE_LAID);
+      value += this.templeValue(cell, player);
       // Closing a sphere is not a bonus in this mode, it is the scoring round:
       // everything the two colours count pays out over the whole board, to
       // whoever is standing in it. Priced as what it would pay US minus what
@@ -1162,14 +1153,24 @@ export class Girando extends Mode {
     return mine - best;
   }
 
-  /** Laying next to somebody's temple pays them, not you. */
-  templeValue(cell, player, rate) {
+  /**
+   * Filling a square in somebody's parish. Red pays a temple's keeper a point
+   * for every tile standing around it, so every square of the eight you fill
+   * in is worth a point to them on every red sphere still to come — which
+   * means building beside a rival's temple is a gift, and beside your own is
+   * an annuity.
+   */
+  templeValue(cell, player, weight = 1) {
+    const board = this.game.board;
     let value = 0;
     for (const [dx, dy] of RING) {
-      const t = this.game.board.get(cell.x + dx, cell.y + dy);
+      const t = board.get(cell.x + dx, cell.y + dy);
       if (!t || !isTemple(t)) continue;
-      if (t.meeple) value += t.meeple.player === player ? rate : -rate;
-      else value += 0.25 * (8 - this.game.board.surroundCount(t.x, t.y));
+      const per = (this.onIsland(t) ? RATE.temple.isle : RATE.temple.main) * SPHERES_AHEAD;
+      if (t.meeple) value += (t.meeple.player === player ? per : -per) * weight;
+      // An empty temple you could stand in yourself is a parish waiting for a
+      // keeper, and worth rather more than one square of somebody else's.
+      else value += 0.3 * per * weight;
     }
     return value;
   }
@@ -1268,7 +1269,7 @@ export class Girando extends Mode {
         value += other.meeple.player === player ? -worse : worse * 0.7;
       }
       value += this.templeValue(
-        { x: other.x + dx * strength, y: other.y + dy * strength }, player, TEMPLE_BLOWN * 0.6);
+        { x: other.x + dx * strength, y: other.y + dy * strength }, player, 0.6);
       if (zephyrDirs(other).includes(dir)) strength = Math.min(MAX_STRENGTH, strength + 1);
     }
     return value;

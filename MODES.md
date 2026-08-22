@@ -240,9 +240,13 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 >
 > **The deck had to grow.** The cloud pool is 65 tiles now, and cut to 72 that left seven base tiles — a board with nothing on it for three of the four colours to count. 88, which gives about twenty-one ordinary cities, roads and fields.
 >
-> **Where it landed, and the one number to argue about.** Thirty sharp-bot games, two players, per game: green 309, blue 245, red 218, yellow 168, temple offerings 70, turbine gusts 9.5, archipelago 10.7, windmills 5.2. Scores 86–401, mean 222, about 8 spheres a game.
+> **And then the temple's offering went too.** It was the last income that arrived without a sphere — a point for every tile laid in the parish, two for every one the wind blew in — and it had been the biggest single stream in the mode for four passes running. Red is now a temple's only source, which changes what a temple IS rather than just what it earns: red pays a point per tile of the parish, so a temple is the one thing on the board whose value is its neighbours. Laying beside your own is an annuity; laying beside a rival's is a gift. The offering said the same thing in a much worse voice, because it paid at the moment of arrival and could be farmed by two facing zephyrs walking the same tile in and out.
 >
-> The four-way split across the colours is remarkably even, which is the thing worth having — no colour is a trap and none is the obvious pick. What is startling is the magnitude: scores went up roughly tenfold, because a scoring pass over the whole board fired sixteen times a game pays for everything you hold every single time. That is exactly what the rules say and it may well be the point — but if the numbers want to be Carcassonne-sized rather than pinball-sized, the knob is the rates themselves, not the structure. Halving every rate would leave the split untouched.
+> Taking it out also forced the computer player to be told what things are worth, which was overdue. It had been reading the board's ordinary Carcassonne values — which price a field at nothing and a temple at nothing, two of the four things actually worth holding here — so it is now given each feature's own colour rate times how many times that colour is still likely to fire.
+>
+> **Where it landed.** Thirty sharp-bot games, two players, per game: yellow 369, blue 322, green 279, red 245, windmills 7.1, turbine gusts 6.9, archipelago 9.0. Scores 107–270, mean 186, about 8 spheres a game.
+>
+> The four-way split is even enough that no colour is a trap and none is the obvious pick, which is the thing worth having; yellow leads because a road picks up the cities it reaches as well as its own tiles, so it compounds where the others don't. Scores are still roughly eightfold what they were before the sferas took over the economy, because a pass over the whole board firing sixteen times a game pays for everything you hold every single time. That is what the rules say and it may well be the point — but if the numbers want to be Carcassonne-sized rather than pinball-sized, the knob is the rates themselves, not the structure. Halving every rate leaves the split untouched.
 
 
 **Question it answers:** is a small board you keep *editing* better than a big
@@ -771,7 +775,7 @@ A few things the harness noticed that are worth watching for at the table:
   bot games, where Classic runs 28 and 45. That was the thesis working (nothing
   pays until it closes, and the wind keeps things from closing) but it sat close
   to the edge: if a game can end with everyone on 4, the wind is winning too
-  often. *Several passes later it runs 134 across random play and 174 across bot
+  often. *Several passes later it runs 131 across random play and 172 across bot
   games*, and the question has inverted twice over — see the Girando entry above
   for where the points come from now. The gap between the two numbers is the
   thing worth watching, and it has narrowed: the sfera passes pay for everything
