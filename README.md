@@ -77,7 +77,7 @@ that has ever stopped one is the whale lying on top of it.
 | **Windmill** | The turbine built into a city wall. Every gust through it pays **1** to whoever holds that city, and every windmill standing in a city that **finishes** pays **2** to whoever laid the last tile — and no wind ever takes that back. It is the one durable point in the mode |
 | **Road** | Nobody's. You don't claim one; you finish it, for **1 a tile**. What makes a road worth building is what it *arrives* at: every city or temple it runs into pays **2** to whoever holds that city or temple, which is as often as not the player across the table. Roads are the mode's diplomacy |
 | **Farm** | Harvested when a sphere closes, to whoever has the most farmers lying in the field — and the farmers then **walk home**, which no other figure in the mode ever does. What the harvest *counts* is the colour of the sphere |
-| **Sfera** | Fifteen of them, each half a sphere on one edge, and that edge meets nothing but another sfera's **of its own colour**. Joining two is the whole trigger for the harvest: it scores **the field the sfera itself is lying in**, once, there and then, and does nothing else. **Green** pays 1 a tile of farmland, **blue** 2 a finished city the field feeds, **red** 2 a temple standing on it — so which sfera you are holding decides which field is worth planting. Five halves a colour, so one of each is always left over |
+| **Sfera** | Fifteen of them, each half a sphere on one edge, and that edge meets nothing but another sfera's — but **any** half fits **any** other, whatever colour it is. Joining two is the whole trigger for the harvest: it scores **the field the sfera itself is lying in**, once, there and then, and does nothing else. **Green** pays 1 a tile of farmland, **blue** 2 a finished city the field feeds, **red** 2 a temple standing on it — and **both halves fire**. Two greens double the ground; a green against a blue takes a smaller field and the cities on it. The pairing is the decision, and a colour you have no partner for is still worth playing against whatever you can reach |
 | **Temple** | A monastery with no cloisters left in the sky — every one is a temple. Claim it and it pays by the tile: **1** every time somebody *lays* a tile in the eight squares around it, **2** every time the wind *blows* one in. Capped at one payment per temple per tile per turn, or two facing zephyrs print money walking the same tile in and out of the parish |
 | **The Palazzo** | The seat of the kingdom, and what "mainland" *means*. Whichever piece of country it stands on is the kingdom; every other group of **two or more** tiles is an **island**. It starts the game and it is as blowable as anything else, so the mainland moves. And when a gust gets hold of the Palazzo itself, **every island slides one square** the way the seat went — which is how you close a gap you were never allowed to build across |
 | **Islands** | Pay more of everything: roads **2** a tile, cities **3**, farms **double**. The catch is that you may not *build* onto one and you may not walk a follower onto one — a tile only goes down where it touches the mainland. Islands are made, not chosen: you were standing there when the country came apart, or you blew a tile across the gap, or you flew somebody out. At the end of the game a flat **10** goes to whoever has a follower standing on more separate islands than anybody else |
@@ -88,10 +88,10 @@ that has ever stopped one is the whale lying on top of it.
 
 **The end of the season** is Carcassonne's endgame bent to a board that never
 settled. The islands are counted off the board exactly as play left it. Every
-farm still being worked is harvested once more — taking its colour from any
-sfera lying in that field, and falling back to **blue** where there is none, so
-the half-sphere you never managed to pair still tells the harvest what to look
-for. And a city that **never finished at all** pays **1 a tile** to whoever is
+farm still being worked is harvested once more — with every **unpaired** half
+lying in that field firing as though you had found it a partner, and **blue**
+where there is none. The sfera you could never place against another is not a
+wasted tile; it is a standing instruction about the ground it is lying on. And a city that **never finished at all** pays **1 a tile** to whoever is
 standing in it, while one that finished and was blown open pays nothing more:
 it was paid in full and it gave a point a tile back, and that is the whole of
 its account.

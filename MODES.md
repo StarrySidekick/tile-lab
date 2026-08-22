@@ -213,11 +213,17 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 >
 > - **The city clawback drops from the full payment to a point a tile.** The eighth pass measured 84% of everything cities paid getting taken straight back, leaving a city worth about 3 points net over a whole game for a follower you never get back. The rule is now: 2 a tile the FIRST time it closes, and 1 a tile up and down forever after as the weather opens and shuts it. So a city you finish and then lose is still ahead, and what the wind takes is the difference between holding it and having held it. The ledger had to go per-TILE to say that — a city is not a stable object here, the wind splits one into two and shoves two into one, and only the tiles carry anything through it. A tile that has been in a finished city before is worth 1; one that never has is worth the full rate, so a fresh wing built onto an old city pays properly for the new ground and nothing twice for the old. It also fixed the split case the whole-payment version got wrong for free: each piece of a shattered city is charged for its own tiles, and the piece that sailed off the edge of the world is charged as it falls.
 > - **An endgame, at last.** Carcassonne's, bent to a board that never settled. Islands are counted off the board exactly as play left it — before the harvest, because a farmer that walks home during the tidying-up was standing on that island when the wind dropped. Every farm still being worked is harvested once more. And a city that never finished at all pays 1 a tile, while one that finished and was blown open pays nothing more: it was paid in full, it gave a point a tile back, and that is the whole of its account. The per-tile ledger is what tells those two apart, which is the second thing it bought.
-> - **Three sferas.** Green, blue and red, and the colour decides what the harvest COUNTS on the field the sphere is lying in: green 1 a tile of farmland, blue 2 a finished city the field feeds, red 2 a temple standing on it. That turns the sfera from a trigger into a decision — the green half in your hand wants a big empty field, the blue one wants to be beside your own building, the red one wants the parish you were already garrisoning. A colour only ever meets its own colour, which costs nothing to implement and is worth writing down: edge matching is the whole of the board's join rule, so three edge letters (o/p/q) is the entire mechanism and nothing downstream needs to know sferas have colours at all. Five shapes in each colour, one of each — so a colour is five halves and two spheres with one left over, and the odd half is the point, because at the endgame a field takes its harvest colour from whatever sfera is lying in it. The half you never managed to pair still tells the last harvest what to look for.
+> - **Three sferas, and ANY half fits any other.** Green, blue and red, and the colour decides what the harvest COUNTS on the field the sphere is lying in: green 1 a tile of farmland, blue 2 a finished city the field feeds, red 2 a temple standing on it. BOTH halves of a closed sphere fire, which is the rule that makes the whole thing a decision rather than a lottery — two greens double the ground, a green against a blue takes a smaller field and the cities on it, and a colour you have no partner for is still worth playing against whatever you can reach. The green half in your hand wants a big empty field, the blue one wants to be beside your own building, the red one wants the parish you were already garrisoning; what you can actually pair it with decides which of those you get.
 >
-> **Where that landed.** Thirty sharp-bot games, two players, per game: temple 60.4, farm 38.9, city 23.1 net (19.5 paid, −8.9 clawed back, 5.8 for cities that never closed, 6.7 windmills), road 20.7 including 3.7 of tolls, turbine gusts 9.0, archipelago 10.3. Scores 19–182, mean 81.2, 6.3 spheres a game — colour-matching did not make spheres rarer, which was the risk.
+>   Built first the other way — a colour only meeting its own colour, three edge letters and the sphere unambiguously one thing. It was tidier and it was worse: it made the sfera in your hand a tile you either found the right partner for or did not, with no play in between. Letting the halves mix is one line fewer and turns every pairing into a small design problem.
 >
-> Cities went from 3 points net a game to 23, which is the change working. The farm went from 15.9 to 38.9, most of it from the endgame harvest rather than the colours. The temple is still the largest single stream at 37% of the total, down from 43% but still the thing most worth pointing a knob at next: it is the only income in the mode that arrives without anything closing.
+>   Five shapes in each colour, one of each. The halves that never pair are not waste: at the endgame every unpaired half lying in a field fires as though it had found a partner, so a sfera you could not place against another is a standing instruction about the ground it is lying on.
+>
+> **Where that landed.** Thirty sharp-bot games, two players, per game: farm 57.4, temple 52.8, city 24.4 net (19.5 paid, −8.5 clawed back, 6.7 for cities that never closed, 6.7 windmills), road 20.3 including 3.6 of tolls, archipelago 11.7, turbine gusts 8.3. Scores 21–203, mean 87.4, 8.0 spheres a game and 2.3 halves left unpaired on the board.
+>
+> Cities went from 3 points net a game to 24, which is the clawback change working. The farm went from 15.9 to 57.4 and is now the largest single stream — but only just, with the temple at 52.8 behind it, and the two of them are 63% of the game between them rather than one of them being 43% on its own. That is a better shape than it was. Of the farm's 57, only 5.8 comes from the endgame harvest: it is an economy you work during the game, not a lump at the end.
+>
+> The temple is still the thing most worth pointing a knob at next. It is the only income in the mode that arrives without anything closing.
 
 
 **Question it answers:** is a small board you keep *editing* better than a big
@@ -746,12 +752,13 @@ A few things the harness noticed that are worth watching for at the table:
   bot games, where Classic runs 28 and 45. That was the thesis working (nothing
   pays until it closes, and the wind keeps things from closing) but it sat close
   to the edge: if a game can end with everyone on 4, the wind is winning too
-  often. *Several passes later it runs 33 across random play and 63 across bot
+  often. *Several passes later it runs 42 across random play and 69 across bot
   games*, and the question has inverted twice over — see the Girando entry above
   for where the points come from now. The gap between the two numbers is the
   thing worth watching: it is a mode where knowing what you are doing is worth
-  nearly twice as much as not, a wider gap than Classic's, and it comes from a
-  board that pays you for being somewhere you couldn't have chosen to be.
+  two thirds again as much as not, a wider gap than Classic's, and it comes
+  from a board that pays you for being somewhere you couldn't have chosen to
+  be.
 - **Marches** is capped at twelve rounds because uncapped income compounds into
   meaningless numbers. If the campaign feels short, raise the cap before you
   touch the scoring — the round count is the tuning knob, not the points.
