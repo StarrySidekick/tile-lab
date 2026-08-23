@@ -270,6 +270,37 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > Two trained bots at full depth run a mean of 196 a game with a highest single score of 382, and 499 was seen during training. The lopsidedness — 317 from farms against 26 from roads — is the balance finding: the four colours are near-even when nobody is trying, and a long way from even once somebody is.
 
 
+> **Twelfth pass: put the followers back in the box, and give roads somewhere to go.**
+>
+> The eleventh pass measured the mode and the measurement said two things. Roads were claimed 1.9 times a game against fields held 44 tiles deep, and the trained bot took 317 points a game out of green and 26 out of yellow. Both numbers have the same cause and it is not the rates: a gust cuts a road in half and the two halves can never rejoin, because the seam that used to be a road is now a road facing empty sky and the board will not weld a mismatched edge. Fields reconnect freely — ground is ground. So the mode paid roads by exactly the quantity the weather was built to destroy, and the bot noticed long before I did.
+>
+> **The sky bridge is the fix, and it is a scoring rule rather than a terrain rule.** A road that runs off one tile, across one empty square, and straight on out of the tile beyond is one road: it scores as one and a follower may walk across it. The gap stays open air — the wind neither notices the bridge nor stops at it, and a tile can be blown clean through where it stands. That separation is the whole of why it works. Making the gap into ground would have given the wind a new kind of obstacle to reason about and turned every cut road into a permanent structure; making it a *fact about connectivity* costs the weather nothing. It lives in `Board.bridgeRoads()`, which unions the two road parts and takes 2 off the pair's open count, and it runs from `place()` as well as `rebuild()` — the incremental path links without rebuilding, so a freshly built board had no bridges at all until it did.
+>
+> **And followers come home again — but only off something finished.** The eighth pass made them permanent, on the argument that a feature which scores over and over needs a standing record of whose it is. That argument is right and the consequence was still wrong: a figure put down on turn three collected from every sphere for the rest of the game and never moved, so the mode was a race to claim in the first ten turns and then a long wait. The rule now is the one distinction the mode already had lying around: a sphere paying a **finished** city or road hands its followers back, one paying an unfinished one leaves them standing. Eight each instead of nine. Finishing something is still not a payday — it never pays a point — but it is now how you get your people back, which is a second reason to close things in a mode that had removed the first one.
+>
+> Two figures are exempt because the rule cannot reach them. A **farmer** stands in a field and a field is never finished. And one **lying flat** is a follower you have retired into its city on purpose: it never comes home, and the city it holds pays the lower rate — a point a tile, finished or not — for as long as it is the only thing holding it. That is a real bargain rather than a bonus. It is the answer to "I want to keep this one" in a mode where keeping anything now costs you the piece, and it costs you the piece.
+>
+> **The walk** is the other half of the same idea. A follower whose feature just finished may go out along a road connected to where it stood instead of coming home — as far as the road runs, hopping the bridges, until it reaches something. A dead end is the road itself, claimed. A city stops it on the first tile it enters. You may not walk into an occupied feature or down a road somebody else is standing on. It is Carcassonne's wagon with the mode's own geometry underneath it, and it does two jobs at once: it is the only way a figure moves anywhere under its own steam, and it is the only thing in the mode that makes a road worth *building through* rather than merely worth holding.
+>
+> The rest of the pass is tightening:
+>
+> - **Farms pay the majority only**, and a field somebody else is already farming is closed to you. Ties split it. A field that pays everyone standing in it is a field nobody has to contest, and green was the biggest income in the game.
+> - **No second figure into something you already hold.** It had never been a rule and it should always have been one.
+> - **Straight roads no longer swing onto the wind.** The windvane does, and it is now the only tile the weather re-cuts. A road you built should stay where you built it; the vane is the exception you can see coming, because it is drawn as one.
+> - **The windmill pays the feature's owner**, not whoever laid the closing tile, and it stands on roads as well as in cities: 2 for every gust through it and 2 more when the feature closes. A mill is a thing you own, not a race you win.
+> - **A held city the wind blows open again costs a point a tile.** Nothing was paid for finishing it, so this is not a clawback; it is the price of having been the one standing in it when the weather arrived.
+> - **The Abbazia finishes what it caps**, rather than only capping it — and that turned out to be a genuine ordering bug rather than a rule change. `link()` decided whether to apply a cap by asking whether the neighbour was already in the union-find, using an id of `"x,y#null"` for the featureless Abbazia itself, so an Abbazia laid *before* the road it capped never capped it and that road could never close. It now tracks the cells it has wired.
+> - **Four of every sfera, not five**, and the endgame fires the four colours once — a sphere you close on the last turn is not a fifth pass.
+> - **You may build onto an island you are standing on.** Being blown out there was meant to be an opportunity rather than a sentence.
+>
+>
+> **Where it landed, and it landed on the thing it was aimed at.** A fresh sensitivity sweep — one weight at a time, halved and doubled, 80 games each — says **`road` doubled wins 63%**, the strongest single move on the board, against a weight the eleventh pass had trained *down* to 0.55 because roads were not worth holding. Composed with the other two the sweep liked (`farm` doubled again, `gust` doubled), the set beats the shipped one in **57.1% of 120 games at a mean margin of 12**. Its income, per game: green 306, red 80, **yellow 75**, blue 16. Yellow has gone from 26 to 75 and it is now the second real stream rather than the thing nobody claimed.
+>
+> Blue collapsing from 118 to 16 is the follower rule showing its teeth, and it is worth being honest about: a city only pays double once it is finished, and finishing it now takes your follower off it, so the bot mostly stops holding cities and lets the walk carry the figure somewhere else. That may be too sharp. The knob is `cityDone`, not the return rule — but it is the number to watch at a real table.
+>
+> Scores roughly halved, 196 a game to 105, which is what the brake was for. Random play runs 41 and bot play 91 against 131/172 before the pass. The gap between the two has *widened*, which is the good direction: more of the score is now arriving because somebody meant it.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 
@@ -796,14 +827,14 @@ A few things the harness noticed that are worth watching for at the table:
   bot games, where Classic runs 28 and 45. That was the thesis working (nothing
   pays until it closes, and the wind keeps things from closing) but it sat close
   to the edge: if a game can end with everyone on 4, the wind is winning too
-  often. *Several passes later it runs 131 across random play and 172 across bot
-  games*, and the question has inverted twice over — see the Girando entry above
-  for where the points come from now. The gap between the two numbers is the
-  thing worth watching, and it has narrowed: the sfera passes pay for everything
-  on the board every time one fires, so a lot of a random player's score is
-  arriving whether they meant it or not. That is the cost of making the
-  spheres the whole economy, and it is the number to watch if the rates ever
-  get tuned.
+  often. *Several passes later it ran 131 across random play and 172 across bot
+  games*, and the question had inverted twice over. The twelfth pass put the
+  followers back in the box — they come home off anything finished — and it
+  runs **41 across random play and 91 across bot games** now. The gap between
+  the two numbers is the thing worth watching, and taking it from 1.3× to 2.2×
+  is the whole point of that rule: the sfera passes pay for everything on the
+  board every time one fires, so a lot of a random player's score used to
+  arrive whether they meant it or not.
 - **Marches** is capped at twelve rounds because uncapped income compounds into
   meaningless numbers. If the campaign feels short, raise the cap before you
   touch the scoring — the round count is the tuning knob, not the points.

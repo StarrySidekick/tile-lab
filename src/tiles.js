@@ -241,10 +241,10 @@ export const TILE_TYPES = [
   { id: 'R', n: 3, group: 'base', name: 'City 3-sided',            feats: [city([N, E, W])], fields: [[4, 5]] },
   { id: 'S', n: 2, group: 'base', name: 'City 3-sided + road (sh)',feats: [city([N, E, W], true), road([S])], fields: [[4], [5]] },
   { id: 'T', n: 1, group: 'base', name: 'City 3-sided + road',     feats: [city([N, E, W]), road([S])], fields: [[4], [5]] },
-  // A straight road lies along whatever wind is blowing through it: hit side
-  // on, it swings onto the wind's axis. `align` is the quiet half of `swing` —
-  // same behaviour in the weather, none of the vane's art.
-  { id: 'U', n: 8, group: 'base', name: 'Road straight',           feats: [road([N, S])], align: true , fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  // A straight road used to lie along whatever wind blew through it, the quiet
+  // half of the windvane's trick. It doesn't any more: a road you built stays
+  // where you built it, and the VANE is the one tile the weather re-cuts.
+  { id: 'U', n: 8, group: 'base', name: 'Road straight',           feats: [road([N, S])], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
   { id: 'V', n: 9, group: 'base', name: 'Road bend',               feats: [road([W, S])], fields: [[5, 6], [0, 1, 2, 3, 4, 7]] },
   { id: 'W', n: 4, group: 'base', name: 'Road 3-way',              feats: [road([E]), road([S]), road([W])], fields: [[3, 4], [5, 6], [0, 1, 2, 7]] },
   { id: 'X', n: 1, group: 'base', name: 'Road 4-way',              feats: [road([N]), road([E]), road([S]), road([W])], fields: [[1, 2], [3, 4], [5, 6], [0, 7]] },
@@ -355,6 +355,11 @@ export const TILE_TYPES = [
   // something you want it to leave alone.
   { id: 'Ktb', n: 3, group: 'cloud', name: 'Tower turbine',  feats: [city([N])],    marks: [mark('turbine', 0)], fields: [[2, 3, 4, 5, 6, 7]] },
   { id: 'Ktc', n: 2, group: 'cloud', name: 'Turbine corner', feats: [city([N, W])], marks: [mark('turbine', 0)], fields: [[2, 3, 4, 5]] },
+  // …and on a road, which is the same bargain on the other kind of feature: a
+  // mill wants the weather to keep arriving, and a road is the thing the
+  // weather most reliably arrives at.
+  { id: 'Ktr', n: 2, group: 'cloud', name: 'Turbine road',   feats: [road([N, S])], marks: [mark('turbine', 0)], fields: [[1, 2, 3, 4], [0, 5, 6, 7]] },
+  { id: 'Ktw', n: 1, group: 'cloud', name: 'Turbine bend',   feats: [road([W, S])], marks: [mark('turbine', 0)], fields: [[5, 6], [0, 1, 2, 3, 4, 7]] },
 
   // The sfera: one edge is half a sphere and meets nothing but another sfera's.
   // ANY two halves close a sphere, whatever colours they are — and closing one
@@ -372,25 +377,21 @@ export const TILE_TYPES = [
   { id: 'Kso', n: 1, group: 'cloud', name: 'Green sfera',       feats: [sfera(N, 'green')], fields: [[2, 3, 4, 5, 6, 7]] },
   { id: 'Ksr', n: 1, group: 'cloud', name: 'Green sfera road',  feats: [sfera(N, 'green'), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
   { id: 'Ksc', n: 1, group: 'cloud', name: 'Green sfera wall',  feats: [sfera(N, 'green'), city([S])], fields: [[2, 3], [6, 7]] },
-  { id: 'Ksb', n: 1, group: 'cloud', name: 'Green sfera lane',  feats: [sfera(N, 'green'), road([S])], fields: [[2, 3, 4], [5, 6, 7]] },
   { id: 'Ksx', n: 1, group: 'cloud', name: 'Green sfera span',  feats: [sfera(N, 'green'), city([E, W])], fields: [[4, 5]] },
 
   { id: 'Kbo', n: 1, group: 'cloud', name: 'Blue sfera',        feats: [sfera(N, 'blue')], fields: [[2, 3, 4, 5, 6, 7]] },
   { id: 'Kbr', n: 1, group: 'cloud', name: 'Blue sfera road',   feats: [sfera(N, 'blue'), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
   { id: 'Kbc', n: 1, group: 'cloud', name: 'Blue sfera wall',   feats: [sfera(N, 'blue'), city([S])], fields: [[2, 3], [6, 7]] },
-  { id: 'Kbb', n: 1, group: 'cloud', name: 'Blue sfera lane',   feats: [sfera(N, 'blue'), road([S])], fields: [[2, 3, 4], [5, 6, 7]] },
   { id: 'Kbx', n: 1, group: 'cloud', name: 'Blue sfera span',   feats: [sfera(N, 'blue'), city([E, W])], fields: [[4, 5]] },
 
   { id: 'Kro', n: 1, group: 'cloud', name: 'Red sfera',         feats: [sfera(N, 'red')], fields: [[2, 3, 4, 5, 6, 7]] },
   { id: 'Krr', n: 1, group: 'cloud', name: 'Red sfera road',    feats: [sfera(N, 'red'), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
   { id: 'Krc', n: 1, group: 'cloud', name: 'Red sfera wall',    feats: [sfera(N, 'red'), city([S])], fields: [[2, 3], [6, 7]] },
-  { id: 'Krb', n: 1, group: 'cloud', name: 'Red sfera lane',    feats: [sfera(N, 'red'), road([S])], fields: [[2, 3, 4], [5, 6, 7]] },
   { id: 'Krx', n: 1, group: 'cloud', name: 'Red sfera span',    feats: [sfera(N, 'red'), city([E, W])], fields: [[4, 5]] },
 
   { id: 'Kyo', n: 1, group: 'cloud', name: 'Yellow sfera',      feats: [sfera(N, 'yellow')], fields: [[2, 3, 4, 5, 6, 7]] },
   { id: 'Kyr', n: 1, group: 'cloud', name: 'Yellow sfera road', feats: [sfera(N, 'yellow'), road([E, W])], fields: [[2, 7], [3, 4, 5, 6]] },
   { id: 'Kyc', n: 1, group: 'cloud', name: 'Yellow sfera wall', feats: [sfera(N, 'yellow'), city([S])], fields: [[2, 3], [6, 7]] },
-  { id: 'Kyb', n: 1, group: 'cloud', name: 'Yellow sfera lane', feats: [sfera(N, 'yellow'), road([S])], fields: [[2, 3, 4], [5, 6, 7]] },
   { id: 'Kyx', n: 1, group: 'cloud', name: 'Yellow sfera span', feats: [sfera(N, 'yellow'), city([E, W])], fields: [[4, 5]] },
 
   // End caps. A city has to be able to stop somewhere, and in a country that

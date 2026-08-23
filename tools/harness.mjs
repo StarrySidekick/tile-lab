@@ -117,6 +117,22 @@ function step(game, rng) {
       }
       return;
     }
+    // Girando: walking a follower on down a road after the sky has paid it.
+    case 'stroll': {
+      const spots = game.m.stroll?.targets || [];
+      if (!spots.length || rng() < 0.25) return void game.m.skipStroll();
+      const t = pick(spots);
+      if (!game.cellClick(t.x, t.y)) game.m.skipStroll();
+      return;
+    }
+    // …and retiring one into a city it is standing in.
+    case 'flat': {
+      const spots = game.m.flatTargets();
+      if (!spots.length) return void game.m.cancelFlat();
+      const t = pick(spots);
+      if (!game.cellClick(t.x, t.y)) game.m.cancelFlat();
+      return;
+    }
     // Girando's flying machine, fetching a follower back off its own lane.
     case 'flight': {
       const spots = game.m.flightLifts();
@@ -139,6 +155,7 @@ function step(game, rng) {
     case 'meeple': {
       // A mode may offer something INSTEAD of a follower; Girando's whale is
       // the only one, and it never gets exercised unless something picks it.
+      if (game.m.canLieDown?.() && rng() < 0.3) return void game.m.beginFlat();
       if (game.m.canLift?.() && rng() < 0.25) return void game.m.beginLift();
       if (game.m.canSwim?.() && rng() < 0.15) return void game.m.beginSwim();
       if (game.canPlaceBuilding?.() && rng() < 0.5) game.placeBuilding();
@@ -250,7 +267,9 @@ function mulberry(a) {
 function checkBoard() {
   console.log('board primitives');
 
-  // remove() must restore exactly the connectivity a fresh board would have.
+  // remove() must restore exactly the connectivity a fresh board would have —
+  // which now includes the sky bridge over the hole it just made, so the test
+  // is the invariant rather than a number.
   const a = new Board();
   a.place(0, 0, TILES.U, 0);
   a.place(0, -1, TILES.U, 0);
@@ -258,8 +277,32 @@ function checkBoard() {
   const road = a.featureOf(0, 0, 0);
   if (road.tiles.size !== 3) return fail('union of three road tiles', `got ${road.tiles.size}`);
   a.remove(0, -1);
+  const fresh = new Board();
+  fresh.place(0, 0, TILES.U, 0);
+  fresh.place(0, -2, TILES.U, 0);
   const split = a.featureOf(0, 0, 0);
-  if (split.tiles.size !== 1) return fail('remove() splits a component', `got ${split.tiles.size}`);
+  if (split.tiles.size !== fresh.featureOf(0, 0, 0).tiles.size) {
+    return fail('remove() leaves what a fresh board would have',
+      `${split.tiles.size} against ${fresh.featureOf(0, 0, 0).tiles.size}`);
+  }
+
+  // A SKY BRIDGE: one square of open air, straight on, and the road is one
+  // road again. Only straight, and only one square.
+  {
+    const b = new Board();
+    b.place(0, 0, TILES.U, 0);
+    b.place(0, -2, TILES.U, 0);
+    if (b.featureOf(0, 0, 0).tiles.size !== 2) return fail('a road bridges one straight square', 'it did not');
+    if (b.bridges.length !== 1) return fail('the bridge is reported for drawing', `${b.bridges.length}`);
+    const c = new Board();
+    c.place(0, 0, TILES.U, 0);
+    c.place(0, -3, TILES.U, 0);
+    if (c.featureOf(0, 0, 0).tiles.size !== 1) return fail('a road does not bridge two squares', 'it did');
+    const d = new Board();
+    d.place(0, 0, TILES.U, 0);
+    d.place(0, -2, TILES.U, 1);                 // turned across: no longer straight
+    if (d.featureOf(0, 0, 0).tiles.size !== 1) return fail('a bridge has to be straight', 'it bent');
+  }
   if (a.size !== 2) return fail('remove() drops the cell', `size ${a.size}`);
 
   // Stacking: the top tile is what the neighbours see.
@@ -414,15 +457,15 @@ function checkWind() {
     if (!at(b, 0, -1) || !at(b, 0, -2)) return fail('a tile pressed against solid ground stays put', 'something moved');
   }
 
-  // A straight road lies along whatever is blowing through it.
+  // A straight road does NOT swing any more — a road you built stays where you
+  // built it, and the windvane is the one tile the weather re-cuts.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz', 1);                  // blowing east
-    lay(b, 1, 0, 'U');                      // road N-S at rot 0, side on to it
+    const straight = lay(b, 1, 0, 'U');     // road N-S at rot 0, side on to it
     lay(b, 2, 1, 'U');                      // something for it to land beside
     gust(b, { dir: 1, from: { x: 0, y: 0 } });
-    const after = b.get(2, 0) || b.get(1, 0);
-    if (!after || (after.rot & 1) !== 1) return fail('a straight road swings onto the wind', `rot ${after && after.rot}`);
+    if ((straight.rot & 1) !== 0) return fail('a straight road holds its line', `rot ${straight.rot}`);
   }
 
   // …and a tile the wind never touched falls too, if what was holding it up
@@ -752,27 +795,65 @@ function checkGirando() {
     b.addMeeple(0, 0, 0, 1);                  // seat 1 garrisons it
     b.rebuild();
     h.m.settle(0);                            // seat 0 laid the closing tile
-    if (h.players[1].score !== 0) {
-      return fail('finishing a city pays its holder nothing', `paid ${h.players[1].score}`);
+    // The windmill pays the city's HOLDER, not the player who closed it: a mill
+    // is a thing you own, not a race you win.
+    if (h.players[0].score !== 0) {
+      return fail('closing somebody else\'s city pays you nothing', `paid ${h.players[0].score}`);
     }
-    if (h.players[0].score !== 2) {
-      return fail('a windmill pays 2 to whoever closes its city', `paid ${h.players[0].score}`);
+    if (h.players[1].score !== 2) {
+      return fail('a windmill pays 2 to whoever holds its city', `paid ${h.players[1].score}`);
     }
+    h.players[1].score = 0;
     if (!b.get(0, 0).meeple) return fail('a follower stays in the city it finished', 'it went home');
 
     // …and a BLUE sphere is what actually pays it: 2 a tile now that it has
-    // closed, where an open one would have paid 1.
+    // closed — and then it hands the follower back, because a FINISHED feature
+    // that has been paid for is a feature you get your piece out of.
     h.players[1].score = 0;
+    h.players[1].meeples = 4;
     h.m.fire('blue');
     if (h.players[1].score !== 4) {
       return fail('blue pays 2 a tile for a finished city', `paid ${h.players[1].score} for two tiles`);
     }
-    b.remove(0, -1);                          // blown open again
-    h.m.reopen();
-    h.players[1].score = 0;
+    if (b.get(0, 0).meeple) return fail('a finished city hands its follower back', 'it stayed put');
+    if (h.players[1].meeples !== 5) {
+      return fail('the returned follower reaches the supply', `${h.players[1].meeples} in hand`);
+    }
+  }
+
+  // An UNFINISHED city pays 1 a tile and keeps its follower — there is nothing
+  // to collect it for yet.
+  {
+    const h = fresh(41);
+    const b = h.board;
+    lay(b, 0, 0, 'Ktb');                      // a city facing north, open
+    b.addMeeple(0, 0, 0, 0);
+    b.rebuild();
     h.m.fire('blue');
-    if (h.players[1].score !== 1) {
-      return fail('blue pays 1 a tile for an unfinished city', `paid ${h.players[1].score} for one tile`);
+    if (h.players[0].score !== 1) {
+      return fail('blue pays 1 a tile for an unfinished city', `paid ${h.players[0].score}`);
+    }
+    if (!b.get(0, 0).meeple) return fail('an unfinished city keeps its follower', 'it went home');
+  }
+
+  // …and a city you were HOLDING, finished, that the wind blows open again
+  // costs its owner a point a tile.
+  {
+    const h = fresh(42);
+    const b = h.board;
+    lay(b, 0, 0, 'Ktb');                      // city north…
+    lay(b, 0, -1, 'Ca');                      // …carried on north, two tiles
+    lay(b, 0, -2, 'Kab');                     // …and an Abbazia capping it shut
+    b.addMeeple(0, 0, 0, 1);
+    b.rebuild();
+    h.m.settle(0);
+    h.players[1].score = 0;
+    b.shift({ x: 0, y: -2 }, { x: 4, y: -4 });   // the cap blows away
+    b.rebuild();
+    h.m.reopen();
+    if (h.players[1].score !== -2) {
+      return fail('a held city blown open costs a point a tile',
+        `it cost ${-h.players[1].score} for two tiles`);
     }
   }
 
@@ -899,8 +980,9 @@ function checkGirando() {
     }
   }
 
-  // The end of the season fires every colour once, plus once more for each
-  // half-sphere still lying around unpaired.
+  // The end of the season fires every colour once, and nothing else. Unpaired
+  // halves used to fire again here, which made a sfera you could not place
+  // worth keeping — a consolation prize for a whole colour's worth of decision.
   {
     const h = fresh(37);
     const b = h.board;
@@ -919,9 +1001,166 @@ function checkGirando() {
     sb.addMeeple(0, 0, 0, 0);
     sb.rebuild();
     spare.m.lastRound();
-    if (spare.players[0].score <= once) {
-      return fail('an unpaired half fires its colour once more at the end',
-        `paid ${spare.players[0].score}, no better than ${once} without it`);
+    if (spare.players[0].score !== once) {
+      return fail('an unpaired half buys nothing at the end',
+        `it paid ${spare.players[0].score} against ${once} without one`);
+    }
+  }
+
+  // A ROAD BRIDGES a one-square gap for scoring, and a follower may walk
+  // across one. The gap is not ground: the wind neither notices it nor stops
+  // at it, and a tile can be blown straight through where the bridge was.
+  {
+    const h = fresh(43);
+    const b = h.board;
+    lay(b, 0, 0, 'U');
+    lay(b, 0, -2, 'U');
+    b.addMeeple(0, 0, 0, 0);
+    b.rebuild();
+    const road = b.featureOf(0, 0, 0);
+    if (road.tiles.size !== 2) return fail('a bridged road scores as one road', `${road.tiles.size} tiles`);
+    h.m.fire('yellow');
+    if (h.players[0].score !== 2) {
+      return fail('yellow pays a bridged road for both halves', `paid ${h.players[0].score}`);
+    }
+  }
+
+  // …and a windmill on a finished ROAD pays its holder the same way.
+  {
+    const h = fresh(48);
+    const b = h.board;
+    lay(b, 0, 0, 'Ktr');                      // a turbine on a road, north–south
+    lay(b, 0, -1, 'Kab');                     // capped both ends by Abbazias
+    lay(b, 0, 1, 'Kab');
+    b.addMeeple(0, 0, 0, 0);
+    b.rebuild();
+    h.m.settle(1);
+    if (h.players[0].score !== 2) {
+      return fail('a windmill on a finished road pays its holder', `paid ${h.players[0].score}`);
+    }
+  }
+
+  // A TURBINE ON A ROAD pays the road's holder, exactly as one in a city pays
+  // the city's.
+  {
+    const h = fresh(44);
+    const b = h.board;
+    const mill = lay(b, 0, 0, 'Ktr');          // a turbine on a road
+    b.addMeeple(0, 0, 0, 0);
+    b.rebuild();
+    h.m.payTurbines([mill]);
+    if (h.players[0].score !== 2) {
+      return fail('a road turbine pays 2 to the road\'s holder', `paid ${h.players[0].score}`);
+    }
+  }
+
+  // You may not double up on a feature you already hold, and a field with a
+  // rival's farmer on it is closed to you outright.
+  {
+    const h = fresh(45);
+    const b = h.board;
+    lay(b, 0, 0, 'Kz');
+    lay(b, 1, 0, 'Kz');
+    const field = TILES.Kz.feats.findIndex((f) => f.type === 'field');
+    b.addMeeple(0, 0, field, 0);
+    b.rebuild();
+    h.current = 0;
+    if (h.m.claimAllowed({ x: 1, y: 0, i: field, f: { type: 'field' } })) {
+      return fail('you may not put a second follower on your own feature', 'it was offered');
+    }
+    h.current = 1;
+    if (h.m.claimAllowed({ x: 1, y: 0, i: field, f: { type: 'field' } })) {
+      return fail('a field with a rival farmer is closed to you', 'it was offered');
+    }
+  }
+
+  // An island you are already standing on is one you may build onto — being
+  // blown out there is meant to be an opportunity, not a sentence.
+  {
+    const h = fresh(46);
+    const b = h.board;
+    lay(b, 0, 0, 'Kpz');
+    lay(b, 5, 5, 'Kz');
+    lay(b, 5, 6, 'Kz');
+    b.rebuild();
+    if (h.m.placeOpts().onto.has('5,5')) {
+      return fail('an empty island is out of reach', 'it was offered');
+    }
+    b.get(5, 5).meeple = { player: 0, feat: null, big: false };
+    b.rebuild();
+    if (!h.m.placeOpts().onto.has('5,5')) {
+      return fail('an island you stand on is buildable', 'it was refused');
+    }
+  }
+
+  // A follower LYING FLAT keeps its city at the lower rate and never comes
+  // home — which is the trade, because a standing one in a finished city does.
+  {
+    const h = fresh(47);
+    const b = h.board;
+    lay(b, 0, 0, 'Ktb');
+    lay(b, 0, -1, 'E', 2);                    // capped, so the city is finished
+    b.addMeeple(0, 0, 0, 0);
+    b.rebuild();
+    h.phase = 'meeple';
+    h.current = 0;
+    if (!h.m.canLieDown()) return fail('a follower in a city may lie flat', 'it was not offered');
+    h.m.beginFlat();
+    h.m.flatAt(0, 0);
+    h.m.fire('blue');
+    if (h.players[0].score !== 2) {
+      return fail('a flat follower holds its city at 1 a tile', `paid ${h.players[0].score} for two tiles`);
+    }
+    if (!b.get(0, 0).meeple) return fail('a flat follower stays put', 'it went home');
+  }
+
+  // THE WALK. A follower whose feature just finished may go out along a road
+  // instead of home — as far as the road runs, and take up what it finds. It
+  // may not turn round and step back into the thing it just left.
+  {
+    const h = fresh(49);
+    const b = h.board;
+    lay(b, 0, 0, 'Kzt');                      // city south, road east–west
+    lay(b, 0, 1, 'Kab');                      // capped, so the city is finished
+    lay(b, 1, 0, 'Kta', 1);                   // a temple down the road, unclaimed
+    b.addMeeple(0, 0, 0, 0);
+    b.rebuild();
+    h.current = 0;
+    const had = h.players[0].meeples;
+    h.m.fire('blue');
+    if (b.get(0, 0).meeple) return fail('a finished city sends its follower off', 'it stayed');
+    if (h.players[0].meeples !== had + 1) {
+      return fail('the walker is back in the supply first', `${h.players[0].meeples} of ${had + 1}`);
+    }
+    const spots = h.m.strollTargets({ x: 0, y: 0, i: 0 });
+    if (spots.some((o) => o.x === 0 && o.y === 0)) {
+      return fail('a walk may not turn back into the city it left', 'it was offered');
+    }
+    if (!spots.some((o) => o.x === 1 && o.y === 0 && o.f.type === 'temple')) {
+      return fail('a walk reaches the temple down the road',
+        spots.map((o) => `${o.x},${o.y}:${o.f.type}`).join(' ') || 'nowhere');
+    }
+    if (!h.m.beginStroll()) return fail('the walk is offered', 'it was not');
+    h.m.strollTo(1, 0);
+    if (!b.get(1, 0).meeple) return fail('the follower walks on and takes the temple', 'it did not');
+    if (h.players[0].meeples !== had) {
+      return fail('walking spends the follower it just got back', `${h.players[0].meeples}`);
+    }
+  }
+
+  // A road with somebody ELSE standing on it is a road you may not walk down.
+  {
+    const h = fresh(50);
+    const b = h.board;
+    lay(b, 0, 0, 'Kzt');
+    lay(b, 0, 1, 'Kab');
+    lay(b, 1, 0, 'Kta', 1);
+    b.addMeeple(0, 0, 0, 0);
+    b.addMeeple(1, 0, 1, 1);                  // a rival on the road itself
+    b.rebuild();
+    h.current = 0;
+    if (h.m.strollTargets({ x: 0, y: 0, i: 0 }).length) {
+      return fail('a road held by a rival is closed to the walk', 'it was offered');
     }
   }
 

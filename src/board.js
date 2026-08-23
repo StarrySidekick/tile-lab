@@ -60,6 +60,8 @@ export class Board {
      */
     this.version = 0;
     this.links = [];              // extra unions (tunnels) that survive a rebuild
+    this.bridges = [];            // one-square road hops, for the renderer
+    this.linked = new Set();      // cells already wired this rebuild — see link()
   }
 
   get(x, y) { return this.cells.get(keyOf(x, y)); }
@@ -234,6 +236,7 @@ export class Board {
   link(cell) {
     const { x, y } = cell;
     const k = keyOf(x, y);
+    this.linked.add(cell);
     cell.type.feats.forEach((f, i) => {
       const id = `${k}#${i}`;
       this.parent.set(id, id);
@@ -260,6 +263,13 @@ export class Board {
       // During a rebuild the neighbours are replayed in placement order, so a
       // later one isn't wired up yet — it'll make this same join from its side.
       const wired = this.parent.has(id);
+      // …and the same question asked of the TILE rather than of one feature on
+      // it, which is what a wildcard needs: an Abbazia has no features at all,
+      // so `id` is "x,y#null" and `wired` can never be true for it. That made a
+      // cap depend on which of the two tiles happened to be laid first — an
+      // Abbazia put down BEFORE the road it caps never capped it, and the road
+      // could never finish.
+      const here = this.linked.has(nb);
 
       // A dock edge does neither: a ship moored against a road leaves the road
       // exactly as open as it found it. It is the one edge in the game that is
@@ -274,11 +284,11 @@ export class Board {
       // was built. Without the guard a rebuild double-counts it, and a road
       // with an Abbazia at each end never re-opens when one blows away.
       if (theirEdge === CAP) {
-        if (mine != null && wired) this.data.get(this.find(`${k}#${mine}`)).open -= 1;
+        if (mine != null && here) this.data.get(this.find(`${k}#${mine}`)).open -= 1;
         continue;
       }
       if (myEdge === CAP) {
-        if (theirs != null && wired) this.data.get(this.find(id)).open -= 1;
+        if (theirs != null && here) this.data.get(this.find(id)).open -= 1;
         continue;
       }
 
@@ -328,8 +338,10 @@ export class Board {
   rebuild() {
     this.parent.clear();
     this.data.clear();
+    this.linked.clear();
     const order = [...this.cells.values()].sort((a, b) => a.seq - b.seq);
     for (const cell of order) this.link(cell);
+    this.bridgeRoads();
     // The tunnels: unions between parts that are nowhere near each other, so
     // the adjacency replay above can't rediscover them. A link whose end was
     // lifted or blown away just goes quiet until the tile comes back.
@@ -352,6 +364,50 @@ export class Board {
   }
 
   /**
+   * SKY BRIDGES. A road that runs off one tile, across one empty square, and
+   * straight on out of the tile beyond is one road — the gap is bridged.
+   *
+   * This exists because of what the wind does. A gust cuts a road and the two
+   * halves can never rejoin: `link` refuses a seam whose edges disagree, and
+   * field ground reconnects freely where road ground does not, so roads are
+   * the most weather-fragile thing on the board and they are paid by exactly
+   * the quantity the weather destroys. A one-square hop gives them back the
+   * length a single shove took away.
+   *
+   * STRAIGHT ONLY, and only across ONE square: the road has to leave the near
+   * tile on the same axis it enters the far one, so a bridge is a thing you
+   * can see rather than a rule you have to work out. It joins the roads for
+   * SCORING and for a follower walking along them; it is not ground, and the
+   * wind neither notices it nor is stopped by it.
+   *
+   * Rebuilt from scratch with everything else, so a bridge appears and
+   * disappears as the weather opens and closes the gap under it.
+   */
+  bridgeRoads() {
+    this.bridges = [];
+    for (const cell of this.cells.values()) {
+      // Only two of the four directions, or every bridge is found twice.
+      for (const s of [1, 2]) {
+        if (this.edgeAt(cell, s) !== 'r') continue;
+        const [dx, dy] = SIDE_STEP[s];
+        if (this.cells.has(keyOf(cell.x + dx, cell.y + dy))) continue;   // no gap
+        const far = this.get(cell.x + dx * 2, cell.y + dy * 2);
+        if (!far || this.edgeAt(far, opposite(s)) !== 'r') continue;
+        const mine = this.featAt(cell, s);
+        const theirs = this.featAt(far, opposite(s));
+        if (mine == null || theirs == null) continue;
+        const a = `${keyOf(cell.x, cell.y)}#${mine}`;
+        const b = `${keyOf(far.x, far.y)}#${theirs}`;
+        if (!this.parent.has(a) || !this.parent.has(b)) continue;
+        if (this.find(a) === this.find(b)) continue;      // already one road
+        const root = this.union(a, b);
+        this.data.get(root).open -= 2;                    // both ends are met
+        this.bridges.push({ x: cell.x + dx, y: cell.y + dy, axis: s & 1 });
+      }
+    }
+  }
+
+  /**
    * Place a tile. Assumes canPlace() already said yes.
    *   over   stack on top of whatever is here (Strata), keeping it underneath
    */
@@ -368,7 +424,17 @@ export class Board {
       h: under ? under.h + 1 : 0,
     };
     this.cells.set(k, cell);
-    if (under) this.rebuild(); else this.link(cell);
+    if (under) {
+      this.rebuild();
+    } else {
+      this.link(cell);
+      // A placement can complete a bridge as readily as a removal can — the
+      // tile you just laid may be the far end of a one-square hop. Without
+      // this a board only grew bridges after something forced a rebuild, so
+      // the same two tiles were one road or two depending on how they got
+      // there.
+      this.bridgeRoads();
+    }
     return cell;
   }
 

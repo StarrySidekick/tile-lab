@@ -1120,6 +1120,8 @@ const PHASE_TEXT = {
   rob: 'Post your robber on an opponent',
   balena: 'Send the Balena — click a tile within three squares',
   flight: 'Click one of your followers on the flight to pick it up',
+  stroll: 'Walk the follower on down the road, or send it home',
+  flat: 'Click one of your followers in a city to lay it flat',
   'interior-place': 'Lay the next piece',
   'interior-move': 'Move, or hold',
   over: 'Game over',
