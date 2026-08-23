@@ -321,53 +321,77 @@ function drawRoad(ctx, f, terrain, short = false) {
 
 /**
  * A temple: a monastery that pays by the arrival rather than by the closure.
- * The precinct ring is open on the side it faces — the way in — and the pennant
- * on the roof points the same way, so a temple reads as facing somewhere even
- * though nothing but the art cares which way that is.
+ *
+ * It used to sit inside a walled ring, which read from across the table as a
+ * coin rather than a building — a temple is not a precinct, it is a ROOF ON
+ * COLUMNS, and that silhouette is the one everybody already knows. So: a
+ * stepped stone platform, a colonnade, a pediment, and the pennant on the
+ * ridge that gives the mode its weather. The steps and the pennant both point
+ * the way the temple FACES, which is the one thing about it the art has to
+ * carry even though nothing but the art cares which way that is.
  */
 function drawTemple(ctx, f, L) {
-  const cx = 0.5, cy = 0.52, r = 0.29;
   const face = (f.face ?? 0) & 3;
-  const a = -Math.PI / 2 + face * Math.PI / 2;         // 0=N, clockwise
 
   ctx.save();
+  // Drawn facing north and then turned, because a colonnade seen from three
+  // sides at once is not a colonnade.
+  ctx.translate(0.5, 0.5);
+  ctx.rotate(face * Math.PI / 2);
+  ctx.translate(-0.5, -0.5);
+
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'butt';
+
+  // The ground shadow, thrown the way everything else on the board throws one.
   ctx.beginPath();
-  ctx.arc(cx - L.x * 0.045, cy - L.y * 0.045, r, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(13,11,17,0.34)';
+  ctx.ellipse(0.5 - L.x * 0.06, 0.68 - L.y * 0.06, 0.31, 0.13, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(13,11,17,0.30)';
   ctx.fill();
 
+  ctx.strokeStyle = THEME.timber;
+  ctx.lineWidth = 0.018;
+
+  // Three steps up to it, widest at the front. A temple you can walk up to.
+  const steps = [[0.29, 0.72, 0.42, 0.08], [0.24, 0.79, 0.52, 0.08]];
+  for (const [x, y, w, h] of steps) {
+    ctx.fillStyle = THEME.cityWall;
+    ctx.beginPath(); ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.wallLit;                    // the lit tread
+    ctx.beginPath(); ctx.rect(x, y, w, 0.022); ctx.fill();
+  }
+
+  // The stylobate the columns stand on.
+  ctx.fillStyle = THEME.city;
+  ctx.beginPath(); ctx.rect(0.22, 0.64, 0.56, 0.09); ctx.fill(); ctx.stroke();
+
+  // The colonnade: four columns, the two outer ones a shade darker so the row
+  // reads as having depth rather than as a picket fence.
+  for (let i = 0; i < 4; i++) {
+    const x = 0.28 + i * 0.15;
+    ctx.fillStyle = i === 0 || i === 3 ? '#8d7f63' : THEME.plaster;
+    ctx.beginPath(); ctx.rect(x - 0.035, 0.40, 0.07, 0.24); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = THEME.wallLit;                    // capital
+    ctx.beginPath(); ctx.rect(x - 0.05, 0.375, 0.10, 0.035); ctx.fill(); ctx.stroke();
+  }
+
+  // The architrave, and the pediment over it.
+  ctx.fillStyle = THEME.city;
+  ctx.beginPath(); ctx.rect(0.20, 0.33, 0.60, 0.05); ctx.fill(); ctx.stroke();
+  roofTri(ctx, 0.5, 0.33, 0.64, 0.19, THEME.roof);
+  ctx.fillStyle = 'rgba(255,244,225,0.16)';           // the lit rake of the roof
   ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = '#6a7350';
-  ctx.fill();
+  ctx.moveTo(0.18, 0.33); ctx.lineTo(0.5, 0.14); ctx.lineTo(0.5, 0.20);
+  ctx.closePath(); ctx.fill();
 
-  // The precinct ring, left open to the quarter it faces.
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = THEME.cityWall;
-  ctx.lineWidth = 0.075;
-  ctx.beginPath(); ctx.arc(cx, cy, r, a + 0.5, a - 0.5 + Math.PI * 2); ctx.stroke();
-  ctx.strokeStyle = THEME.wallLit;
-  ctx.lineWidth = 0.035;
-  ctx.beginPath(); ctx.arc(cx, cy - 0.018, r, a + 0.5, a - 0.5 + Math.PI * 2); ctx.stroke();
-
-  // A squat shrine, and the pennant that gives the mode its weather.
-  ctx.fillStyle = THEME.plaster;
+  // The pennant on the ridge — the mode's weather, flying the way it faces.
   ctx.strokeStyle = THEME.timber;
-  ctx.lineWidth = 0.022;
-  ctx.beginPath(); ctx.rect(cx - 0.11, cy - 0.10, 0.22, 0.22); ctx.fill(); ctx.stroke();
-  roofTri(ctx, cx, cy - 0.10, 0.30, 0.16, THEME.roof);
-
-  ctx.save();
-  ctx.translate(cx, cy - 0.20);
-  ctx.rotate(a + Math.PI / 2);
-  ctx.strokeStyle = THEME.timber;
-  ctx.lineWidth = 0.03;
-  ctx.beginPath(); ctx.moveTo(0, 0.06); ctx.lineTo(0, -0.20); ctx.stroke();
+  ctx.lineWidth = 0.026;
+  ctx.beginPath(); ctx.moveTo(0.5, 0.16); ctx.lineTo(0.5, 0.01); ctx.stroke();
   ctx.fillStyle = THEME.teal;
   ctx.beginPath();
-  ctx.moveTo(0.01, -0.20); ctx.lineTo(0.22, -0.10); ctx.lineTo(0.01, -0.01);
+  ctx.moveTo(0.51, 0.01); ctx.lineTo(0.70, 0.08); ctx.lineTo(0.51, 0.15);
   ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.restore();
 
   ctx.restore();
 }

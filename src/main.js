@@ -1118,7 +1118,7 @@ const PHASE_TEXT = {
   magic: 'Place the figure — click an unfinished road or city',
   crop: 'A crop circle — choose what everyone does',
   rob: 'Post your robber on an opponent',
-  balena: 'Send the Balena — click a tile within three squares',
+  balena: 'Send the Balena — click any tile on the board',
   flight: 'Click one of your followers on the flight to pick it up',
   stroll: 'Walk the follower on down the road, or send it home',
   flat: 'Click one of your followers in a city to lay it flat',

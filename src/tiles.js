@@ -774,7 +774,7 @@ export const MARKS = {
   // cloud
   turbine: { label: 'Windmill turbine', score: 0, note: 'Pays 1 to whoever holds its city for every gust through it, and 2 to whoever closes that city — kept even if the city blows open again.' },
   palazzo: { label: 'The Palazzo', score: 0, note: 'The seat of the kingdom: whatever it stands on is the mainland, and everything else adrift is an island. Blown by a gust, it tows every island one square with it.' },
-  zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane when played. A gust that reaches it absorbs it if they agree and wakes it otherwise — the storm then turns down this zephyr’s own lane. Gusts stack up to three squares.' },
+  zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane when played — and does nothing to the country it passes through. It tears the LOOSE END off: the run downwind of it ends at a gap, and a gust arriving there at power N pops the last N tiles off and carries each of them N squares. It gains a power off every zephyr blowing its own way, and off every corner it turns. A gust that reaches a zephyr absorbs it if they agree and wakes it otherwise, and the storm turns down that zephyr’s own lane.' },
   abbazia: { label: 'Abbazia', score: 0, note: 'Caps every feature it touches — and un-caps them if the wind takes it away.' },
   flier:   { label: 'Flying machine', score: 0, note: 'Place it and a follower may fly out along it, riding any zephyr it crosses.' },
 };

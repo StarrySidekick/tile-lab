@@ -301,6 +301,79 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > Scores roughly halved, 196 a game to 105, which is what the brake was for. Random play runs 41 and bot play 91 against 131/172 before the pass. The gap between the two has *widened*, which is the good direction: more of the score is now arriving because somebody meant it.
 
 
+> **Thirteenth pass: the wind stops shuffling the lane and starts tearing the end off it.**
+>
+> Every pass so far has treated a gust as a conveyor: everything downwind slides
+> along together, so a zephyr rearranged a whole row and changed almost nothing
+> about it. The country came out the far end in the same order it went in, one
+> square over. It looked enormous and it did very little, and the tell was that
+> nobody at the table could ever say what a particular zephyr would *do* beyond
+> "shift that lot".
+>
+> **The wind does nothing to the country it passes through.** It runs down the
+> lane and takes the LOOSE END: the run of tiles downwind of the zephyr stops
+> somewhere — a gap, open sky — and the last tiles before that gap are the ones
+> that come away. Country backed up against more country is country the wind
+> can't get under, which is a sentence you can plan around. **How many and how
+> far is the power**: a gust arriving at power *N* pops the last *N* tiles off
+> and carries each of them *N* squares, as a raft, still touching each other
+> because they all travel the same distance. A row of five with a zephyr on the
+> right blowing west loses its leftmost tile, one square. Put a second
+> west-blowing zephyr in that row and the wind arrives at two: the leftmost
+> **two** tiles come away, two squares each.
+>
+> **And power no longer stops at three.** It gained a square per same-facing
+> zephyr and capped, which made a lane of four zephyrs identical to a lane of
+> three. It now also gains **a square for every corner the storm turns** — a
+> woken zephyr opens one power harder than the wind that woke it — so a chain
+> through a knot of zephyrs is a storm that keeps getting worse, and the raft it
+> tears off the next end keeps getting wider. What still bounds it is that no
+> zephyr contributes the same direction to one storm twice, and that every
+> square of power costs a distinct zephyr. `MAX_STRENGTH` is a backstop now
+> rather than a rule.
+>
+> **A tile the wind moved has to still fit what it landed against.** The falling
+> rule only ever asked whether a tile was touching anything; a road shoved up
+> against a city wall was touching plenty and joined to none of it, and it hung
+> there in the sky as a permanent dead seam. It falls now — and unlike a tile
+> that simply drifted loose, **it does not come back**. Nobody collects it and
+> nobody plays it again. One legal connection is enough to stay up; none is the
+> end of the tile. The report says which kind of loss it was, because the two
+> are not worth the same to the mode: `adrift` goes to the bottom of the deck
+> and can be caught, `mismatch` leaves the game. Followers on anything that
+> falls, either way, go back to their owners — they used to go down with it.
+>
+> **The zephyr no longer travels with its own wind.** That rule existed because
+> a zephyr shoved the country away from itself and then sat in the gap it had
+> made; under the new wind it opens no gap beside itself, so riding into one
+> only ever blew the zephyr into open sky. Followers still travel exactly as
+> they did — one on the raft rides it, and every other follower in the lane is
+> picked up and put down downwind on whatever is there. That asymmetry is the
+> mode in one line: **the wind moves people; it does not move the ground under
+> them.**
+>
+> **Scoring a feature empties it, finished or not.** The twelfth pass gave
+> followers back off finished things, which left the farmer — the single biggest
+> income in the game — standing in a field nothing can ever finish, permanently.
+> Farms, cities, roads and temples all hand the figure back now. The temple's
+> keeper no longer waits for a full parish it will probably never get. Only a
+> follower **lying flat** stays, which is exactly what you bought when you laid
+> it down.
+>
+> **And the Balena swims anywhere.** Three squares meant the whale could only
+> shelter the neighbourhood it was already in, and the tile you actually wanted
+> saved was reliably four squares away — a brake anybody can pick up is only a
+> brake if it can reach the thing that needs stopping.
+>
+> Two pieces of art went with it. The temple was drawn inside a walled ring,
+> which reads from across the table as a coin: it is a roof on columns now,
+> steps and a pediment and the pennant on the ridge, because that silhouette is
+> the one everybody already knows. And the drifting cloud banks came off the sky
+> chart — soft white blobs sliding over a drawn map, smudging the graticule and
+> reading as dirt on the glass. The chart is the backdrop; nothing floats in
+> front of it.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 

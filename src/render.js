@@ -30,13 +30,6 @@ const WINDS = [
   { name: 'MERIDIES', dir: 2 }, { name: 'OCCIDENS', dir: 3 },
 ];
 
-/** Cloud banks for a sky backdrop: [x, y, radius, drift speed], all fractions. */
-const CLOUDS = [
-  [0.08, 0.17, 0.09, 0.9], [0.42, 0.09, 0.06, 1.5], [0.71, 0.24, 0.11, 0.6],
-  [0.19, 0.52, 0.07, 1.2], [0.58, 0.63, 0.10, 0.8], [0.88, 0.47, 0.05, 1.8],
-  [0.33, 0.86, 0.08, 1.0], [0.77, 0.91, 0.06, 1.4],
-];
-
 /** Fast then slow — the shape almost everything transient here moves on. */
 const ease = (t) => 1 - (1 - t) ** 3;
 
@@ -269,6 +262,11 @@ export class Renderer {
    * with the Latin winds named round it. All of it is drawn in WORLD space, so
    * it pans and zooms with the board and reads as the chart the kingdom is
    * printed on rather than as wallpaper behind it.
+   *
+   * There were drifting cloud banks over the top of it, and they were the one
+   * thing here that wasn't the chart: soft white blobs sliding across a drawn
+   * map, smudging the graticule and reading as dirt on the glass. The chart is
+   * the backdrop. Nothing floats in front of it.
    */
   drawChart() {
     const ctx = this.ctx;
@@ -280,7 +278,6 @@ export class Renderer {
     sea.addColorStop(1, '#5c7f9e');
     ctx.fillStyle = sea;
     ctx.fillRect(0, 0, this.w, this.h);
-    this.drawClouds();
 
     // The rhumb network and the rose are the expensive half and the half that
     // stops meaning anything when the squares get small, so both drop out with
@@ -426,35 +423,6 @@ export class Renderer {
       }
       ctx.restore();
     });
-    ctx.restore();
-  }
-
-  /**
-   * Slow cloud, drifting behind everything. Parallaxed against the camera
-   * rather than pinned to the screen, so panning reads as moving over the sky
-   * instead of dragging a wallpaper about — and laid out from a fixed table
-   * rather than at random, so it never flickers or reshuffles between frames.
-   */
-  drawClouds() {
-    const ctx = this.ctx;
-    const t = performance.now() / 90000;
-    const drift = this.cam.zoom * 0.12;
-    ctx.save();
-    for (const [ox, oy, r, speed] of CLOUDS) {
-      const x = (((ox + t * speed) % 1.4) - 0.2) * this.w - this.cam.x * drift;
-      const y = oy * this.h - this.cam.y * drift;
-      const rad = r * Math.min(this.w, this.h);
-      // Feathered rather than a hard ellipse. A flat white blob at 15% alpha
-      // reads as a smudge on the glass; a radial falloff reads as distance.
-      const soft = ctx.createRadialGradient(x, y, 0, x, y, rad * 2.1);
-      soft.addColorStop(0, 'rgba(255,255,255,0.16)');
-      soft.addColorStop(0.55, 'rgba(255,255,255,0.09)');
-      soft.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = soft;
-      ctx.beginPath();
-      ctx.ellipse(x, y, rad * 2.1, rad * 0.72, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
     ctx.restore();
   }
 

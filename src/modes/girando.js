@@ -7,21 +7,30 @@
 // that has ever stopped one is the whale lying on top of it.
 //
 // THE ZEPHYR is the engine — twenty-two of them in the deck. Play one and it
-// blows down its lane: everything in that row or column, downwind, slides
-// along, and THE ZEPHYR GOES WITH IT, one square into the hole it just opened.
-// Without that it was a permanent hole-maker, shoving the country away from
-// itself and then sitting in the gap. Two DOUBLE ZEPHYRS open at two squares
-// rather than one; a gust that runs over a zephyr blowing the SAME way absorbs
-// it and blows a square harder beyond it, up to three — never harder upon it,
-// so a zephyr is never shoved along by its own breath. A zephyr pointing ANY
-// OTHER way is woken rather than absorbed: the storm turns and carries on down
-// the new zephyr's lane, in the new zephyr's direction. Across the wind, back
-// into it, it makes no difference — a line of zephyrs is a chain reaction that
-// turns corners. What keeps it finite is that no zephyr contributes the same
-// direction to the same storm twice. The ones that blow several ways at once
-// don't travel: there is no answer to which way a compass rose would go, so it
-// stands still in the hole it makes of its own neighbourhood, and usually falls
-// through it.
+// blows down its lane, and what it does there is not what you would guess: it
+// does NOTHING to the country it passes through. Country packed against more
+// country is country the wind can't get under. What it moves is THE LOOSE END
+// — the run of tiles downwind of the zephyr stops somewhere, at a gap or at
+// open sky, and the last tiles before that gap are the ones that come away.
+//
+// HOW MANY, AND HOW FAR, IS THE POWER. A gust arriving at the loose end with
+// power N pops the last N tiles off and carries each of them N squares. A row
+// of five with a zephyr on the right of it blowing west: power one, so the
+// leftmost tile alone goes one square west. Put a second west-blowing zephyr
+// in that row and the gust absorbs it, arrives at power two, and the leftmost
+// TWO tiles come away two squares each — as a raft, because they were touching
+// before and they all travel together.
+//
+// AND IT BUILDS. Power used to stop at three; it doesn't any more. A gust that
+// runs over a zephyr blowing the SAME way absorbs it and blows a square harder
+// beyond it — never harder upon it, so a zephyr is never shoved along by its
+// own breath. A zephyr pointing ANY OTHER way is woken rather than absorbed:
+// the storm turns and carries on down the new zephyr's lane, in the new
+// zephyr's direction, ONE POWER HARDER THAN IT ARRIVED. Every corner a storm
+// turns it hits harder, and the raft it tears off the next end is wider. What
+// keeps that finite is that no zephyr contributes the same direction to the
+// same storm twice. The ones that blow several ways at once open a lane each
+// out of the same square. Two DOUBLE ZEPHYRS open at two.
 //
 // A TILE TOUCHING NOTHING ORTHOGONALLY falls out of the sky, back to the bottom
 // of the deck — and that is asked of every tile after a gust, not only the ones
@@ -30,17 +39,26 @@
 // and throw it straight back down, taking a second placement while the hole the
 // wind just made is still open. Once a turn.
 //
-// FOLLOWERS COME BACK, BUT ONLY OFF SOMETHING FINISHED. A sphere that pays a
-// FINISHED city or road hands its followers home; one that pays an unfinished
-// one leaves them where they are, because there is nothing to collect them
-// for yet. That is the brake on the whole economy: without it a figure put
-// down early collects from every sphere for the rest of the game and never
-// moves, which is a game of who claimed fastest in the first ten turns.
+// AND A TILE THE WIND MOVED HAS TO STILL FIT. One that lands beside country it
+// cannot legally join is touching the kingdom and holding on to none of it: a
+// road jammed against a city wall. It falls too — and unlike the first kind, it
+// does not come back. Nobody collects it, nobody plays it again. One legal
+// connection is enough to stay in the sky; none is the end of the tile.
 //
-// Eight each. Two figures never come home: a FARMER, because a field is never
-// finished, and one LYING FLAT, which is a follower you have retired into its
-// city on purpose — it keeps the city and the city pays the lower rate for as
-// long as it is the only thing holding it.
+// FOLLOWERS ARE BLOWN LIKE TILES, WHICH IS NOT WHAT HAPPENS TO THE TILES. One
+// standing on the raft rides it and never notices. Every other follower in the
+// lane is picked up and put down downwind, on whatever is there — somebody
+// else's feature, or nothing at all. Nothing at all means it goes home.
+//
+// A FEATURE THAT SCORES IS EMPTIED. Farms, cities, roads, temples: a colour
+// firing over a thing you are standing in pays you, and then hands the figure
+// back. That is the brake on the whole economy — without it a figure put down
+// early collects from every sphere for the rest of the game and never moves,
+// which is a game of who claimed fastest in the first ten turns.
+//
+// Eight each. One figure never comes home: one LYING FLAT, which is a follower
+// you have retired into its city on purpose — it keeps the city and the city
+// pays the lower rate for as long as it is the only thing holding it.
 //
 // And a follower whose feature just finished may WALK instead of going home:
 // out along a road connected to where it stood, as far as the road runs, and
@@ -92,10 +110,11 @@
 // island in the sky slides one square the way the seat went.
 //
 // THE BALENA is a sky whale the size of a district. Whatever tile it is lying
-// on cannot be moved by any wind, and no gust passes through it — everything
-// in its lee is sheltered. On your turn, INSTEAD of placing a follower, you
-// may move it three squares to wherever you want it. It is the only brake in
-// the mode, and it is a brake anybody can pick up.
+// on cannot be moved by any wind, and no gust passes through it — a run backed
+// up against the whale has no loose end, so nothing comes off it and its lee
+// is untouched. On your turn, INSTEAD of placing a follower, you may send it
+// ANYWHERE on the board. It is the only brake in the mode, and it is a brake
+// anybody can pick up.
 //
 // THE WINDVANE has four ways in and only two of them joined, and the wind picks
 // which two. It is the ONLY tile the weather re-cuts — a straight road used to
@@ -114,7 +133,8 @@
 // on the board whose value is its NEIGHBOURS: red pays its keeper a point for
 // every tile standing in the eight squares around it, so a temple laid early
 // and garrisoned is worth more every time somebody builds near it — and worth
-// something to your rival every time you do.
+// something to your rival every time you do. Red pays it and then takes the
+// keeper back, like every other colour.
 //
 // THE ABBAZIA takes any edge and CAPS everything it touches: a road running
 // into one ends there, a city walls itself off against it, and both can finish
@@ -142,7 +162,7 @@ import {
 import { PLAYER_COLORS } from '../theme.js';
 import { claimableFeatures, citiesFed } from '../mechanics.js';
 import {
-  storm, zephyrDirs, worldDir, turbineOn, isTemple, MAX_STRENGTH,
+  storm, zephyrDirs, zephyrPush, worldDir, turbineOn, isTemple, MAX_STRENGTH,
 } from '../wind.js';
 
 /**
@@ -209,7 +229,6 @@ const WINDMILL = 2;          // …and per windmill, to whoever HOLDS the featur
 const REOPENED = 1;          // per tile, off a held city the wind blows open again
 const MAX_CHAIN = 6;         // storms raised while a storm is still landing
 const FLIGHT_RANGE = 24;     // squares, before we assume the zephyrs are a loop
-const BALENA_RANGE = 3;      // squares the whale swims in one turn
 const ARCHIPELAGO = 10;      // at the end, to whoever stands on the most islands
 const EXTRA_FOLLOWERS = 1;   // …on top of everyone's usual seven
 const SUPPLY = 8;            // …which is what the panel draws
@@ -316,16 +335,17 @@ export class Girando extends Mode {
   }
 
   setup() {
-    // Two more followers than anywhere else. Nothing here ever comes home off
-    // a scored feature — a figure is put down and stays down — so a supply of
-    // seven is a supply you run out of halfway through and then watch the
-    // spheres go off without you.
+    // One more follower than anywhere else. Everything comes home off a scored
+    // feature now, so the supply turns over — but a sphere is also the only
+    // thing that ever pays, and being caught one figure short of the board you
+    // wanted when one closes is the whole loss.
     for (const p of this.game.players) p.meeples += EXTRA_FOLLOWERS;
     this.flight = null;
     this.lifted = null;
     this.laid = 0;
     this.gusts = 0;
     this.fallen = 0;
+    this.wrecked = 0;         // …of which fitted nothing and left the game
     this.spheres = 0;          // spheres closed so far
     this.hues = {};            // …and how many of each colour
     this.drifts = 0;           // times the Palazzo has towed the islands along
@@ -333,6 +353,7 @@ export class Girando extends Mode {
     this.blame = null;         // whose weather is currently running
     this.queued = [];
     this.caught = false;       // a tile fell into our hands this turn
+    this.pending = [];         // followers the sphere has paid, waiting to come off
     this.strollers = [];       // followers offered a walk when the scoring settles
     this.stroll = null;        // …and the one being asked about now
     this.laidFlat = false;     // one follower retired into a city per turn
@@ -451,7 +472,10 @@ export class Girando extends Mode {
         ? `${this.game.player.name} lets the wind out ${dirs.length} ways at once.`
         : `${this.game.player.name} lets the zephyr out.`);
       const from = { x: cell.x, y: cell.y };
-      this.weather(dirs.map((dir) => ({ dir, from })), this.game.current);
+      // …at its own strength: a double zephyr opens at two whether the wind
+      // that let it out was somebody else's gust or its owner's hand.
+      const push = zephyrPush(cell);
+      this.weather(dirs.map((dir) => ({ dir, from, push })), this.game.current);
     }
     this.joinSferas();
     // The flight is worked out after the weather, because the weather may have
@@ -576,6 +600,7 @@ export class Girando extends Mode {
         + `${listTally(hues, (h) => COLOURS[h])}.`);
       this.game.emit('landmark');
       for (const h of hues) this.fire(h);
+      this.sweep();
       this.beginStroll();
     }
   }
@@ -645,7 +670,7 @@ export class Girando extends Mode {
       this.payHolders(d, per * d.tiles.size,
         `${flat ? 'A city kept by a retired follower' : done ? 'A finished city' : 'An unfinished city'}`
         + ` of ${d.tiles.size} tile${d.tiles.size === 1 ? '' : 's'}`
-        + `${per > RATE[kind].main ? ' out on an island' : ''}`, cells, done);
+        + `${per > RATE[kind].main ? ' out on an island' : ''}`, cells);
     }
   }
 
@@ -667,15 +692,11 @@ export class Girando extends Mode {
         + `${per > RATE.temple.main ? ' out on an island' : ''}`
         + ` — ${this.game.players[cell.meeple.player].name}`,
         [{ x: cell.x, y: cell.y }]);
-      // A full parish is a finished temple, and its keeper walks home.
-      if (around === 8 && !cell.meeple.flat) {
-        const who = cell.meeple.player;
-        if (who === this.game.current) {
-          this.strollers.push({ x: cell.x, y: cell.y, i: cell.meeple.feat });
-        }
-        this.game.sendHome(cell);
-        this.game.emit('meeple', { recall: true, player: who, at: { x: cell.x + 0.5, y: cell.y + 0.5 } });
-      }
+      // …and then the keeper comes off it, like everybody else the sky has just
+      // paid. A temple is never finished — the parish can always lose a tile to
+      // the weather again — so waiting for a full eight was waiting for a thing
+      // that mostly never came.
+      if (!cell.meeple.flat) this.pending.push({ x: cell.x, y: cell.y });
     }
   }
 
@@ -715,25 +736,27 @@ export class Girando extends Mode {
       this.payHolders(d, pts,
         `Road of ${d.tiles.size} tile${d.tiles.size === 1 ? '' : 's'}`
         + `${reached ? ` into ${reached} cit${reached === 1 ? 'y' : 'ies'}` : ''}`
-        + `${isle ? ' out on an island' : ''}`, cells, d.open === 0);
+        + `${isle ? ' out on an island' : ''}`, cells);
     }
   }
 
   /**
-   * Pay a component's majority, and then decide who is still standing there.
+   * Pay a component's majority, and then take everybody off it.
    *
-   * A FINISHED feature hands its followers back. That is the brake on the
-   * whole economy: without it a figure put down early collects from every
-   * sphere for the rest of the game and there is no reason to ever move it,
-   * which is a game of who claimed fastest in the first ten turns. An
-   * UNFINISHED one keeps its followers, because it is still being built and
-   * there is nothing to collect them for.
+   * SCORING A FEATURE EMPTIES IT. Farms, cities, roads, temples — finished or
+   * not, a colour firing over a thing you are standing in pays you and then
+   * hands the figure back. That is the brake on the whole economy: without it
+   * a figure put down early collects from every sphere for the rest of the
+   * game and there is no reason ever to move it, which is a game of who
+   * claimed fastest in the first ten turns. It used to be only FINISHED things
+   * that emptied, which left the farmer — the single biggest income in the
+   * mode — standing in a field nothing could ever finish, for good.
    *
-   * Two figures stay regardless. One LYING FLAT has been retired into its city
-   * on purpose and lives there now. And a FARMER never comes back, because a
-   * field is never finished — which is what makes a farm the long game.
+   * One figure stays: one LYING FLAT has been retired into its city on purpose
+   * and lives there now, which is the whole of what you bought when you laid
+   * it down.
    */
-  payHolders(d, pts, line, cells, done = false) {
+  payHolders(d, pts, line, cells) {
     const g = this.game;
     const where = cells.map((c) => ({ x: c.x, y: c.y }));
     if (pts > 0) {
@@ -741,16 +764,37 @@ export class Girando extends Mode {
         this.pay(p, pts, `${line} — ${g.players[p].name}`, where);
       }
     }
-    if (!done) return;
     for (const m of d.meeples.slice()) {
       if (m.flat) continue;
-      const cell = g.board.get(m.x, m.y);
-      if (!cell || !cell.meeple || cell.meeple.flat) continue;
+      this.pending.push({ x: m.x, y: m.y });
+    }
+  }
+
+  /**
+   * Take everybody the sphere just paid off the board — AFTER every half of it
+   * has fired, which is the whole reason this is a queue rather than something
+   * `payHolders` does on the spot. Both halves of a sphere fire, and two reds
+   * pay the same temple twice; emptying it the moment the first half landed
+   * meant the second half found an empty board and a matched pair paid once.
+   *
+   * It is also what keeps the computer player honest. `sphereValue` fires a
+   * sphere for real against a scratch tally to find out what it would pay, and
+   * with the reclaim inline that made merely THINKING about a placement strip
+   * the followers off the board. The bot throws the queue away; the game sweeps
+   * it.
+   */
+  sweep() {
+    const g = this.game;
+    if (!this.pending.length) return;
+    for (const { x, y } of this.pending.splice(0)) {
+      const cell = g.board.get(x, y);
+      const m = cell?.meeple;
+      if (!m || m.flat) continue;                  // already gone, or lying down
       // The current player is offered a walk instead of the trip home; this
       // notes the chance and the host asks about it once the pass is over.
-      if (m.player === g.current) this.strollers.push({ x: m.x, y: m.y, i: m.feat });
+      if (m.player === g.current) this.strollers.push({ x, y, i: m.feat });
       g.sendHome(cell);
-      g.emit('meeple', { recall: true, player: m.player, at: { x: m.x + 0.5, y: m.y + 0.5 } });
+      g.emit('meeple', { recall: true, player: m.player, at: { x: x + 0.5, y: y + 0.5 } });
     }
     g.board.rebuild();
   }
@@ -965,13 +1009,19 @@ export class Girando extends Mode {
     cell.balena = true;
   }
 
-  /** Three squares, orthogonally, onto any tile — that's the whole of it. */
+  /**
+   * Anywhere on the board — that's the whole of it. It used to swim three
+   * squares, which meant the whale could only ever shelter the neighbourhood
+   * it was already in, and the tile you actually wanted saved was reliably
+   * four squares away. A brake anybody can pick up is only a brake if it can
+   * reach the thing that needs stopping.
+   */
   balenaTargets() {
     if (!this.balena) return [];
     const out = [];
     for (const cell of this.game.board.cells.values()) {
-      const d = Math.abs(cell.x - this.balena.x) + Math.abs(cell.y - this.balena.y);
-      if (d > 0 && d <= BALENA_RANGE) out.push({ x: cell.x, y: cell.y });
+      if (cell.x === this.balena.x && cell.y === this.balena.y) continue;
+      out.push({ x: cell.x, y: cell.y });
     }
     return out;
   }
@@ -1181,22 +1231,33 @@ export class Girando extends Mode {
       fell: r.fell.map((f) => ({ x: f.x, y: f.y, type: f.type, rot: f.rot })),
     });
     if (r.strength > 1) {
-      g.say(`The gust picks up a second wind — ${r.strength} squares.`);
+      g.say(`The gust picks up — ${r.strength} tiles off the end, ${r.strength} squares each.`);
     }
 
-    // A tile the wind pushes off the edge of the world goes back to the bottom
-    // of the deck — and whoever set the wind off may catch one and throw it
-    // straight back down, which is what turns a big storm from bookkeeping
-    // into a swing: the wind clears you a hole and hands you something to put
-    // in it while it's still open. Once a turn.
+    // A tile the wind shakes ADRIFT — touching nothing at all — falls off the
+    // edge of the world and back to the bottom of the deck, and whoever set the
+    // wind off may catch one and throw it straight back down, which is what
+    // turns a big storm from bookkeeping into a swing: the wind clears you a
+    // hole and hands you something to put in it while it's still open. Once a
+    // turn.
+    //
+    // A tile that fell because it no longer FITS what it landed against is a
+    // different loss. It was still touching country; what it had stopped doing
+    // was joining any of it, and a tile the sky wouldn't take back is not a
+    // tile anybody picks up again. It leaves the game.
     let caught = 0;
+    let wrecked = 0;
     for (const f of r.fell) {
       this.fallen++;
+      if (f.why === 'mismatch') { this.wrecked++; wrecked++; continue; }
       g.deck.unshift(f.id);
       caught++;
     }
-    if (r.fell.length) {
-      g.say(`${r.fell.length} tile${r.fell.length > 1 ? 's' : ''} blow off the edge of the world and back into the deck.`);
+    if (caught) {
+      g.say(`${caught} tile${caught > 1 ? 's' : ''} blow off the edge of the world and back into the deck.`);
+    }
+    if (wrecked) {
+      g.say(`${wrecked} tile${wrecked > 1 ? 's fit nothing they landed against and are' : ' fits nothing it landed against and is'} lost out of the sky for good.`);
     }
     if (caught && this.blame === g.current && !this.caught) {
       this.caught = true;
@@ -1218,7 +1279,9 @@ export class Girando extends Mode {
     for (const m of r.homed) {
       g.players[m.player].meeples++;
       if (m.big) g.players[m.player].big++;
-      g.say(`${g.players[m.player].name}'s follower is blown into open sky and comes home.`);
+      g.say(m.why === 'fell'
+        ? `${g.players[m.player].name}'s follower goes down with its tile and comes home.`
+        : `${g.players[m.player].name}'s follower is blown into open sky and comes home.`);
       g.emit('meeple', { recall: true, player: m.player, at: { x: m.x + 0.5, y: m.y + 0.5 } });
     }
 
@@ -1371,8 +1434,8 @@ export class Girando extends Mode {
   /**
    * A temple with all eight squares around it filled is a temple at its
    * ceiling: red pays a point a tile of the parish, and eight is as many tiles
-   * as a parish holds. The keeper STAYS — every figure in Girando stays where
-   * it is put — and goes on being paid by every red sphere that closes.
+   * as a parish holds. Nothing is paid for reaching it — it is worth saying
+   * out loud because the parish is the one thing on the board that fills up.
    */
   templeCloses(d) {
     this.game.say(`The temple at (${d.at.x}, ${d.at.y}) is enclosed — a full parish, `
@@ -1412,6 +1475,7 @@ export class Girando extends Mode {
   lastRound() {
     this.game.say('The season turns, and the sky scores everything one last time.');
     for (const hue of Object.keys(COLOURS)) this.fire(hue);
+    this.sweep();
   }
 
   /**
@@ -1480,6 +1544,7 @@ export class Girando extends Mode {
     try {
       for (const hue of hues) this.fire(hue);
     } finally {
+      this.pending.length = 0;              // thinking about a sphere doesn't empty the board
       this.game.say = quiet;
       this.game.emit = emit;
     }
@@ -1593,10 +1658,16 @@ export class Girando extends Mode {
 
   /**
    * What letting this gust out does. It is the same questions the wind itself
-   * asks — how hard is it blowing by the time it gets there, whose figures are
-   * in the way, whose temples and turbines does it feed — answered by walking
-   * the lane rather than by simulating it, because the bot prices hundreds of
+   * asks — how far down the lane does the country run, how hard is it blowing
+   * by the time it gets to the loose end, whose figures are standing in the
+   * way, whose temples and turbines does it feed — answered by walking the
+   * lane rather than by simulating it, because the bot prices hundreds of
    * candidate squares a turn.
+   *
+   * The shape of the answer changed with the wind. A gust does nothing to the
+   * country it passes through; what it is worth is what it does to the RAFT it
+   * tears off the far end, and to every follower standing in the lane between
+   * here and there.
    */
   gustValue(cell, dir, player) {
     const board = this.game.board;
@@ -1604,21 +1675,34 @@ export class Girando extends Mode {
     const [dx, dy] = SIDE_STEP[dir];
     let value = 0;
     let strength = 1;
+    const run = [];
     for (let step = 1; step <= 24; step++) {
       const other = board.get(cell.x + dx * step, cell.y + dy * step);
-      if (!other) continue;
-      if (other.balena) break;                   // the whale ends the lane
+      if (!other) break;                         // the gap: this is the loose end
+      if (other.balena) return value;            // the whale: nothing comes away
+      run.push({ cell: other, force: strength });
       value += this.turbineValue(other, player) * 0.3;
-      // A follower about to be moved: ours is a risk, theirs is an opportunity,
-      // and either way the further it travels the less likely it lands well.
+      if (zephyrDirs(other).includes(dir)) strength = Math.min(MAX_STRENGTH, strength + 1);
+    }
+    if (!run.length) return value;
+    const power = run[run.length - 1].force;
+    const raft = new Set(run.slice(Math.max(0, run.length - power)).map((r) => r.cell));
+    for (const { cell: other, force } of run) {
+      // A follower about to be moved: ours is a risk, theirs is an
+      // opportunity. One on the raft rides it and is only as exposed as its
+      // tile; one on the country between is picked up and put down blind.
       if (other.meeple) {
-        const dest = board.get(other.x + dx * strength, other.y + dy * strength);
-        const worse = (dest ? 0.6 : 2) * w.gustBlow;   // over open sky it goes home
+        const steps = raft.has(other) ? power : force;
+        const dest = board.get(other.x + dx * steps, other.y + dy * steps);
+        const worse = (dest ? 0.6 : 2) * w.gustBlow * (raft.has(other) ? 0.5 : 1);
         value += other.meeple.player === player ? -worse : worse * 0.7;
       }
+      // Only the raft actually lands somewhere new, so only the raft can
+      // arrive in — or leave — somebody's parish.
+      if (!raft.has(other)) continue;
       value += this.templeValue(
-        { x: other.x + dx * strength, y: other.y + dy * strength }, player, 0.6);
-      if (zephyrDirs(other).includes(dir)) strength = Math.min(MAX_STRENGTH, strength + 1);
+        { x: other.x + dx * power, y: other.y + dy * power }, player, 0.6);
+      value -= this.templeValue({ x: other.x, y: other.y }, player, 0.6);
     }
     return value;
   }
@@ -1654,7 +1738,7 @@ export class Girando extends Mode {
     }
     if (g.phase !== 'meeple') return [];
     const out = [{
-      label: `Send the Balena (${BALENA_RANGE} squares)`,
+      label: 'Send the Balena (anywhere)',
       fn: () => this.beginSwim(),
       disabled: !this.canSwim(),
     }];
@@ -1708,7 +1792,8 @@ export class Girando extends Mode {
     const whale = this.balena ? `The Balena rests at (${this.balena.x}, ${this.balena.y}).` : 'The Balena is nowhere.';
     const closed = ['green', 'blue', 'red'].filter((h) => this.hues[h])
       .map((h) => `${this.hues[h]} ${h}`).join(', ');
-    return `${rows}<p class="hint">${this.gusts} gust${this.gusts === 1 ? '' : 's'} · ${this.fallen} tile${this.fallen === 1 ? '' : 's'} blown out of the sky · ${this.spheres ? `spheres harvested: ${closed}` : 'no sphere closed yet'} · ${whale}</p>`;
+    const lost = this.wrecked ? ` (${this.wrecked} lost for good)` : '';
+    return `${rows}<p class="hint">${this.gusts} gust${this.gusts === 1 ? '' : 's'} · ${this.fallen} tile${this.fallen === 1 ? '' : 's'} blown out of the sky${lost} · ${this.spheres ? `spheres harvested: ${closed}` : 'no sphere closed yet'} · ${whale}</p>`;
   }
 }
 
@@ -1722,11 +1807,14 @@ Girando.spec = {
   maxPlayers: 4,
   tideStart: 5,
   opening: 'A first stone hangs in the cloud. Everything else is weather.',
-  hint: 'A zephyr blows its whole lane and wakes every other zephyr it reaches. '
+  hint: 'A zephyr does nothing to the country it blows through — it tears the LOOSE END off it. '
+    + 'The run downwind of the zephyr ends at a gap, and the last tiles before that gap come away: power N pops N tiles off and carries each of them N squares. '
+    + 'It gains a power off every zephyr blowing its own way and off every corner it turns, and it no longer stops at three. '
+    + 'A tile that lands where it fits nothing is lost for good. '
     + 'Nothing is paid for being finished: closing a SPHERE is the scoring round, and both its halves fire a pass over the whole board. '
     + 'Green scores the farms (1 per two tiles of field), blue the cities (1 a tile open, 2 finished), red the temples (1 per tile around one), yellow the roads (1 a tile plus what each city it reaches is worth). '
     + 'Any half fits any other, so the pairing is the decision. '
     + 'You may only build onto the Palazzo’s mainland; everything adrift is an island, and islands pay more. '
-    + 'A finished feature hands its followers back — or they walk on down a road. '
-    + 'Instead of a follower, send the Balena — nothing under the whale can be moved by any wind.',
+    + 'A feature that scores hands its followers back — or they walk on down a road. '
+    + 'Instead of a follower, send the Balena anywhere on the board — nothing under the whale can be moved by any wind.',
 };
