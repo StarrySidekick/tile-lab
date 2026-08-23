@@ -182,7 +182,6 @@ export const GIRANDO_WEIGHTS = {
 /** A seat's own weights, or the defaults. */
 const weightsFor = (mode, seat) => mode.brains?.[seat] || GIRANDO_WEIGHTS;
 const WINDMILL = 2;          // …and per windmill, to whoever closes its city
-const ROAD_LINK = 2;         // to the holder of every city or temple a road reaches
 const MAX_CHAIN = 6;         // storms raised while a storm is still landing
 const FLIGHT_RANGE = 24;     // squares, before we assume the zephyrs are a loop
 const BALENA_RANGE = 3;      // squares the whale swims in one turn
