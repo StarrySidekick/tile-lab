@@ -50,6 +50,15 @@ export class Board {
     this.scoredParts = new Set(); // "x,y#i" of features already paid out
     this.bounds = bounds;         // {minX,maxX,minY,maxY} or null for unbounded
     this.seq = 0;                 // placement counter, for replay order
+    /**
+     * Bumped by every mutation — placing, shifting, removing, replacing. It
+     * exists so that anything deriving an expensive answer FROM the board can
+     * cache it against a single integer instead of re-deriving it or hashing
+     * the cells. Girando asks "which piece of country is this tile on" once
+     * per visible tile per frame and once per candidate square per turn, and
+     * without this that question walks every cell on the board every time.
+     */
+    this.version = 0;
     this.links = [];              // extra unions (tunnels) that survive a rebuild
   }
 
@@ -347,6 +356,7 @@ export class Board {
    *   over   stack on top of whatever is here (Strata), keeping it underneath
    */
   place(x, y, type, rot, { over = false, owner = null } = {}) {
+    this.version++;
     const k = keyOf(x, y);
     const under = over ? this.cells.get(k) || null : null;
     const cell = {
@@ -374,6 +384,7 @@ export class Board {
    * edges disagree.
    */
   shift(from, to) {
+    this.version++;
     const fromKey = keyOf(from.x, from.y);
     const toKey = keyOf(to.x, to.y);
     const cell = this.cells.get(fromKey);
@@ -394,19 +405,27 @@ export class Board {
   /**
    * Lift the top tile off a cell. Returns the removed cell, or null.
    * If something was underneath it resurfaces.
+   *
+   * `quiet` skips the rebuild, for a caller taking several tiles off in one go
+   * and rebuilding once at the end. Rebuilding is a full replay of the board's
+   * connectivity, so doing it per tile in a loop is the difference between a
+   * storm costing microseconds and costing milliseconds — the wind can shed a
+   * dozen tiles in one gust.
    */
-  remove(x, y) {
+  remove(x, y, { quiet = false } = {}) {
+    this.version++;
     const k = keyOf(x, y);
     const cell = this.cells.get(k);
     if (!cell) return null;
     if (cell.under) this.cells.set(k, cell.under); else this.cells.delete(k);
     for (const f of cell.type.feats.keys()) this.scoredParts.delete(`${k}#${f}`);
-    this.rebuild();
+    if (!quiet) this.rebuild();
     return cell;
   }
 
   /** Swap a placed tile for another type/rotation in situ (two-faced tiles). */
   replace(x, y, type, rot = null) {
+    this.version++;
     const cell = this.cells.get(keyOf(x, y));
     if (!cell) return null;
     cell.type = type;

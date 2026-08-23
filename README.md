@@ -456,6 +456,40 @@ time, which is the only evidence that the three settings are a ladder rather
 than three flavours. Against a person who is thinking, it is beatable — that's
 the point of it.
 
+### Teaching it a new mode
+
+Reading the board is one thing; knowing what to *care* about is another, and
+for a mode whose rules were invented last week nobody knows the answer —
+including whoever wrote the mode. Girando's advice is therefore a block of
+plain numbers, `GIRANDO_WEIGHTS`, and `tools/train.mjs` improves them by
+playing the mode against itself:
+
+```bash
+node tools/train.mjs                  # a session, ~20 minutes on four cores
+node tools/train.mjs --rounds 40 --games 16
+node tools/train.mjs --report         # just measure the shipped weights
+```
+
+Three things about it are worth stating, because each one is a trap somebody
+falls into:
+
+- **It selects on winning, not on scoring.** "Make the bot's score as large as
+  possible" is the obvious objective and it is badly wrong: both seats play the
+  same mode, so anything that inflates the board inflates *both* scores. A
+  weight set that closes spheres constantly scores enormously and hands the
+  same enormous score to its opponent. Win rate against the incumbent is the
+  only signal that separates good play from big numbers.
+- **Every match is played twice with the seats swapped.** The first player lays
+  the tile that starts the weather, and over sixteen games that is worth more
+  than most of the weights are.
+- **A challenger has to beat a margin, not merely win.** Forty games puts the
+  standard error on a win rate at about eight points; a hill-climb that accepts
+  noise walks away from a good answer as happily as it walks toward one.
+
+The session prints where the trained bot's points actually came from, per game
+and per colour, which is the nearest thing the workshop has to a statement of
+what the winning strategy *is*. Results land in `tools/brains/`.
+
 ## Which version am I looking at?
 
 The panel header carries a build stamp — `v0.9.0 · b12` — and it is the first
@@ -752,6 +786,8 @@ node tools/harness.mjs              # every mode + modifier, headless
 node tools/harness.mjs marches 200  # one mode, 200 seeded games
 node tools/smoke.mjs                # each mode booted in a real browser
 node tools/smoke.mjs --shots        # …and screenshotted to tools/shots/
+node tools/train.mjs                # tune Girando's bot by self-play
+node tools/train.mjs --report       # …or just measure what it does now
 node tools/stamp.mjs -m "what's new"  # bump the build stamp before pushing
 ```
 

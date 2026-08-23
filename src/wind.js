@@ -268,7 +268,7 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1 }) 
     for (const cell of loose) {
       if (board.size <= 1) break;
       report.fell.push({ id: cell.type.id, x: cell.x, y: cell.y, type: cell.type, rot: cell.rot, cell });
-      board.remove(cell.x, cell.y);
+      board.remove(cell.x, cell.y, { quiet: true });   // one rebuild at the end
     }
   }
 

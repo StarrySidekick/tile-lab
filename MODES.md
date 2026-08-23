@@ -249,6 +249,27 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > The four-way split is even enough that no colour is a trap and none is the obvious pick, which is the thing worth having; yellow leads because a road picks up the cities it reaches as well as its own tiles, so it compounds where the others don't. Scores are still roughly eightfold what they were before the sferas took over the economy, because a pass over the whole board firing sixteen times a game pays for everything you hold every single time. That is what the rules say and it may well be the point — but if the numbers want to be Carcassonne-sized rather than pinball-sized, the knob is the rates themselves, not the structure. Halving every rate leaves the split untouched.
 
 
+> **Eleventh pass: teach the computer player the rules, and find out what winning looks like.**
+>
+> Girando's rules were four passes old and nobody had ever played it well — including the harness, which was reading the board correctly and then valuing what it saw by Carcassonne's assumptions. So the mode's advice to the bot became a block of fifteen plain numbers, `GIRANDO_WEIGHTS`, and `tools/train.mjs` plays the mode against itself to improve them. Three things about how it is built are worth writing down, because each is a trap:
+>
+> - **It selects on WINNING, not on scoring.** "Make the bot's score as large as possible" is the obvious objective and it is badly wrong: both seats play the same mode, so anything that inflates the board inflates both scores. A weight set that closes spheres constantly scores enormously and hands the same enormous score to its opponent.
+> - **Every match is played twice with the seats swapped.** The first player lays the tile that starts the weather, and over sixteen games that is worth more than most of the weights are.
+> - **A challenger has to beat a margin.** Forty games puts the standard error on a win rate at about eight points, and a hill-climb that accepts noise walks away from a good answer as happily as it walks toward one.
+>
+> **It found a real bug in ten minutes, and the bug is the interesting part.** The trainer has a sweep mode that moves one weight at a time, halved and doubled. The `farm` weight came back at exactly 50% and a mean margin of exactly zero in BOTH directions — which, with the seats swapped, is the signature of two players behaving identically. The weight was not wired to anything: `Bot.expectedValue` had a hard-coded branch pricing a field by the completed cities touching it, Carcassonne's own farm rule, without ever asking the mode. Girando's farms pay by the TILE. The bot had been valuing the biggest income in the game by a rule that has nothing to do with it, for four passes, and nothing else would ever have caught it. The fix is one guard: a mode that prices a feature type itself is the authority on it. The bot's mean score went from 158 to 195 on that line alone.
+>
+> The same signature caught two dead weights. `whale` was a pure positive scale on a value used only in an argmax and a sign test, so it could not change a decision; it is a THRESHOLD now — how good the shelter has to be before the Balena is worth a follower placement. `turbineFree` guarded a branch nothing reaches, and is gone.
+>
+> **What winning actually looks like.** A sensitivity sweep and a self-play climb, run separately, agreed on every direction; the composed set beats the guesses it started from in **62.5% of 120 games at a mean margin of 19 points**. Read off the weights, the mode says:
+>
+> - **FARMS ARE THE GAME.** Twice as important as first assumed, and the strongest single signal in the sweep by a distance — halving it loses 75% of games, doubling it wins 69%. A trained bot takes 317 points a game from green and 26 from yellow.
+> - **Temples come second**, and roads are worth about half what they look like — despite yellow being the biggest stream when two identical bots play, which is the point: yellow pays everybody, and paying everybody is not a strategy.
+> - **A windmill in a city you hold is worth twice the guess**, which makes it the one small permanent thing worth fighting over.
+>
+> Two trained bots at full depth run a mean of 196 a game with a highest single score of 382, and 499 was seen during training. The lopsidedness — 317 from farms against 26 from roads — is the balance finding: the four colours are near-even when nobody is trying, and a long way from even once somebody is.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 

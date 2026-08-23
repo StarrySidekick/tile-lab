@@ -1,0 +1,41 @@
+{
+  "mode": "girando",
+  "rounds": 60,
+  "games": 40,
+  "trials": 60,
+  "accepted": 3,
+  "validation": {
+    "rate": 0.575,
+    "margin": 9.3,
+    "top": 293,
+    "mean": 201.2,
+    "spheres": 7.325,
+    "streams": {
+      "green farms": 226,
+      "red temples": 151,
+      "blue cities": 171,
+      "windmills": 4,
+      "yellow roads": 39,
+      "turbine gusts": 4
+    },
+    "games": 40
+  },
+  "weights": {
+    "ahead": 2,
+    "farm": 1.095,
+    "city": 1,
+    "road": 0.534,
+    "temple": 1,
+    "sphere": 1,
+    "sferaHalf": 1,
+    "parish": 0.611,
+    "parishFree": 0.289,
+    "turbineMine": 5,
+    "turbineFree": 3,
+    "turbineTheirs": -3.42,
+    "gust": 0.918,
+    "gustBlow": 1,
+    "whale": 1.61
+  },
+  "note": "The self-play climb that produced this ran before the shipped weights were updated, so it is a record of the session rather than the current defaults. The set actually shipped is composed from this and the sensitivity sweep, and validated at 62.5% over 120 games \u2014 see GIRANDO_WEIGHTS."
+}

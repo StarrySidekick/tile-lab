@@ -54,7 +54,14 @@ export const BOT_LEVELS = [
 
 export const BOT_LEVEL_BY_ID = Object.fromEntries(BOT_LEVELS.map((l) => [l.id, l]));
 
-const MAX_TRIALS = 160;      // candidate placements actually evaluated per turn
+/**
+ * Candidate placements actually evaluated per turn. Overridable per bot,
+ * because pricing a placement means laying the tile, rebuilding the board's
+ * connectivity, scoring, and taking it off again — so this number is most of
+ * what a bot's turn costs, and a trainer playing thousands of games wants to
+ * buy speed with a bit of depth.
+ */
+const MAX_TRIALS = 160;
 const CLAIM_BASE = 2.2;      // what an unplaced follower is worth, in points
 const FARMER_COST = 1.9;     // …and how much dearer it is when it never comes back
 const CLAIM_SCARCITY = 9;    // …divided by how many are left, so the last ones hurt
@@ -72,7 +79,8 @@ export class Bot {
    * @param seed   its own RNG, kept separate from the game's so that thinking
    *               never disturbs a seeded shuffle
    */
-  constructor(game, seat, { level = 'steady', seed = 1 } = {}) {
+  constructor(game, seat, { level = 'steady', seed = 1, trials = MAX_TRIALS } = {}) {
+    this.trials = trials;
     this.game = game;
     this.seat = seat;
     this.level = BOT_LEVEL_BY_ID[level] || BOT_LEVEL_BY_ID.steady;
@@ -285,7 +293,12 @@ export class Bot {
       }
       return this.scorePosition(laid);
     } finally {
-      for (let i = laid.length - 1; i >= 0; i--) board.remove(laid[i].x, laid[i].y);
+      // Quietly, then one rebuild: replaying the board's connectivity once per
+      // tile taken off is the single most expensive thing the bot does.
+      for (let i = laid.length - 1; i >= 0; i--) {
+        board.remove(laid[i].x, laid[i].y, { quiet: true });
+      }
+      if (laid.length) board.rebuild();
     }
   }
 
@@ -383,6 +396,22 @@ export class Bot {
   expectedValue(d, closed, room) {
     const g = this.game;
     const board = g.board;
+
+    // A MODE THAT PRICES THIS FEATURE ITSELF IS THE AUTHORITY ON IT. What
+    // follows is Carcassonne's own reasoning — how likely is this to close,
+    // how much will it grow first — and it is only reasoning at all in a mode
+    // where closing is what pays. Girando pays for what is standing where at
+    // the moment somebody closes a sphere, so its own numbers are the answer
+    // and none of the odds below mean anything.
+    //
+    // The farm branch is why this guard has to come first. It priced a field
+    // by the completed cities touching it, hard-coded, without ever asking the
+    // mode — so Girando's fields, which pay by the TILE, were valued by a rule
+    // that has nothing to do with them, and the weight meant to tune that was
+    // measurably doing nothing at all. A sweep of one weight at a time found
+    // it: halved and doubled came back byte-identical.
+    const own = g.m.valueOf?.(d, false);
+    if (own != null) return own;
 
     // A monastery is the clearest case of the distinction: an empty one
     // already pays 1 and will pay 9 if the country fills in around it.
@@ -665,13 +694,13 @@ export class Bot {
 
   /** Big boards make big candidate lists; take a random slice and move on. */
   sample(list) {
-    if (list.length <= MAX_TRIALS) return list;
+    if (list.length <= this.trials) return list;
     const out = list.slice();
     for (let i = out.length - 1; i > 0; i--) {
       const j = this.roll(i + 1);
       [out[i], out[j]] = [out[j], out[i]];
     }
-    return out.slice(0, MAX_TRIALS);
+    return out.slice(0, this.trials);
   }
 }
 
