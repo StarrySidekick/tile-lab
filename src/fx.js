@@ -33,6 +33,7 @@
 
 import { PLAYER_COLORS, THEME } from './theme.js';
 import { rotPoint } from './tiles.js';
+import { DESIGN } from './design.js';
 
 const MAX_LIVE = 120;         // a runaway effect list is a frame-rate bug
 
@@ -307,7 +308,7 @@ export class Effects {
         // rather than a single instantaneous rearrangement.
         const at = data.delay || 0;
         for (const m of data.moves || []) {
-          this.flyTile({ from: m.from, to: m.at, type: m.type, rot: m.rot, delay: at, life: LIFE.gustTile, solid: true });
+          this.flyTile({ from: m.from, to: m.at, type: m.type, rot: m.rot, delay: at, life: DESIGN.storm.tileGlide, solid: true });
         }
         if (data.fell?.length) this.fall(data.fell, 'blow', at);
         return;

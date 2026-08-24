@@ -202,6 +202,7 @@ import {
   TILE_TYPES, CENTRE_FEATURES, SIDE_STEP, opposite, buildDeck,
 } from '../tiles.js';
 import { PLAYER_COLORS } from '../theme.js';
+import { DESIGN } from '../design.js';
 import { claimableFeatures, citiesFed, hasMark } from '../mechanics.js';
 import {
   storm, zephyrDirs, zephyrPush, isCannon, worldDir, turbineOn, isTemple, MAX_STRENGTH,
@@ -1317,7 +1318,11 @@ export class Girando extends Mode {
     const at = this.stormAt || 0;
     // The first gusts of a storm take a full beat; later ones come quicker, so
     // a six-gust chain reads as weather picking up pace rather than a queue.
-    const BEAT = Math.max(340, 650 - 90 * (this.stormN || 0));
+    // Beats SHORTEN as a storm goes on: by the third corner you have
+    // understood the shape and only want to see where it ends up. Never below
+    // the floor, and both dials live in the design book.
+    const BEAT = Math.max(DESIGN.storm.minBeat,
+      DESIGN.storm.beat * (DESIGN.storm.decay ** (this.stormN || 0)));
     // The gust's own streak, down the lane it actually reached — and a beat on
     // the clock only if there was anything to watch.
     const acted = r.moved.length || r.fell.length || r.swung.length

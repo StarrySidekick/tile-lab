@@ -10,6 +10,7 @@ import { drawTile, drawMeeple, drawPig, drawIngots, drawBuilding, PLAYER_COLORS 
 import { tileSprite } from './sprites.js';
 import { LIGHT } from './light.js';
 import { THEME, applyDusk, usePalette } from './theme.js';
+import { DESIGN, rgba } from './design.js';
 import { rotPoint } from './tiles.js';
 import { liftableCells } from './mechanics.js';
 
@@ -322,8 +323,13 @@ export class Renderer {
       this.paperPattern = ctx.createPattern(this.paper, 'repeat');
     }
     if (this.paperPattern) {
+      ctx.fillStyle = DESIGN.paper.tint;          // the sheet's own tone, under the print
+      ctx.fillRect(0, 0, this.w, this.h);
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
       ctx.fillStyle = this.paperPattern;
       ctx.fillRect(0, 0, this.w, this.h);
+      ctx.restore();
     } else {
       const paper = ctx.createLinearGradient(0, 0, this.w * 0.4, this.h);
       paper.addColorStop(0, '#e9dcbd');
@@ -361,23 +367,26 @@ export class Renderer {
   drawSkyWash() {
     const ctx = this.ctx;
     ctx.save();
+    const a = DESIGN.sky.alpha;
     const sky = ctx.createLinearGradient(0, 0, 0, this.h);
-    sky.addColorStop(0, 'rgba(86,116,146,0.80)');
-    sky.addColorStop(0.42, 'rgba(116,146,171,0.74)');
-    sky.addColorStop(0.78, 'rgba(150,175,188,0.62)');
-    sky.addColorStop(1, 'rgba(178,194,192,0.50)');
+    sky.addColorStop(0, rgba(DESIGN.sky.top, a * 1.08));
+    sky.addColorStop(0.42, rgba(DESIGN.sky.mid, a));
+    sky.addColorStop(0.78, rgba(DESIGN.sky.low, a * 0.84));
+    sky.addColorStop(1, rgba(DESIGN.sky.low, a * 0.66));
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, this.w, this.h);
+    if (!DESIGN.sky.pooling) { ctx.restore(); return; }
 
     const drift = this.cam.zoom * 0.10;
-    for (const [ox, oy, r, a] of POOLING) {
+    for (const [ox, oy, r, pa] of POOLING) {
       const x = ox * this.w - this.cam.x * drift;
       const y = oy * this.h - this.cam.y * drift;
       const rad = r * Math.max(this.w, this.h);
+      const k = pa * DESIGN.sky.pooling;
       const pool = ctx.createRadialGradient(x, y, 0, x, y, rad);
-      pool.addColorStop(0, `rgba(62,96,128,${a})`);
-      pool.addColorStop(0.65, `rgba(62,96,128,${a * 0.4})`);
-      pool.addColorStop(1, 'rgba(62,96,128,0)');
+      pool.addColorStop(0, rgba(DESIGN.sky.poolTone, k));
+      pool.addColorStop(0.65, rgba(DESIGN.sky.poolTone, k * 0.4));
+      pool.addColorStop(1, rgba(DESIGN.sky.poolTone, 0));
       ctx.fillStyle = pool;
       ctx.beginPath();
       ctx.ellipse(x, y, rad, rad * 0.66, 0, 0, Math.PI * 2);
@@ -395,11 +404,11 @@ export class Renderer {
    * are looking through, not a place on the board.
    */
   drawGrain() {
-    if (!this.paperPattern) return;
+    if (!this.paperPattern || !DESIGN.paper.grain) return;
     const ctx = this.ctx;
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = 0.42;
+    ctx.globalAlpha = DESIGN.paper.grain;
     ctx.fillStyle = this.paperPattern;
     ctx.fillRect(0, 0, this.w, this.h);
     ctx.restore();
@@ -412,6 +421,7 @@ export class Renderer {
    * texture stuck to the glass — and so it never reshuffles between frames.
    */
   drawFoxing() {
+    if (!DESIGN.paper.foxing) return;
     const ctx = this.ctx;
     const drift = this.cam.zoom * 0.10;
     ctx.save();
@@ -422,9 +432,10 @@ export class Renderer {
       const x = ox * this.w - this.cam.x * drift;
       const y = oy * this.h - this.cam.y * drift;
       const rad = r * Math.min(this.w, this.h);
+      const k = a * DESIGN.paper.foxing;
       const blot = ctx.createRadialGradient(x, y, 0, x, y, rad);
-      blot.addColorStop(0, `rgba(146,104,54,${a * 1.7})`);
-      blot.addColorStop(0.6, `rgba(146,104,54,${a * 0.8})`);
+      blot.addColorStop(0, `rgba(146,104,54,${k * 1.7})`);
+      blot.addColorStop(0.6, `rgba(146,104,54,${k * 0.8})`);
       blot.addColorStop(1, 'rgba(146,104,54,0)');
       ctx.fillStyle = blot;
       ctx.beginPath();
@@ -443,9 +454,10 @@ export class Renderer {
     const ctx = this.ctx;
     const r = Math.hypot(this.w, this.h) * 0.62;
     const v = ctx.createRadialGradient(this.w / 2, this.h / 2, r * 0.42, this.w / 2, this.h / 2, r);
-    v.addColorStop(0, 'rgba(84,56,28,0)');
-    v.addColorStop(0.72, 'rgba(84,56,28,0.10)');
-    v.addColorStop(1, 'rgba(84,56,28,0.40)');
+    const e = DESIGN.paper.edge;
+    v.addColorStop(0, rgba(DESIGN.paper.edgeTone, 0));
+    v.addColorStop(0.72, rgba(DESIGN.paper.edgeTone, e * 0.25));
+    v.addColorStop(1, rgba(DESIGN.paper.edgeTone, e));
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, this.w, this.h);
   }
@@ -483,7 +495,9 @@ export class Renderer {
     const [x0, y0] = this.toWorld(0, 0);
     const [x1, y1] = this.toWorld(this.w, this.h);
 
-    for (const [step, color, width] of [[1, 'rgba(38,28,16,0.17)', 1], [5, 'rgba(38,28,16,0.42)', 1.6]]) {
+    for (const [step, color, width] of [
+      [1, rgba(DESIGN.ink.tone, DESIGN.ink.graticule), 1],
+      [5, rgba(DESIGN.ink.tone, DESIGN.ink.meridian), 1.6]]) {
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       ctx.beginPath();
@@ -513,7 +527,7 @@ export class Renderer {
     const R = RHUMB_RING;                                  // node ring, in squares
     const reach = (Math.hypot(this.w, this.h) / z) + R * 2;
     ctx.save();
-    ctx.strokeStyle = 'rgba(126,46,32,0.17)';        // rhumbs are drawn in red ink
+    ctx.strokeStyle = rgba(DESIGN.ink.rhumbTone, DESIGN.ink.rhumb);   // portolan red
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let n = 0; n < RHUMB_NODES; n++) {
@@ -547,7 +561,7 @@ export class Renderer {
 
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.strokeStyle = 'rgba(38,28,16,0.46)';
+    ctx.strokeStyle = rgba(DESIGN.ink.tone, DESIGN.ink.rose);
     ctx.lineWidth = 1.2;
     for (const k of [1, 0.72, 0.16]) {
       ctx.beginPath();
@@ -564,14 +578,14 @@ export class Renderer {
       ctx.lineTo(Math.cos(a + Math.PI / 2) * w, Math.sin(a + Math.PI / 2) * w);
       ctx.lineTo(Math.cos(a - Math.PI / 2) * w, Math.sin(a - Math.PI / 2) * w);
       ctx.closePath();
-      if (i % 2 === 0) { ctx.fillStyle = 'rgba(126,46,32,0.30)'; ctx.fill(); }
+      if (i % 2 === 0) { ctx.fillStyle = rgba(DESIGN.ink.rhumbTone, DESIGN.ink.rose * 0.65); ctx.fill(); }
       ctx.stroke();
     }
     // Small caps, letter-spaced, and clamped: the names are an inscription on
     // the chart, not a headline. Left unclamped they scale with the zoom and
     // SEPTENTRIO ends up the size of a tile.
     const size = Math.max(8, Math.min(15, r * 0.12));
-    ctx.fillStyle = 'rgba(38,28,16,0.62)';
+    ctx.fillStyle = rgba(DESIGN.ink.tone, DESIGN.ink.windNames);
     ctx.font = `600 ${size}px ui-serif, Georgia, serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -622,14 +636,18 @@ export class Renderer {
     const ctx = this.ctx;
     const [sx, sy] = this.toScreen(x, y);
     const z = this.cam.zoom;
-    ctx.save();
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = 'rgba(216,193,150,0.15)';
-    ctx.fillRect(sx, sy, z, z);
-    ctx.restore();
-    ctx.strokeStyle = 'rgba(64,44,26,0.28)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(Math.round(sx) + 0.5, Math.round(sy) + 0.5, Math.round(z) - 1, Math.round(z) - 1);
+    if (DESIGN.tile.wash) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = rgba(DESIGN.tile.washTone, DESIGN.tile.wash);
+      ctx.fillRect(sx, sy, z, z);
+      ctx.restore();
+    }
+    if (DESIGN.tile.border) {
+      ctx.strokeStyle = rgba(DESIGN.ink.tone, DESIGN.tile.border);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(Math.round(sx) + 0.5, Math.round(sy) + 0.5, Math.round(z) - 1, Math.round(z) - 1);
+    }
   }
 
   drawCellOverlay(cell, overlay, lift) {
@@ -1610,8 +1628,8 @@ export class Renderer {
           const [ssx, ssy] = at(fx0 - 0.5, fy0 - 0.5);
           const fade = t < 0.12 ? t / 0.12 : t > 0.75 ? (1 - t) / 0.25 : 1;
           ctx.save();
-          ctx.globalAlpha = fade * 0.8;
-          ctx.strokeStyle = e.blast ? 'rgba(126,46,32,0.9)' : 'rgba(40,36,28,0.75)';
+          ctx.globalAlpha = fade * DESIGN.storm.streak;
+          ctx.strokeStyle = e.blast ? rgba(DESIGN.storm.cannonInk, 0.92) : rgba(DESIGN.storm.streakInk, 0.85);
           ctx.lineCap = 'round';
           const [nx, ny] = dx === 0 ? [1, 0] : [0, 1];    // perpendicular to the lane
           for (const o of [-0.16, 0, 0.16]) {

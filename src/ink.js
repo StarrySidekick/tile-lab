@@ -21,6 +21,8 @@
 // ---------------------------------------------------------------------------
 
 /** Deterministic PRNG, so the grain of the world doesn't reroll per session. */
+import { DESIGN } from './design.js';
+
 function mulberry(seed) {
   let a = seed >>> 0;
   return () => {
@@ -58,8 +60,14 @@ const noiseY = makeNoise(707);
  * `grain` the wobble wavelength as a fraction of the width. Small amp, longish
  * wavelength is a steady hand; crank either and it becomes a child's crayon.
  */
-/** The gentle bend for the ground pass — amp ~0.9% of the tile. */
-export const WOBBLE = (w) => ({ amp: Math.max(0.7, w * 0.009), grain: 0.12 });
+/**
+ * The gentle bend for the ground pass. Read from the design book at CALL time,
+ * never cached — the console has to be able to move it while you watch.
+ */
+export const WOBBLE = (w) => ({
+  amp: Math.max(0.4, w * DESIGN.line.wobbleAmp),
+  grain: DESIGN.line.wobbleGrain,
+});
 
 /**
  * The tooth pass for everything, architecture included: sub-pixel amplitude at
@@ -67,7 +75,10 @@ export const WOBBLE = (w) => ({ amp: Math.max(0.7, w * 0.009), grain: 0.12 });
  * EDGE, which takes the grain of the paper the way ink does. This is the other
  * facet of a drawn line besides wander, and it is the one buildings get.
  */
-export const TOOTH = (w) => ({ amp: Math.max(0.4, w * 0.0022), grain: 0.032 });
+export const TOOTH = (w) => ({
+  amp: Math.max(0.25, w * DESIGN.line.toothAmp),
+  grain: DESIGN.line.toothGrain,
+});
 
 export function roughen(canvas, { amp = null, grain = 0.09 } = {}) {
   const w = canvas.width, h = canvas.height;

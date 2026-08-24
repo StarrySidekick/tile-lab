@@ -24,7 +24,7 @@
 
 import { drawTile } from './art.js';
 import { THEME } from './theme.js';
-import { roughen } from './ink.js';
+import { roughen, WOBBLE, TOOTH } from './ink.js';
 
 // Sprites are rendered at whichever bucket is the first one big enough, so
 // zooming re-uses a sprite until it would visibly soften, then steps up.
@@ -83,9 +83,9 @@ export function tileSprite(type, rot, terrain, px) {
     //      other half of what a nib does — straight lines stay straight but
     //      their edges take the grain of the paper.
     drawTile(ctx, type, { terrain, rot, only: 'ground' });
-    roughen(canvas, { amp: Math.max(0.7, size * 0.009), grain: 0.12 });
+    roughen(canvas, WOBBLE(size));
     drawTile(ctx, type, { terrain, rot, only: 'built' });
-    roughen(canvas, { amp: Math.max(0.5, size * 0.0032), grain: 0.024 });
+    roughen(canvas, TOOTH(size));
   } else {
     drawTile(ctx, type, { terrain, rot });
   }

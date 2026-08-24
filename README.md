@@ -103,6 +103,15 @@ you managed to close on the last turn is not a fifth pass, it is the same four
 everyone gets. The islands are counted first, off the board exactly as play
 left it.
 
+**The design console — `Shift`+`D`.** Every visual dial in the mode, live, with
+a slider or a swatch and a sentence saying what it does: the sheet's tone and
+grain and foxing, the sky wash and where the brush pooled, the wobble and tooth
+of the hand-drawn line, the chart's ink weights, every colour the country is
+painted in, the storm's pacing, the proportions of a star person. **Export JSON**
+hands back only what you changed — drop that file in as `assets/design.json` and
+the game boots wearing it, for everyone. Adding a new dial is one line in
+`src/design.js`; the console builds its own controls from that book.
+
 **The sky is the space, not the ground.** The gaps between tiles are open air —
 it is what a tile the wind blows clear of everything hangs in, and what runs
 between islands — while the tiles themselves stay ordinary countryside. It is drawn as an old

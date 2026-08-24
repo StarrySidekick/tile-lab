@@ -698,6 +698,38 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 >   chewed rather than drawn.
 
 
+> **Twentieth pass: the design book, and a console to read it with.**
+>
+> Every visual constant in the game was a literal buried three files deep,
+> tuned by guesswork and rediscovered by grepping — the foxing table in
+> render.js, the wobble amplitude in ink.js, the storm beat in girando.js, the
+> chart palette in theme.js, the parchment variables in style.css. They are now
+> ONE table in `src/design.js`: 56 entries, each with a name, a type, a range,
+> a default and a sentence saying what it does.
+>
+> `src/designer.js` generates a control for every entry straight from that
+> table — slider for a number, swatch for a colour, the note underneath — so
+> **adding a tunable is one line and it turns up in the console with its own
+> documentation.** Shift+D opens it. Export writes only the differences from
+> the defaults, which is a small readable JSON you can paste into a
+> conversation as readily as drop in a folder; `assets/design.json`, if
+> committed, is loaded at boot and becomes the baseline for everyone. Import
+> takes one back, Reset returns to the book, and the session is remembered in
+> localStorage so a look survives a reload while you are still deciding.
+>
+> The contract that makes it work is one line long and worth stating because it
+> is the thing that breaks: **read at use, never at module load.** A value
+> cached in a `const` at import time cannot be tuned, which is exactly the
+> problem the book exists to end. Changing anything drops the sprite cache
+> (tiles bake the palette AND the hand-drawn line into a bitmap), forces the
+> palette to rebuild, and repaints the previews — paid on drag, not per frame.
+>
+> The storm's pacing got its dials at the same time and the shape they wanted
+> turned out to be a DECAY: beats shorten as a chain goes on, because by the
+> third corner you have understood the shape and only want to see where it ends
+> up. 650ms, ×0.82 a beat, never below 220.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 

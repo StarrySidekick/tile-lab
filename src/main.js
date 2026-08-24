@@ -20,7 +20,10 @@ import {
 import { Renderer } from './render.js';
 import { drawTile, drawMeeple, PLAYER_COLORS } from './art.js';
 import { roughen, WOBBLE, TOOTH } from './ink.js';
-import { THEME } from './theme.js';
+import { DESIGN, onDesignChange, loadCommitted } from './design.js';
+import { Designer } from './designer.js';
+import { THEME, usePalette } from './theme.js';
+import { clearSprites } from './sprites.js';
 import { TILE_TYPES, TILES, GROUPS, rotPoint } from './tiles.js';
 import { Sfx, SOUND_NAMES } from './audio.js';
 import { Effects } from './fx.js';
@@ -28,6 +31,33 @@ import { VERSION } from './version.js';
 
 const canvas = document.getElementById('board');
 const renderer = new Renderer(canvas);
+
+/**
+ * THE DESIGN CONSOLE. Every visual dial in the game, live, behind Shift+D —
+ * see design.js for the book it is generated from.
+ *
+ * Changing anything means the cached tile pictures are wrong (they bake the
+ * palette and the hand-drawn line into a bitmap) and the panel's CSS variables
+ * are stale, so a change drops the sprite cache, repaints the previews and
+ * forces the palette to rebuild. That is the whole cost, and it is paid on
+ * drag rather than per frame.
+ */
+const designer = new Designer();
+designer.restore();
+onDesignChange(() => {
+  clearSprites();
+  usePalette(THEME.paletteName, true);
+  paintCss();
+  if (game) { drawPreview(); renderClaim(); }
+});
+
+/** The design book's colours, pushed into the stylesheet for the panels. */
+function paintCss() {
+  const root = document.documentElement.style;
+  root.setProperty('--paper-tint', DESIGN.paper.tint);
+  root.setProperty('--ink-tone', DESIGN.ink.tone);
+  root.setProperty('--chart-accent', DESIGN.ink.rhumbTone);
+}
 const $ = (id) => document.getElementById(id);
 const sfx = new Sfx();
 
@@ -504,6 +534,8 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); return void setLean(!lean); }
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   // The two view keys still work while the computer plays; nothing else does.
+  // Shift+D opens the design console; plain d is still the debug overlay.
+  if (e.key === 'D' && e.shiftKey) { e.preventDefault(); return void designer.toggle(); }
   if (e.key === 'd' || e.key === 'D') { renderer.showDebug = !renderer.showDebug; $('debug').checked = renderer.showDebug; }
   if (e.key === 'c' || e.key === 'C') {
     if (game.lastPlaced) renderer.centerOn(game.lastPlaced.x, game.lastPlaced.y);
@@ -1512,7 +1544,16 @@ game = bind(new Game({
 game.free = $('freePlace').checked;
 buildBots();
 syncPanel();
+paintCss();
 frame();
+
+// A committed assets/design.json — an exported session somebody decided to
+// keep — becomes the baseline for everyone. Loaded after the first frame so
+// boot is never blocked on a file that usually isn't there; when it is, the
+// change hook repaints everything.
+loadCommitted().then((found) => {
+  if (found) { designer.sync(); console.log('design: assets/design.json applied'); }
+});
 
 // Handy for poking at state from the devtools console while iterating.
 window.LAB = {
@@ -1520,7 +1561,7 @@ window.LAB = {
   get bots() { return bots; },
   renderer, newGame, THEME, sfx, fx, MODES, MECHANICS, LIVE_MECHANICS, VERSION,
   claimSpots: () => claimSpots,
-  setLean,
+  setLean, designer, DESIGN,
   get mechanics() { return mechanics; },
   get ruleset() { return ruleset; },
 };

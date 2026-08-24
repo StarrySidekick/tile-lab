@@ -10,6 +10,7 @@ import { SIDE_MID, SIDE_VEC } from './tiles.js';
 import { THEME, PLAYER_COLORS, PLAYER_NAMES } from './theme.js';
 import { LIGHT, spin, shadow, noShadow } from './light.js';
 import { featureShape } from './shape.js';
+import { DESIGN } from './design.js';
 
 export { PLAYER_COLORS, PLAYER_NAMES };
 
@@ -2105,7 +2106,7 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     // On the chart palette the hatch drops to a whisper: a printed map's land
     // is a wash, and the crosshatch at full strength read as wallpaper.
     const chart = THEME.paletteName === 'chart';
-    ctx.strokeStyle = chart ? 'rgba(92,96,58,0.10)' : 'rgba(92,102,58,0.20)';
+    ctx.strokeStyle = chart ? `rgba(92,96,58,${DESIGN.tile.hatch})` : 'rgba(92,102,58,0.20)';
     ctx.lineWidth = 0.016;
     for (let i = -1.2; i < 2.4; i += 0.25) {
       ctx.beginPath();
@@ -2280,9 +2281,9 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
  * somebody standing with their arms out.
  */
 export function meeplePath(ctx) {
-  const OUT = 0.56;                    // arms, legs
-  const HEAD = 0.68;                   // …and the head, which reaches further
-  const IN = 0.235;                    // the waist between them
+  const OUT = DESIGN.star.arm;         // arms, legs
+  const HEAD = DESIGN.star.head;       // …and the head, which reaches further
+  const IN = DESIGN.star.waist;        // the waist between them
   ctx.beginPath();
   for (let i = 0; i < 5; i++) {
     const a = -Math.PI / 2 + i * (Math.PI * 2 / 5);
@@ -2323,7 +2324,7 @@ export function drawMeeple(ctx, x, y, size, color, opts = {}) {
     ctx.ellipse(0, 0.16, 0.52, 0.26, 0, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
-    ctx.lineWidth = 0.09;
+    ctx.lineWidth = 0.09 * DESIGN.star.ink;
     ctx.strokeStyle = 'rgba(0,0,0,0.65)';
     ctx.stroke();
     ctx.restore();
