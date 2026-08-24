@@ -608,6 +608,38 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > the mechanic.
 
 
+> **Seventeenth pass: the art gets an instrument panel, and the whole mode is struck from one plate.**
+>
+> Three tools first, because art was being reviewed by squinting at screenshots:
+> `docs/refs/` holds the owner's five reference scans with their palettes and
+> ink densities MEASURED (the Blaeu paper samples to `#e8c888`, the engraved
+> wind-heads are 48% ink — numbers, not vibes; `tools/art.mjs --measure`
+> re-runs the sampling). `tools/art.mjs` renders a contact sheet of every cloud
+> tile at 24/40/64/240px, because art reviewed only at atlas size ships mush at
+> play size. And `tools/paper.py` SYNTHESISES the sheet — FFT-periodic value
+> noise for cockle, wire and chain lines, pulp flecks — into a tileable
+> `assets/paper.png`. Deterministic, seeded, no generator anywhere near it.
+>
+> **The chart palette.** Girando's country is recoloured to the measured
+> reference tones — sage wash on buff land, bare-paper roads inside ink edges,
+> vermillion roofs, the portolan's near-grey sea — as a palette overlay in
+> theme.js that `usePalette()` swaps in per frame. The sprite cache keys on the
+> palette name, so every other mode keeps twilight untouched. The sferas were
+> the last modern object on the board — radial-gradient glass balls — and are
+> now ENGRAVED: flat glaze inside an ink rim, meridian hatching, a lit
+> crescent, the way a chart draws a globe gore. The backdrop and the panels are
+> the synthesised paper; the fake 3px "laid lines" died unmourned.
+>
+> **And the storm became watchable.** The rules still resolve synchronously —
+> the harness never waits — but each gust's effects are stamped onto a visual
+> clock a 650ms beat after the last: an ink comet sweeps the lane the gust
+> actually reached (red for a cannon), every zephyr it wakes flashes a ring
+> just before its own gust plays, and the tiles slide on their gust's beat
+> rather than all at once. A chain that turns three corners is now a sequence
+> you watch turn three corners. Tiles moving on a delayed beat are drawn
+> sitting at their origin until it arrives, so nothing blinks out of the world.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 

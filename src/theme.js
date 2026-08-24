@@ -81,6 +81,80 @@ export const THEME = {
   dim: '#9a9089',
 };
 
+/**
+ * THE CHART PALETTE — Girando's, and measured rather than invented. The
+ * reference scans in docs/refs sample to a gold-buff paper (#e8c888 family),
+ * near-grey sea washes, vermillion accents and a warm near-black ink; the
+ * values here are those samples, adjusted only far enough apart to stay
+ * readable at 40px. See docs/refs/README.md for the numbers.
+ *
+ * A partial overlay: anything not named here keeps its twilight value.
+ */
+const CHART = {
+  field: '#b0ab77',        // sage wash on buff — land colour on the coloured charts
+  fieldAlt: '#a49e6c',
+  fieldEdge: '#7d774e',
+
+  road: '#e6d6ae',         // bare paper showing between ink edges
+  roadCore: '#eee0bf',
+  roadEdge: '#45351f',     // ink
+
+  city: '#cdb488',         // warm stone, one step off the paper
+  cityShade: '#b39a6e',
+  cityWall: '#54402a',
+  wallLit: '#e5d2a6',
+  cityGround: '#c4ac81',
+  cityGrit: '#b9a175',
+
+  roof: '#b5502f',         // vermillion — the accent every reference leans on
+  roofDark: '#8c3a20',
+  roofLit: '#d0703f',
+  roofShade: '#6e2c17',
+  plaster: '#eee0c2',
+  timber: '#54402a',
+
+  shield: '#5b7f99',       // chart blue
+  shieldEdge: '#33506a',
+
+  forest: '#7d8a58',
+  forestDark: '#616e42',
+  forestCanopy: '#8f9c66',
+  rock: '#a08c6e',
+  rockDark: '#7c6b51',
+  rockSnow: '#e8dcc2',
+  water: '#8fa9b4',        // the portolan's near-grey sea
+  waterDeep: '#6d8b9a',
+  waterEdge: '#b6cbd1',
+
+  border: 'rgba(40,36,28,0.55)',   // ink outline on every tile
+
+  teal: '#2f6f68',
+  tealDeep: '#1f4a45',
+
+  // An engraving is hatched, not lit: the sun all but goes out.
+  lit: 'rgba(255,244,214,0.16)',
+  shade: 'rgba(70,50,30,0.18)',
+  cast: 'rgba(58,42,26,0.28)',
+};
+
+/** What twilight had, for everything CHART touches — so the switch reverses. */
+const TWILIGHT = {};
+for (const k of Object.keys(CHART)) TWILIGHT[k] = THEME[k];
+
+/**
+ * Swap the live palette. THEME is imported by value-reference everywhere, so
+ * this mutates it in place; the sprite cache keys on `THEME.paletteName` and
+ * keeps both sets of pictures. The renderer calls this once per frame from
+ * whatever mode is active — the last game drawn decides, which is fine,
+ * because there is only ever one.
+ */
+THEME.paletteName = 'twilight';
+export function usePalette(name) {
+  if (THEME.paletteName === name) return;
+  Object.assign(THEME, name === 'chart' ? CHART : TWILIGHT);
+  THEME.paletteName = name;
+}
+
 // Muted, earthy player colors — no primaries.
 export const PLAYER_COLORS = ['#b6483a', '#4a7fa8', '#6f9a52', '#d0a03f', '#7a6a94'];
 export const PLAYER_NAMES = ['Ordon', 'Lanayru', 'Faron', 'Eldin', 'Twilight'];

@@ -9,7 +9,7 @@
 import { drawTile, drawMeeple, drawPig, drawIngots, drawBuilding, PLAYER_COLORS } from './art.js';
 import { tileSprite } from './sprites.js';
 import { LIGHT } from './light.js';
-import { THEME, applyDusk } from './theme.js';
+import { THEME, applyDusk, usePalette } from './theme.js';
 import { rotPoint } from './tiles.js';
 import { liftableCells } from './mechanics.js';
 
@@ -50,6 +50,12 @@ export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    // The synthesised sheet (tools/paper.py): laid lines, chain lines, cockle
+    // and flecks, tileable. Loaded once; until it arrives the flat gradient
+    // stands in, which is one frame nobody sees.
+    this.paper = new Image();
+    this.paper.src = './assets/paper.png';
+    this.paperPattern = null;
     this.cam = { x: 0.5, y: 0.5, zoom: 96 };
     this.hover = null;      // grid cell under the pointer
     this.pending = null;    // a placement staged but not yet committed
@@ -183,10 +189,14 @@ export class Renderer {
     if (game.options?.tide) this.drawWater(game);
 
     const fog = game.options?.fog ? this.fogSet(game) : null;
-    // A mode printed on parchment wants its country printed on it too, not
-    // painted over the top of it. One warm wash and a hairline of ink round
-    // every tile turns the board from a set of models into a plate.
+    // A mode printed on parchment gets the CHART palette: the country is
+    // recoloured to the measured reference tones (see theme.js), the sprite
+    // cache keeps both sets of pictures, and every other mode stays twilight.
+    // On top of that, a hairline of ink round every tile turns the board from
+    // a set of models into a plate. Set before ANY tile is drawn this frame —
+    // the hand preview and claim panel draw through the same global.
     const antique = game.m?.backdrop === 'sky';
+    usePalette(antique ? 'chart' : 'twilight');
 
     for (const cell of game.board.cells.values()) {
       if (!this.onScreen(cell.x, cell.y)) continue;
@@ -306,15 +316,25 @@ export class Renderer {
     // — the rhumbs, the rose, the wind-heads on the zephyrs — is ink. So the
     // ground is aged paper, warm in the middle and browner at the edges the way
     // a sheet is where it has been handled, with foxing blotted into it.
-    const paper = ctx.createLinearGradient(0, 0, this.w * 0.4, this.h);
-    paper.addColorStop(0, '#e9dcbd');
-    paper.addColorStop(0.45, '#e2d3b0');
-    paper.addColorStop(1, '#cfbc94');
-    ctx.fillStyle = paper;
-    ctx.fillRect(0, 0, this.w, this.h);
+    // The real sheet, if it has arrived — a repeating pattern of the
+    // synthesised laid paper — and the flat gradient for the frame before it.
+    if (!this.paperPattern && this.paper.complete && this.paper.naturalWidth) {
+      this.paperPattern = ctx.createPattern(this.paper, 'repeat');
+    }
+    if (this.paperPattern) {
+      ctx.fillStyle = this.paperPattern;
+      ctx.fillRect(0, 0, this.w, this.h);
+    } else {
+      const paper = ctx.createLinearGradient(0, 0, this.w * 0.4, this.h);
+      paper.addColorStop(0, '#e9dcbd');
+      paper.addColorStop(0.45, '#e2d3b0');
+      paper.addColorStop(1, '#cfbc94');
+      ctx.fillStyle = paper;
+      ctx.fillRect(0, 0, this.w, this.h);
+    }
 
     this.drawSkyWash();
-    this.drawLaidLines();
+    this.drawGrain();
     this.drawFoxing();
 
     // The rhumb network and the rose are the expensive half and the half that
@@ -367,28 +387,21 @@ export class Renderer {
   }
 
   /**
-   * The laid lines of the sheet, brought back through the paint. Fine chain
-   * lines one way and closer wire lines the other, multiplied so they darken
-   * the wash rather than sitting on it — the single cheapest thing that says
-   * "this is paper" and the reason the wash reads as sunk in.
-   *
-   * Pinned to the screen rather than the world: the sheet is what you are
-   * looking THROUGH, and a grain that slid about under the board would read as
-   * something moving rather than as something you are holding.
+   * The paper's grain, brought back THROUGH the paint. The same synthesised
+   * sheet that lies under the wash is multiplied over it at low strength, so
+   * its laid lines and flecks darken the sky rather than vanish beneath it —
+   * paint under grain reads as pigment sunk into a sheet, and this is the half
+   * of the trick that sells it. Pinned to the screen: the sheet is what you
+   * are looking through, not a place on the board.
    */
-  drawLaidLines() {
+  drawGrain() {
+    if (!this.paperPattern) return;
     const ctx = this.ctx;
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
-    ctx.strokeStyle = 'rgba(126,102,68,0.09)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let x = 0; x < this.w; x += 3) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, this.h); }
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(126,102,68,0.07)';
-    ctx.beginPath();
-    for (let y = 0; y < this.h; y += 9) { ctx.moveTo(0, y + 0.5); ctx.lineTo(this.w, y + 0.5); }
-    ctx.stroke();
+    ctx.globalAlpha = 0.42;
+    ctx.fillStyle = this.paperPattern;
+    ctx.fillRect(0, 0, this.w, this.h);
     ctx.restore();
   }
 
@@ -1441,7 +1454,11 @@ export class Renderer {
     ctx.save();
     for (const e of items) {
       if ((e.space || 'board') !== space) continue;
-      if (now < e.born) continue;                 // staggered — not yet
+      // Staggered — not yet. A moving TILE is the exception: it has already
+      // moved on the board and its destination is veiled, so during the wait
+      // it has to be drawn sitting at its origin or it blinks out of the
+      // world. t clamps to 0, which is exactly that.
+      if (now < e.born && e.kind !== 'tile' && e.kind !== 'fall') continue;
       const t = Math.min(1, Math.max(0, (now - e.born) / e.life));
       switch (e.kind) {
         case 'float': {
@@ -1550,6 +1567,40 @@ export class Renderer {
             ctx.fillStyle = `rgba(48,84,110,${0.25 + k * 0.55})`;
             ctx.fillRect(-shrink / 2, -shrink / 2, shrink, shrink);
           }
+          ctx.restore();
+          break;
+        }
+
+        case 'wind': {
+          // The gust itself: an ink comet sweeping down its lane. Three
+          // wavering breath-lines behind a curl of a head — the same drawing
+          // the wind-heads blow, moving. A cannon's is straighter and drawn in
+          // the rhumbs' red.
+          const k = ease(t);
+          const fx0 = e.from.x + 0.5, fy0 = e.from.y + 0.5;
+          const dx = e.to.x - e.from.x, dy = e.to.y - e.from.y;
+          const hx = fx0 + dx * k, hy = fy0 + dy * k;      // the head, in world
+          const [hsx, hsy] = at(hx - 0.5, hy - 0.5);
+          const [ssx, ssy] = at(fx0 - 0.5, fy0 - 0.5);
+          const fade = t < 0.12 ? t / 0.12 : t > 0.75 ? (1 - t) / 0.25 : 1;
+          ctx.save();
+          ctx.globalAlpha = fade * 0.8;
+          ctx.strokeStyle = e.blast ? 'rgba(126,46,32,0.9)' : 'rgba(40,36,28,0.75)';
+          ctx.lineCap = 'round';
+          const [nx, ny] = dx === 0 ? [1, 0] : [0, 1];    // perpendicular to the lane
+          for (const o of [-0.16, 0, 0.16]) {
+            const wob = Math.sin(now / 90 + o * 20) * 0.05;
+            ctx.lineWidth = Math.max(1.5, z * (o === 0 ? 0.05 : 0.03));
+            ctx.beginPath();
+            ctx.moveTo(ssx + z / 2 + nx * (o + wob) * z, ssy + z / 2 + ny * (o + wob) * z);
+            ctx.lineTo(hsx + z / 2 + nx * (o - wob) * z, hsy + z / 2 + ny * (o - wob) * z);
+            ctx.stroke();
+          }
+          // The curl at the head.
+          ctx.lineWidth = Math.max(1.5, z * 0.05);
+          ctx.beginPath();
+          ctx.arc(hsx + z / 2, hsy + z / 2, z * 0.18, 0, Math.PI * 1.5);
+          ctx.stroke();
           ctx.restore();
           break;
         }

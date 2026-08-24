@@ -23,6 +23,7 @@
 // ---------------------------------------------------------------------------
 
 import { drawTile } from './art.js';
+import { THEME } from './theme.js';
 
 // Sprites are rendered at whichever bucket is the first one big enough, so
 // zooming re-uses a sprite until it would visibly soften, then steps up.
@@ -52,7 +53,7 @@ function surface(px) {
 export function tileSprite(type, rot, terrain, px) {
   const size = BUCKETS.find((b) => b >= px);
   if (!size) return null;                       // past 512px, draw vectors
-  const key = `${type.id}|${rot & 3}|${terrain}|${size}`;
+  const key = `${type.id}|${rot & 3}|${terrain}|${size}|${THEME.paletteName}`;
 
   const hit = cache.get(key);
   if (hit) {

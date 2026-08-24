@@ -1282,6 +1282,11 @@ export class Girando extends Mode {
   weather(spec, by) {
     if (this.blowing) { this.queued.push([spec, by]); return; }
     this.blowing = true;
+    // The visual clock. The rules resolve the whole storm synchronously —
+    // nothing here waits — but each gust's EFFECTS are stamped a beat later
+    // than the last, so a chain plays out on screen as a sequence you can
+    // follow: streak, wake, slide, streak, wake, slide.
+    this.stormAt = 0;
     try {
       let job = [spec, by];
       for (let n = 0; job && n < MAX_CHAIN; n++) {
@@ -1308,6 +1313,28 @@ export class Girando extends Mode {
   applyGust(r) {
     const g = this.game;
     this.gusts++;
+    const at = this.stormAt || 0;
+    const BEAT = 650;
+    // The gust's own streak, down the lane it actually reached — and a beat on
+    // the clock only if there was anything to watch.
+    const acted = r.moved.length || r.fell.length || r.swung.length
+      || r.homed.length || r.carried.length || r.lifted.length || r.zephyrs.length;
+    if (r.from && acted) {
+      const [dx, dy] = SIDE_STEP[r.dir];
+      const far = r.reached.length
+        ? Math.max(...r.reached.map((c) => (c.x - r.from.x) * dx + (c.y - r.from.y) * dy)) + 1
+        : 2;
+      g.emit('wind', {
+        dir: r.dir, blast: !!r.blast, delay: at,
+        from: { x: r.from.x, y: r.from.y },
+        to: { x: r.from.x + dx * far, y: r.from.y + dy * far },
+      });
+    }
+    // Every zephyr this gust wakes flashes just before its own gust plays.
+    for (const zz of r.zephyrs) {
+      g.emit('wake', { at: { x: zz.cell.x + 0.5, y: zz.cell.y + 0.5 }, blast: !!zz.blast, delay: at + BEAT * 0.55 });
+    }
+    if (acted) this.stormAt = at + BEAT;
     this.payTurbines(r.turbines);
     // A gust that found nothing has to SAY it found nothing. Nearly half the
     // zephyrs played point out over the edge of the country into open sky —
@@ -1326,6 +1353,7 @@ export class Girando extends Mode {
 
     g.emit('gust', {
       dir: r.dir,
+      delay: at + 140,
       moves: r.moved.map((m) => ({
         from: { x: m.from.x + 0.5, y: m.from.y + 0.5 },
         at: { x: m.cell.x + 0.5, y: m.cell.y + 0.5 },
@@ -1369,6 +1397,7 @@ export class Girando extends Mode {
         from: { x: m.from.x + 0.5, y: m.from.y + 0.5 },
         at: { x: m.to.x + 0.5, y: m.to.y + 0.5 },
         key: `meeple:${m.to.x},${m.to.y}`, player: m.player,
+        delay: at + 220,
       });
     }
     for (const m of r.homed) {

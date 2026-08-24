@@ -42,6 +42,8 @@ export const LIFE = {
   ring: 520,
   land: 400,
   tile: 260,                  // a tile flying in from the preview
+  gustTile: 420,              // a tile the wind moves — slower, so the eye follows
+  wind: 900,                  // the streak of a gust sweeping its lane
   figure: 420,                // a follower hopping to where it's going
   fall: 900,                  // drifting away, or going under
   sweep: 260,                 // per cell; a region takes as long as it's wide
@@ -127,13 +129,13 @@ export class Effects {
    * Strata tile rises onto the stack it just covered instead of appearing on
    * top of it.
    */
-  flyTile({ from, to, type, rot, lift = 0, from_lift = null, delay = 0 }) {
+  flyTile({ from, to, type, rot, lift = 0, from_lift = null, delay = 0, life = LIFE.tile }) {
     const e = this.add({
       kind: 'tile', from: from || to, to, type, rot,
       lift0: from_lift == null ? lift : from_lift, lift1: lift,
-      delay, life: LIFE.tile,
+      delay, life,
     });
-    if (e) this.veil(`tile:${to.x},${to.y}`, (e.delay || 0) + LIFE.tile);
+    if (e) this.veil(`tile:${to.x},${to.y}`, (e.delay || 0) + life);
     return e;
   }
 
@@ -145,14 +147,14 @@ export class Effects {
   }
 
   /** A tile leaving the board: blown off the edge, or going under the water. */
-  fall(cells, how = 'blow') {
+  fall(cells, how = 'blow', delay = 0) {
     if (!cells?.length) return;
     cells.forEach((c, i) => {
       this.add({
         kind: 'fall', x: c.x, y: c.y, type: c.type, rot: c.rot, how,
         spin: how === 'blow' ? (i % 2 ? 0.5 : -0.5) : 0.08,
         drift: how === 'blow' ? 1.6 : 0,
-        delay: i * 45,
+        delay: delay + i * 45,
         life: LIFE.fall,
       });
     });
@@ -288,6 +290,7 @@ export class Effects {
           color: colorOf(data.player ?? game?.current ?? 0),
           key: data.key,
           style: data.style || null,
+          delay: data.delay || 0,
           life: kind === 'warp' ? 300 : LIFE.figure,
         });
         if (kind === 'warp') {
@@ -299,11 +302,35 @@ export class Effects {
 
       case 'gust': {
         // Everything the wind shoved, sliding one square at once, and whatever
-        // it pushed off the edge tumbling after it.
+        // it pushed off the edge tumbling after it. `delay` staggers the gusts
+        // of one storm so a chain plays out as a sequence you can follow
+        // rather than a single instantaneous rearrangement.
+        const at = data.delay || 0;
         for (const m of data.moves || []) {
-          this.flyTile({ from: m.from, to: m.at, type: m.type, rot: m.rot });
+          this.flyTile({ from: m.from, to: m.at, type: m.type, rot: m.rot, delay: at, life: LIFE.gustTile });
         }
-        if (data.fell?.length) this.fall(data.fell, 'blow');
+        if (data.fell?.length) this.fall(data.fell, 'blow', at);
+        return;
+      }
+
+      case 'wind': {
+        // The gust itself: an ink streak sweeping down the lane, so the path
+        // the weather takes is a thing you watch rather than reconstruct.
+        this.add({
+          kind: 'wind', from: data.from, to: data.to, dir: data.dir,
+          blast: !!data.blast, delay: data.delay || 0, life: LIFE.wind,
+        });
+        return;
+      }
+
+      case 'wake': {
+        // A zephyr the storm reached and set off. The ring is the "this one
+        // fires next" cue, timed just before its own gust plays.
+        this.add({
+          kind: 'ring', x: data.at.x, y: data.at.y, color: data.blast ? '#8a3f28' : THEME.tealDeep,
+          r: 0.62, space: 'board', delay: data.delay || 0, life: LIFE.ring + 260,
+        });
+        this.flash([{ x: data.at.x - 0.5, y: data.at.y - 0.5 }], data.blast ? '138,63,40' : '47,111,104', data.delay || 0);
         return;
       }
 

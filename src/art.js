@@ -422,34 +422,56 @@ function drawSfera(ctx, f, L) {
   const [vx, vy] = SIDE_VEC[side];
   const cx = 0.5 + vx * 0.5, cy = 0.5 + vy * 0.5;      // centre sits ON the edge
   const r = 0.30;
+  const INK = 'rgba(40,36,28,0.9)';
 
   ctx.save();
   // Clipped to the tile, so the half that belongs to the neighbour isn't drawn.
   ctx.beginPath(); ctx.rect(0, 0, 1, 1); ctx.clip();
 
-  ctx.beginPath();
-  ctx.arc(cx - L.x * 0.03, cy - L.y * 0.03, r, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(13,11,17,0.30)';
-  ctx.fill();
-
-  const grad = ctx.createRadialGradient(
-    cx - L.x * 0.11, cy - L.y * 0.11, r * 0.12, cx, cy, r);
-  grad.addColorStop(0, glaze.lit);
-  grad.addColorStop(0.55, glaze.body);
-  grad.addColorStop(1, glaze.shade);
+  // ENGRAVED, not rendered. A chart draws a sphere as a flat wash of its
+  // colour inside an ink rim, with curved hatch lines doing the turning —
+  // the way every globe gore and armillary in the references is drawn. The
+  // radial-gradient glass ball it used to be was the one modern object left
+  // on the board.
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = grad;
+  ctx.fillStyle = glaze.body;
   ctx.fill();
-  ctx.lineWidth = 0.028;
-  ctx.strokeStyle = glaze.rim;
-  ctx.stroke();
 
-  // A meridian, so a half looks like half of something rather than a blob.
+  // The lit crescent: paper showing through a thinner wash, offset sunward.
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
   ctx.beginPath();
-  ctx.ellipse(cx, cy, r * 0.42, r, 0, 0, Math.PI * 2);
-  ctx.lineWidth = 0.016;
-  ctx.strokeStyle = 'rgba(232,222,208,0.30)';
+  ctx.arc(cx - L.x * 0.085, cy - L.y * 0.085, r * 0.82, 0, Math.PI * 2);
+  ctx.fillStyle = glaze.lit;
+  ctx.globalAlpha = 0.55;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Hatching: meridian arcs, tighter toward the shaded limb, drawn in the
+  // glaze's own dark rather than black so the four hues stay four hues.
+  ctx.strokeStyle = glaze.shade;
+  ctx.lineWidth = 0.014;
+  for (const k of [-0.85, -0.6, -0.3, 0, 0.3, 0.6, 0.85]) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * Math.abs(k), r, Math.atan2(vy, vx), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // …and the shaded limb itself, a band of closer shading away from the sun.
+  ctx.beginPath();
+  ctx.arc(cx + L.x * 0.10, cy + L.y * 0.10, r * 0.96, 0, Math.PI * 2);
+  ctx.strokeStyle = glaze.shade;
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 0.05;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // The ink rim, and an equator so a half reads as half of something.
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.lineWidth = 0.026;
+  ctx.strokeStyle = INK;
   ctx.stroke();
 
   ctx.restore();
@@ -2074,7 +2096,10 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     // it, and crossed strokes look identical after a quarter turn while one
     // diagonal flips. That's the difference between fields that run together
     // and fields with a seam down every edge.
-    ctx.strokeStyle = 'rgba(92,102,58,0.20)';
+    // On the chart palette the hatch drops to a whisper: a printed map's land
+    // is a wash, and the crosshatch at full strength read as wallpaper.
+    const chart = THEME.paletteName === 'chart';
+    ctx.strokeStyle = chart ? 'rgba(92,96,58,0.10)' : 'rgba(92,102,58,0.20)';
     ctx.lineWidth = 0.016;
     for (let i = -1.2; i < 2.4; i += 0.25) {
       ctx.beginPath();
