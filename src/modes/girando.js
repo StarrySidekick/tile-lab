@@ -32,18 +32,21 @@
 // same storm twice. The ones that blow several ways at once open a lane each
 // out of the same square. Two DOUBLE ZEPHYRS open at two.
 //
-// A TILE TOUCHING NOTHING ORTHOGONALLY falls out of the sky, back to the bottom
-// of the deck — and that is asked of every tile after a gust, not only the ones
-// that moved, because a tile the wind never touched is left hanging when the
-// neighbours holding it up slide away. Whoever set the wind off may catch one
-// and throw it straight back down, taking a second placement while the hole the
-// wind just made is still open. Once a turn.
+// NOTHING FALLS FOR BEING ALONE. A tile the wind shakes free of everything
+// hangs there over open air, and it stays there. That is the engine of the
+// whole mode now: the fragments the weather makes are the ISLANDS, and the old
+// rule — a tile touching nothing drops out of the sky — was an eraser that
+// deleted them before they could ever become country, so the board healed back
+// into one mass every turn and the archipelago was a thing you read about in
+// the rules.
 //
-// AND A TILE THE WIND MOVED HAS TO STILL FIT. One that lands beside country it
-// cannot legally join is touching the kingdom and holding on to none of it: a
-// road jammed against a city wall. It falls too — and unlike the first kind, it
-// does not come back. Nobody collects it, nobody plays it again. One legal
-// connection is enough to stay in the sky; none is the end of the tile.
+// WHAT FALLS IS A TILE THAT NO LONGER FITS. One the wind MOVED that lands
+// beside country it cannot legally join is touching the kingdom and holding on
+// to none of it: a road jammed against a city wall. That one falls, and it does
+// not come back — nobody collects it, nobody plays it again. A tile with no
+// neighbours at all has nothing to disagree with, so it floats. One legal
+// connection is enough to stay in the sky; none, with something beside you, is
+// the end of the tile.
 //
 // FOLLOWERS ARE BLOWN LIKE TILES, WHICH IS NOT WHAT HAPPENS TO THE TILES. One
 // standing on the raft rides it and never notices. Every other follower in the
@@ -344,15 +347,13 @@ export class Girando extends Mode {
     this.lifted = null;
     this.laid = 0;
     this.gusts = 0;
-    this.fallen = 0;
-    this.wrecked = 0;         // …of which fitted nothing and left the game
+    this.fallen = 0;           // tiles that landed where they fit nothing, and left
     this.spheres = 0;          // spheres closed so far
     this.hues = {};            // …and how many of each colour
     this.drifts = 0;           // times the Palazzo has towed the islands along
     this.blowing = false;
     this.blame = null;         // whose weather is currently running
     this.queued = [];
-    this.caught = false;       // a tile fell into our hands this turn
     this.pending = [];         // followers the sphere has paid, waiting to come off
     this.strollers = [];       // followers offered a walk when the scoring settles
     this.stroll = null;        // …and the one being asked about now
@@ -490,7 +491,6 @@ export class Girando extends Mode {
     this.stroll = null;
     this.strollers.length = 0;
     this.laidFlat = false;
-    this.caught = false;
     this.balenaMoved = false;
     if (this.laid >= STORM_LIMIT) {
       this.game.say('The season turns, and the wind drops.');
@@ -1234,36 +1234,16 @@ export class Girando extends Mode {
       g.say(`The gust picks up — ${r.strength} tiles off the end, ${r.strength} squares each.`);
     }
 
-    // A tile the wind shakes ADRIFT — touching nothing at all — falls off the
-    // edge of the world and back to the bottom of the deck, and whoever set the
-    // wind off may catch one and throw it straight back down, which is what
-    // turns a big storm from bookkeeping into a swing: the wind clears you a
-    // hole and hands you something to put in it while it's still open. Once a
-    // turn.
-    //
-    // A tile that fell because it no longer FITS what it landed against is a
-    // different loss. It was still touching country; what it had stopped doing
-    // was joining any of it, and a tile the sky wouldn't take back is not a
-    // tile anybody picks up again. It leaves the game.
-    let caught = 0;
-    let wrecked = 0;
-    for (const f of r.fell) {
-      this.fallen++;
-      if (f.why === 'mismatch') { this.wrecked++; wrecked++; continue; }
-      g.deck.unshift(f.id);
-      caught++;
-    }
-    if (caught) {
-      g.say(`${caught} tile${caught > 1 ? 's' : ''} blow off the edge of the world and back into the deck.`);
-    }
-    if (wrecked) {
-      g.say(`${wrecked} tile${wrecked > 1 ? 's fit nothing they landed against and are' : ' fits nothing it landed against and is'} lost out of the sky for good.`);
-    }
-    if (caught && this.blame === g.current && !this.caught) {
-      this.caught = true;
-      g.tilesLeft++;
-      g.say(`${g.player.name} catches one out of the air, and may throw it straight back down.`);
-      g.emit('landmark');
+    // NOTHING FALLS FOR BEING ALONE any more, so nothing comes back into the
+    // deck and nobody catches anything out of the air. A tile the wind shakes
+    // free of everything hangs there over open sky, and that is the whole
+    // point: it is the seed of the next island. What still falls is a tile that
+    // came down where it no longer FITS — touching country and joined to none
+    // of it — and that one is a loss rather than a return. Nobody picks it up
+    // again; it is out of the game.
+    if (r.fell.length) {
+      this.fallen += r.fell.length;
+      g.say(`${r.fell.length} tile${r.fell.length > 1 ? 's fit nothing they landed against and are' : ' fits nothing it landed against and is'} lost out of the sky for good.`);
     }
 
     // Followers travel with the weather. One the wind put down somewhere is
@@ -1792,8 +1772,7 @@ export class Girando extends Mode {
     const whale = this.balena ? `The Balena rests at (${this.balena.x}, ${this.balena.y}).` : 'The Balena is nowhere.';
     const closed = ['green', 'blue', 'red'].filter((h) => this.hues[h])
       .map((h) => `${this.hues[h]} ${h}`).join(', ');
-    const lost = this.wrecked ? ` (${this.wrecked} lost for good)` : '';
-    return `${rows}<p class="hint">${this.gusts} gust${this.gusts === 1 ? '' : 's'} · ${this.fallen} tile${this.fallen === 1 ? '' : 's'} blown out of the sky${lost} · ${this.spheres ? `spheres harvested: ${closed}` : 'no sphere closed yet'} · ${whale}</p>`;
+    return `${rows}<p class="hint">${this.gusts} gust${this.gusts === 1 ? '' : 's'} · ${this.fallen} tile${this.fallen === 1 ? '' : 's'} lost for good · ${this.spheres ? `spheres harvested: ${closed}` : 'no sphere closed yet'} · ${whale}</p>`;
   }
 }
 
@@ -1810,7 +1789,7 @@ Girando.spec = {
   hint: 'A zephyr does nothing to the country it blows through — it tears the LOOSE END off it. '
     + 'The run downwind of the zephyr ends at a gap, and the last tiles before that gap come away: power N pops N tiles off and carries each of them N squares. '
     + 'It gains a power off every zephyr blowing its own way and off every corner it turns, and it no longer stops at three. '
-    + 'A tile that lands where it fits nothing is lost for good. '
+    + 'A tile the wind shakes loose of everything HANGS THERE — that is where islands come from. What falls is a tile that lands where it fits nothing, and that one is lost for good. '
     + 'Nothing is paid for being finished: closing a SPHERE is the scoring round, and both its halves fire a pass over the whole board. '
     + 'Green scores the farms (1 per two tiles of field), blue the cities (1 a tile open, 2 finished), red the temples (1 per tile around one), yellow the roads (1 a tile plus what each city it reaches is worth). '
     + 'Any half fits any other, so the pairing is the decision. '

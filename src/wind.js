@@ -48,14 +48,14 @@
 //   ONLY THE WHALE STOPS THE WIND. A run that ends against a BLOCKER — in
 //     Girando that is the Balena, and nothing else — has no loose end at all.
 //     Nothing comes off it, and everything in the whale's lee is untouched.
-//   FALLING IS TWO RULES NOW. A tile has to be beside something edge to edge
-//     or it falls out of the sky — asked of every tile after a gust, not only
-//     the ones that moved, because a tile the wind never touched is left
-//     hanging when the neighbours holding it up slide away. And a tile the
-//     wind MOVED has to still fit something: one that lands beside neighbours
-//     it can't legally join has nothing holding it either, and goes the same
-//     way. The first kind is `adrift` and the second is `mismatch`, and the
-//     mode is told which, because they are not worth the same.
+//   NOTHING FALLS FOR BEING ALONE. A tile touching nothing at all hangs there
+//     in the open sky, and that is the point: the fragments are where islands
+//     come from, and dropping them was an eraser that healed the board back
+//     into one mass every turn. The ONE thing that still falls is a tile the
+//     wind MOVED that no longer FITS — one that comes down beside country
+//     whose edges it cannot meet is touching the kingdom and joined to none of
+//     it, and there is nothing holding that up. It is gone for good. A tile
+//     with no neighbours has nothing to disagree with, so it floats.
 //   FOLLOWERS ARE BLOWN LIKE TILES — WHICH IS NOT WHAT HAPPENS TO THE TILES.
 //     A follower on one of the tiles that comes away rides it and never
 //     notices. Every OTHER follower in the lane is picked up and put down that
@@ -291,19 +291,20 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1 }) 
   }
 
   // --- what the move did to them --------------------------------------------
-  // Two ways to fall, and the mode is told which. A tile the wind MOVED has to
-  // still fit what it landed against: a road shoved up against a city wall is
-  // touching country and joined to none of it, and there is nothing holding it
-  // up. That one is gone for good. And a tile touching nothing AT ALL is
-  // adrift, which is asked of every tile on the board and not only the movers,
-  // because a tile the wind never touched is left hanging when the neighbours
-  // holding it up slide out from under it — by far the commonest way to end up
-  // with nothing underneath you. Repeated, because dropping one tile can leave
-  // the next one hanging too.
+  // ONE way to fall, and it is not the obvious one. A tile touching nothing at
+  // all no longer drops: the sky holds it, and a rock adrift over open air is
+  // where the next island comes from. That rule was the mode's great eraser —
+  // it deleted the fragments before they could ever become country, and the
+  // board healed back into one mass every single turn.
   //
-  // Two things are never dropped: the tile the whale is lying on, which is
-  // held up by a hundred tons of sky whale, and the last tile on the board,
-  // because a board with nothing on it is not a game.
+  // What still falls is a tile the wind MOVED that no longer FITS: one that
+  // comes down beside country whose edges it can't meet is touching the kingdom
+  // and joined to none of it — a road shoved up against a city wall — and there
+  // is nothing holding THAT up. It is gone for good; nobody picks it up again.
+  // A tile with no neighbours at all has nothing to disagree with, so it floats.
+  //
+  // The whale's tile is never dropped: a hundred tons of sky whale outranks the
+  // seam it happens to be sitting on.
   const drop = (cell, why) => {
     if (cell.meeple) {
       report.homed.push({ ...cell.meeple, x: cell.x, y: cell.y, why: 'fell' });
@@ -317,21 +318,9 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1 }) 
     if (board.size <= 1) break;
     const cell = m.cell;
     if (board.get(cell.x, cell.y) !== cell || cell.balena) continue;
-    if (!board.degree(cell.x, cell.y)) continue;     // adrift, and the pass below has it
+    if (!board.degree(cell.x, cell.y)) continue;     // nothing to disagree with: it floats
     if (fitsSomething(board, cell)) continue;
     drop(cell, 'mismatch');
-  }
-
-  for (let pass = 0; pass < 32; pass++) {
-    if (board.size <= 1) break;
-    const loose = [...board.cells.values()]
-      .filter((c) => !c.balena && board.degree(c.x, c.y) === 0)
-      .sort((a, b) => a.seq - b.seq);
-    if (!loose.length) break;
-    for (const cell of loose) {
-      if (board.size <= 1) break;
-      drop(cell, 'adrift');
-    }
   }
 
   // --- put the followers down ------------------------------------------------

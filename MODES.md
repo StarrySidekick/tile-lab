@@ -374,6 +374,52 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > front of it.
 
 
+> **Fourteenth pass: nothing falls for being alone — and it did not do what it was for.**
+>
+> The falling rule was the mode's great eraser. A tile touching nothing dropped
+> out of the sky and went back into the deck, which meant every fragment the
+> weather made was deleted before it could become country: the board healed back
+> into one mass every turn, and the archipelago was something you read about in
+> the rules rather than something you saw. So it is gone. A tile the wind shakes
+> free of everything hangs there over open air, and so does the one it strands
+> behind it. The ONE thing that still falls is a tile the wind moved that no
+> longer FITS — touching country and joined to none of it — and that one is a
+> loss, not a return.
+>
+> **It made fewer islands, not more, and the reason is worth writing down.**
+> Twelve bot games on the same seeds, before and after:
+>
+> | | tiles fall | nothing falls |
+> |---|---|---|
+> | islands at the end | 1.8 | **0.6** |
+> | lone rocks adrift | 0.0 | **1.8** |
+> | tiles lost | 14.3 | 3.4 |
+> | gusts a game | 47.8 | 37.8 |
+> | mainland, of ~85 | 78.0 | 81.8 |
+>
+> Three things, and only the first is really about the rule. **The fragments the
+> wind makes are singletons.** A power-one gust — the common case by a distance —
+> pops exactly one tile off the end, and one tile adrift is by rule not an
+> island; it is a rock. The 1.8 tiles a game that used to fall are now sitting
+> there as rocks, which is the same board with the deletions painted back in
+> rather than a board with more country on it. **Nothing goes back into the
+> deck**, so the deck is no longer replenished and a game is eight tiles and ten
+> gusts shorter, which is less weather. And **nothing shrinks the mainland any
+> more**, so it only grows.
+>
+> The lever this actually wants is the *definition*, not the falling: `land()`
+> filters adrift groups to two tiles or more, on the reasoning that a lone tile
+> adrift is not somewhere you could live. Drop that to one and the 1.8 rocks
+> become 1.8 islands, and — the part that compounds — a rock you are standing on
+> becomes somewhere you may BUILD, so it can grow into country instead of sitting
+> there forever. That is a real design decision with teeth (island rates are
+> double, and the end-game archipelago bonus counts islands held), so it is
+> written down here rather than taken.
+>
+> The catch-and-throw went with the falling, because nothing comes back into the
+> deck for anybody to catch.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 
