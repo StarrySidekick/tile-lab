@@ -65,7 +65,7 @@ export class Designer {
     el.innerHTML = `
       <header>
         <b>Design</b>
-        <span class="dim">every visual dial · <kbd>Shift</kbd>+<kbd>D</kbd></span>
+        <span class="dim">every visual dial<span class="key"> · <kbd>Shift</kbd>+<kbd>D</kbd></span></span>
         <button data-act="close" title="Close">✕</button>
       </header>
       <div class="rows"></div>

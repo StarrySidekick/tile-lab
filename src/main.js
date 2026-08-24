@@ -901,6 +901,10 @@ function setLean(on) {
 }
 $('lean').onclick = () => setLean(true);
 $('hudExpand').onclick = () => setLean(false);
+// The console has no keyboard on a phone, so it gets two thumbs' worth of door:
+// one in the settings drawer, one on the HUD for when the drawer is folded away.
+$('openDesign').onclick = () => designer.toggle();
+$('hudDesign').onclick = () => designer.toggle();
 
 // --- the box in the corner ----------------------------------------------------
 //
