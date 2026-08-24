@@ -20,6 +20,18 @@
 //     downwind of the zephyr ends somewhere — at a gap, at open sky — and the
 //     last tiles before that gap are the ones that come away. Country that is
 //     backed up against more country is country the wind can't get under.
+//   AND IT DOES THAT AT EVERY GAP DOWN THE LANE. A gap is open air, not a
+//     wall: the wind crosses it, finds the next piece of country, and takes
+//     that one's loose end too, all the way to the far edge of the board. Its
+//     strength carries across — it is the same wind on both sides of a strait.
+//     One gust is one nibble per run, not one nibble.
+//   WHAT THE WIND CAN GET UNDER GOES WHOLE. A mode may name the country too
+//     big to lift (`rooted` — in Girando, the Palazzo's mainland). Everything
+//     else the gust reaches is small enough that the wind takes ALL of it,
+//     perpendicular arms and all, and sets it down downwind as one thing —
+//     sliding until it comes to rest ALONGSIDE whatever stops it, rather than
+//     short of it. That is what makes an archipelago move: islands travel,
+//     meet, and merge.
 //   HOW MANY, AND HOW FAR, IS THE POWER. A gust arriving at the loose end with
 //     power N pops the last N tiles of the run off and carries each of them N
 //     squares. One is one tile, one square. Two is two tiles, two squares
@@ -46,8 +58,9 @@
 //     frozen in place stops being weather, and a board of stuck zephyrs is a
 //     board where the engine has quietly switched itself off.
 //   ONLY THE WHALE STOPS THE WIND. A run that ends against a BLOCKER — in
-//     Girando that is the Balena, and nothing else — has no loose end at all.
-//     Nothing comes off it, and everything in the whale's lee is untouched.
+//     Girando that is the Balena, and nothing else — has no loose end at all,
+//     and the lane ENDS there: nothing comes off it, and everything in the
+//     whale's lee, gaps and all, is untouched.
 //   NOTHING FALLS FOR BEING ALONE. A tile touching nothing at all hangs there
 //     in the open sky, and that is the point: the fragments are where islands
 //     come from, and dropping them was an eraser that healed the board back
@@ -148,42 +161,79 @@ function fitsSomething(board, cell) {
   return false;
 }
 
-/**
- * The country the wind actually gets hold of: the unbroken run of tiles
- * downwind of a square, and whether it ended at a GAP — which is the loose end
- * the gust pops off — or against something solid, which is a run with no loose
- * end at all.
- */
-function runFrom(board, from, dx, dy) {
-  const cells = [];
-  let x = from.x + dx, y = from.y + dy;
-  for (let i = 0; i < MAX_RUN; i++) {
-    const c = board.get(x, y);
-    if (!c) return { cells, open: true };          // the gap the wind was looking for
-    if (blocks(c)) return { cells, open: false };  // the whale: no loose end
-    cells.push(c);
-    x += dx; y += dy;
-  }
-  return { cells, open: false };
-}
+/** The key a mode's `rooted` set is keyed by, and the one this file uses. */
+const kOf = (x, y) => `${x},${y}`;
 
 /**
- * Every lane on the board at once, for a mass weather event: each lane's run
- * starts at its most upwind tile and ends the same way any other run does.
+ * The runs of country down one lane, in the order the wind meets them.
+ *
+ * The wind does not stop at the first gap. It crosses it — a gap is open air,
+ * not a wall — and finds the next piece of country, and the next, all the way
+ * to the far edge of the board. Every one of those runs has a loose end of its
+ * own, and the gust takes every one. That is the difference between a zephyr
+ * that rearranges its own corner and weather that reaches across a strait, and
+ * it is what lets a gust cut a board that is one tile thick in two places at
+ * once.
+ *
+ * Only the WHALE ends a lane. A run backed up against it has no loose end, and
+ * nothing beyond it is touched at all.
  */
-function openRuns(board, dx, dy) {
-  const lanes = new Map();
+function laneRuns(board, from, dx, dy) {
+  const lane = [];
+  for (const c of board.cells.values()) {
+    const ok = dx === 0
+      ? c.x === from.x && (dy < 0 ? c.y < from.y : c.y > from.y)
+      : c.y === from.y && (dx < 0 ? c.x < from.x : c.x > from.x);
+    if (ok) lane.push(c);
+  }
+  lane.sort((a, b) => (a.x * dx + a.y * dy) - (b.x * dx + b.y * dy));
+
+  const runs = [];
+  let cur = null;
+  let prev = null;
+  for (const c of lane) {
+    if (blocks(c)) { if (cur) cur.open = false; break; }   // the whale: no loose end, no lee
+    const d = c.x * dx + c.y * dy;
+    if (!cur || d !== prev + 1) { cur = { cells: [], open: true }; runs.push(cur); }
+    cur.cells.push(c);
+    prev = d;
+  }
+  return runs;
+}
+
+/** Every lane on the board at once, for a mass weather event. */
+function everyLane(board, dx, dy) {
+  const heads = new Map();
   const along = (c) => c.x * dx + c.y * dy;
   for (const c of board.cells.values()) {
     const lane = dx === 0 ? c.x : c.y;
-    const best = lanes.get(lane);
-    if (!best || along(c) < along(best)) lanes.set(lane, c);
+    const best = heads.get(lane);
+    if (!best || along(c) < along(best)) heads.set(lane, c);
   }
   const out = [];
-  for (const head of lanes.values()) {
-    if (blocks(head)) continue;
-    const run = runFrom(board, { x: head.x - dx, y: head.y - dy }, dx, dy);
-    if (run.cells.length) out.push(run);
+  for (const head of heads.values()) {
+    const runs = laneRuns(board, { x: head.x - dx, y: head.y - dy }, dx, dy);
+    if (runs.length) out.push(runs);
+  }
+  return out;
+}
+
+/** The whole connected piece of country a tile belongs to, corners not counting. */
+function regionOf(board, seed) {
+  const seen = new Set([kOf(seed.x, seed.y)]);
+  const out = [seed];
+  const queue = [seed];
+  while (queue.length) {
+    const c = queue.pop();
+    for (let s = 0; s < 4; s++) {
+      const nb = board.neighbor(c.x, c.y, s);
+      if (!nb) continue;
+      const k = kOf(nb.x, nb.y);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(nb);
+      queue.push(nb);
+    }
   }
   return out;
 }
@@ -198,57 +248,78 @@ function openRuns(board, dx, dy) {
  * @param everywhere  every lane on the board at once
  * @param push   the power it opens at, before anything it absorbs
  */
-export function gust(board, { dir, from = null, everywhere = false, push = 1 }) {
+export function gust(board, { dir, from = null, everywhere = false, push = 1, rooted = null }) {
   const [dx, dy] = SIDE_STEP[dir];
   const report = {
     dir, from, everywhere, push, strength: push,
     moved: [], fell: [], carried: [], homed: [], swung: [],
-    turbines: [], reached: [], zephyrs: [],
+    turbines: [], reached: [], zephyrs: [], lifted: [],
   };
 
-  const runs = everywhere
-    ? openRuns(board, dx, dy)
-    : (from ? [runFrom(board, from, dx, dy)] : []);
-  if (!runs.some((r) => r.cells.length)) return report;
+  const lanes = everywhere
+    ? everyLane(board, dx, dy)
+    : (from ? [laneRuns(board, from, dx, dy)] : []);
+  if (!lanes.some((runs) => runs.length)) return report;
 
+  const roots = typeof rooted === 'function' ? rooted(board) : rooted;
   // Downwind distance along the gust — the order everything happens in.
   const along = (c) => c.x * dx + c.y * dy;
 
-  // --- walk each run, upwind first -------------------------------------------
-  // One pass decides two things: how hard the wind is blowing by the time it
-  // reaches each tile, and which zephyrs it sets off rather than absorbs.
+  // --- walk each lane, upwind first ------------------------------------------
+  // One pass decides three things: how hard the wind is blowing by the time it
+  // reaches each tile, which zephyrs it sets off rather than absorbs, and what
+  // it gets hold of at each loose end. Strength carries ACROSS the gaps — it is
+  // the same wind on the far side of a strait as it was on the near one.
   const force = new Map();                        // cell -> the wind that reached it
-  const rafts = [];                               // the loose end of each run
-  for (const run of runs) {
+  const rafts = [];                               // what actually moves
+  const seen = new Set();                         // pieces of country already lifted
+  for (const runs of lanes) {
     let strength = Math.min(MAX_STRENGTH, push);
-    for (const c of run.cells) {
-      // The force on THIS tile is the wind as it arrived — worked out before
-      // the tile's own zephyr is folded in. A zephyr blowing the same way as
-      // the gust hardens the wind BEYOND itself, not upon itself.
-      force.set(c, strength);
-      report.strength = Math.max(report.strength, strength);
-      report.reached.push(c);
-      if (turbineOn(c)) report.turbines.push(c);
+    for (const run of runs) {
+      for (const c of run.cells) {
+        // The force on THIS tile is the wind as it arrived — worked out before
+        // the tile's own zephyr is folded in. A zephyr blowing the same way as
+        // the gust hardens the wind BEYOND itself, not upon itself.
+        force.set(c, strength);
+        report.strength = Math.max(report.strength, strength);
+        report.reached.push(c);
+        if (turbineOn(c)) report.turbines.push(c);
 
-      let absorbed = false;
-      for (const d of zephyrDirs(c)) {
-        // Blowing our way: absorbed, and the gust hardens from here on.
-        if (d === dir) { absorbed = true; continue; }
-        // Every other way it points, it FIRES — the gust arrives, the zephyr
-        // wakes, and the weather turns down the new zephyr's own lane, one
-        // power harder than it got here. That includes one pointing straight
-        // back at us: the wind rebounds rather than bracing. Nothing runs
-        // away, because a zephyr contributes each of its directions to a storm
-        // exactly once (see `storm`).
-        report.zephyrs.push({ cell: c, dir: d, push: Math.min(MAX_STRENGTH, strength + 1) });
+        let absorbed = false;
+        for (const d of zephyrDirs(c)) {
+          // Blowing our way: absorbed, and the gust hardens from here on.
+          if (d === dir) { absorbed = true; continue; }
+          // Every other way it points, it FIRES — the gust arrives, the zephyr
+          // wakes, and the weather turns down the new zephyr's own lane, one
+          // power harder than it got here. That includes one pointing straight
+          // back at us: the wind rebounds rather than bracing. Nothing runs
+          // away, because a zephyr contributes each of its directions to a
+          // storm exactly once (see `storm`).
+          report.zephyrs.push({ cell: c, dir: d, push: Math.min(MAX_STRENGTH, strength + 1) });
+        }
+        if (absorbed) strength = Math.min(MAX_STRENGTH, strength + 1);
       }
-      if (absorbed) strength = Math.min(MAX_STRENGTH, strength + 1);
+
+      // The loose end. A run backed up against the whale has none.
+      if (!run.open || !run.cells.length) continue;
+      const last = run.cells[run.cells.length - 1];
+      const power = force.get(last);
+
+      // WHAT THE WIND CAN GET UNDER GOES WHOLE. A mode may name the country
+      // that is too big to lift — in Girando that is the Palazzo's mainland,
+      // and nothing else. Everything else adrift in the sky is small enough
+      // that the wind takes ALL of it, perpendicular arms and all, and sets it
+      // down further downwind rather than nibbling a tile off its end. That is
+      // what makes the archipelago move: islands slide, meet, and merge.
+      if (roots && !roots.has(kOf(last.x, last.y))) {
+        const group = regionOf(board, last);
+        if (seen.has(group[0])) continue;
+        for (const c of group) seen.add(c);
+        rafts.push({ power, cells: group, whole: true });
+        continue;
+      }
+      rafts.push({ power, cells: run.cells.slice(Math.max(0, run.cells.length - power)) });
     }
-    // The loose end. A run backed up against the whale has none, and a run
-    // that ends at a gap gives up its last `power` tiles.
-    if (!run.open || !run.cells.length) continue;
-    const power = force.get(run.cells[run.cells.length - 1]);
-    rafts.push({ power, cells: run.cells.slice(Math.max(0, run.cells.length - power)) });
   }
 
   const lifting = new Set();
@@ -272,11 +343,41 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1 }) 
   }
 
   // --- the shove -------------------------------------------------------------
-  // Only the loose end moves, and it moves as one raft: `power` tiles, `power`
-  // squares each, far end first so it slides along behind its own leading edge.
+  // Far end first, always, so anything moving slides along behind its own
+  // leading edge instead of piling up into itself.
   for (const raft of rafts) {
-    for (let i = raft.cells.length - 1; i >= 0; i--) {
-      const cell = raft.cells[i];
+    const order = raft.cells.slice().sort((a, b) => along(b) - along(a));
+
+    // A whole piece of country the wind got under. It travels as ONE thing, so
+    // it goes as far as ALL of it can — up to the power, and no further than
+    // the first square any part of it would have to share. Coming to rest
+    // ALONGSIDE something rather than stopping short of it is the point: that
+    // is how two rocks become an island and how an island grows.
+    if (raft.whole) {
+      if (order.some(immovable)) continue;
+      const mine = new Set(order.map((c) => kOf(c.x, c.y)));
+      let steps = 0;
+      for (let n = 1; n <= raft.power; n++) {
+        const clear = order.every((c) => {
+          const [tx, ty] = [c.x + dx * n, c.y + dy * n];
+          return !board.get(tx, ty) || mine.has(kOf(tx, ty));
+        });
+        if (!clear) break;
+        steps = n;
+      }
+      if (!steps) continue;
+      const was0 = order.map((c) => ({ x: c.x, y: c.y }));
+      for (const cell of order) {
+        const was = { x: cell.x, y: cell.y };
+        if (!board.shift(was, { x: was.x + dx * steps, y: was.y + dy * steps })) continue;
+        report.moved.push({ cell, from: was, steps });
+      }
+      report.lifted.push({ cells: order, steps, from: was0 });
+      continue;
+    }
+
+    // The loose end of the mainland: `power` tiles, each as far as it can get.
+    for (const cell of order) {
       if (immovable(cell)) continue;
       let steps = 0;
       for (let n = 1; n <= raft.power; n++) {
@@ -394,7 +495,7 @@ function landingFeature(cell, wasType) {
  * Reports come back in the order they happened, so the caller can pay for them
  * and narrate them in the order a player watched them.
  */
-export function storm(board, first, cap = MAX_GUSTS) {
+export function storm(board, first, { cap = MAX_GUSTS, rooted = null } = {}) {
   const out = [];
   const queue = Array.isArray(first) ? first.slice() : [first];
   const fired = new Map();                               // cell -> Set of directions
@@ -413,7 +514,7 @@ export function storm(board, first, cap = MAX_GUSTS) {
   }
 
   while (queue.length && out.length < cap) {
-    const g = gust(board, queue.shift());
+    const g = gust(board, { ...queue.shift(), rooted });
     out.push(g);
     for (const { cell, dir, push } of g.zephyrs) {
       if (board.get(cell.x, cell.y) !== cell) continue;   // it fell, or was buried

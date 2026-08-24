@@ -420,6 +420,76 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > deck for anybody to catch.
 
 
+> **Fifteenth pass: three rules that turn the fragments into an archipelago.**
+>
+> The fourteenth pass took the eraser out and got fewer islands, not more. The
+> diagnosis was in the numbers and it was three-part: the wind's commonest act
+> pops exactly ONE tile off a loose end, so nearly every fragment it makes is a
+> singleton; a singleton was by rule not an island, so it scored nothing and —
+> the part that mattered — could never be built on; and a gust stopped at the
+> first gap, so it only ever nibbled the near edge of the country and never cut
+> anything. Three rules, one for each.
+>
+> **The wind crosses gaps.** A gap is open air, not a wall. A gust now takes the
+> loose end of *every* run down its lane, and its strength carries over the open
+> water between them — the same wind on both sides of a strait. One gust is one
+> nibble per run rather than one nibble, and a board that is one tile thick in
+> two places is a board a single gust can cut in two places. Only the whale still
+> ends a lane.
+>
+> **What the wind can get under goes whole.** `gust()` takes a `rooted` set from
+> the mode — the country too big to lift, which in Girando is the Palazzo's
+> mainland and nothing else. Everything else adrift that the gust reaches travels
+> *entire*: perpendicular arms, followers and all, set down downwind as one
+> thing, sliding until it comes to rest **alongside** what stops it rather than
+> short of it. That last word is the mechanism. Rocks meet and become islands,
+> islands meet and become bigger islands — and an island driven back into the
+> mainland is swallowed by it, which is the price of the whole thing being
+> weather rather than a ratchet.
+>
+> **Every fragment is an island, down to one tile.** *A lone tile adrift is not
+> an island, it is a tile adrift* was a good sentence and it was the reason the
+> archipelago never grew. A rock you have somebody standing on is now somewhere
+> you may lay a tile — so the wind makes the seed and the players grow it, which
+> is the only mechanism in the mode where the weather and the placement rules
+> pull the same way.
+>
+> **The ablation, twelve bot games on the same seeds.** Every combination was
+> measured rather than argued about, and the argument would have got it wrong:
+>
+> | | islands | island tiles | biggest | rocks left | mainland | top score |
+> |---|---|---|---|---|---|---|
+> | fourteenth pass | 0.6 | — | — | 1.8 | 81.8 | 125 |
+> | + gaps crossed | 4.2 | 23.6 | 12.0 | 9.2 | 47.8 | 88 |
+> | + gaps, whole lifts | 2.6 | 18.1 | 13.3 | 5.1 | 59.8 | 119 |
+> | + gaps, lifts, rock=island | **6.9** | **25.3** | **15.7** | 4.3 | 57.1 | 108 |
+> | + gaps, rock=island | 10.9 | 21.1 | 7.2 | 7.8 | 58.9 | 98 |
+>
+> Gap-crossing alone makes the most *fragments* and the worst game: half the
+> board ends up in pieces nobody can reach and the score falls by a third. The
+> whole-lift is what turns fragments into country — it more than halves the dead
+> rocks and grows the biggest island — but on its own it also merges islands back
+> into the mainland, so the count goes down. All three together is the one row
+> that is best or near-best on every column that matters: **11× the islands, a
+> biggest island of 16 tiles on an 82-tile board, and a score that gives up 14%
+> rather than a third.**
+>
+> Twenty games on the shipped set confirm it: **7.5 islands a game, 25 tiles of
+> island on an 82-tile board, a biggest island of 13, and 2.5 islands with
+> somebody standing on them** — against 0.6 islands and nobody standing anywhere
+> a pass ago. The archipelago is a thing you look at now.
+>
+> What it costs is spheres: 4.7 a game down to 3.1, and the score with them,
+> because a fragmented board is a board where two sfera halves are harder to
+> bring together and where a third of the country is out of reach of your hand.
+> That is the number to watch — if the mode wants its scoring engine back the
+> knob is the sfera pool or the pairing rule, not the weather. The other honest
+> caveat is that the computer player has no opinion about islands at all: it
+> prices what it holds at the island rate and otherwise plays as if the mainland
+> were the whole board, so every number here is what the archipelago does to
+> players who are not trying to make one.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 

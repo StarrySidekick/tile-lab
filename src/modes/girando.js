@@ -40,6 +40,27 @@
 // into one mass every turn and the archipelago was a thing you read about in
 // the rules.
 //
+// AND THREE RULES TURN THOSE FRAGMENTS INTO AN ARCHIPELAGO. Removing the
+// eraser was not enough by itself — it left the board covered in single tiles
+// that were nobody's and could never grow. So:
+//
+//   THE WIND CROSSES GAPS. It takes the loose end of EVERY run down its lane,
+//     not just the first, and its strength carries over the open air between
+//     them. A board that is one tile thick in two places is a board one gust
+//     can cut in two places.
+//   WHAT THE WIND CAN GET UNDER GOES WHOLE. The Palazzo's mainland is the only
+//     country too big to lift. Everything else adrift the gust reaches travels
+//     entire — arms, followers and all — and slides until it comes to rest
+//     ALONGSIDE what stops it. Rocks meet and become islands; islands meet and
+//     become bigger islands; and an island driven back into the mainland is
+//     swallowed by it, which is the price of the whole thing being weather.
+//   EVERY FRAGMENT IS AN ISLAND, down to a single tile. The wind's commonest
+//     act is popping ONE tile off a loose end, so nearly every fragment it
+//     makes is a singleton, and calling those rocks rather than islands meant
+//     they scored nothing and could never be BUILT ON. A tile you have
+//     somebody standing on is somewhere you may lay a tile — so the wind makes
+//     the seed and the players grow it.
+//
 // WHAT FALLS IS A TILE THAT NO LONGER FITS. One the wind MOVED that lands
 // beside country it cannot legally join is touching the kingdom and holding on
 // to none of it: a road jammed against a city wall. That one falls, and it does
@@ -394,9 +415,17 @@ export class Girando extends Mode {
     // The seat, if it is still on the board at all; the biggest piece of
     // country if the wind has blown the Palazzo out of the sky entirely.
     const main = groups.find(hasPalazzo) || groups[0] || [];
-    // A lone tile adrift is not an island — it is a tile adrift. Two or more
-    // that hold each other up are somewhere you could actually live.
-    const isles = groups.filter((g) => g !== main && g.length >= 2);
+    // EVERY piece of country off the mainland is an island, down to a single
+    // tile. It used to take two — "a lone tile adrift is not an island, it is a
+    // tile adrift" — and that sentence was the reason the archipelago never
+    // grew. The wind's commonest act is popping ONE tile off a loose end, so
+    // nearly every fragment it makes is a singleton; calling those rocks rather
+    // than islands meant they scored nothing, counted for nothing, and above
+    // all could never be BUILT ON, because you may only build onto an island
+    // you are standing on. They sat there forever. A rock you have somebody
+    // standing on is now somewhere you may lay a tile, which is the whole
+    // engine: the wind makes the seed and the players grow it.
+    const isles = groups.filter((g) => g !== main && g.length >= 1);
     const mainKeys = new Set(main.map(key));
     const isleKeys = new Set();
     for (const g of isles) for (const c of g) isleKeys.add(key(c));
@@ -1200,7 +1229,11 @@ export class Girando extends Mode {
       let job = [spec, by];
       for (let n = 0; job && n < MAX_CHAIN; n++) {
         this.blame = job[1];
-        for (const report of storm(this.game.board, job[0])) this.applyGust(report);
+        // The mainland is the one thing in the sky too big for the wind to get
+        // under; it is recomputed per gust because the storm keeps changing
+        // what the mainland IS.
+        const rooted = () => this.land().mainKeys;
+        for (const report of storm(this.game.board, job[0], { rooted })) this.applyGust(report);
         this.settleBalena();
         this.reopen();
         this.settle(job[1]);
@@ -1219,7 +1252,7 @@ export class Girando extends Mode {
     const g = this.game;
     this.gusts++;
     this.payTurbines(r.turbines);
-    if (!r.moved.length && !r.swung.length && !r.homed.length) return;
+    if (!r.moved.length && !r.swung.length && !r.homed.length && !r.lifted.length) return;
 
     g.emit('gust', {
       dir: r.dir,
@@ -1263,6 +1296,15 @@ export class Girando extends Mode {
         ? `${g.players[m.player].name}'s follower goes down with its tile and comes home.`
         : `${g.players[m.player].name}'s follower is blown into open sky and comes home.`);
       g.emit('meeple', { recall: true, player: m.player, at: { x: m.x + 0.5, y: m.y + 0.5 } });
+    }
+
+    // An island going somewhere as one thing is the most visible event on the
+    // board, and the one a player most needs told: the country they were
+    // standing on has just sailed.
+    for (const l of r.lifted) {
+      if (!l.steps) continue;
+      g.say(`An island of ${l.cells.length} tile${l.cells.length > 1 ? 's' : ''} sails `
+        + `${l.steps} square${l.steps > 1 ? 's' : ''} down the wind.`);
     }
 
     if (r.swung.length) {
@@ -1789,7 +1831,8 @@ Girando.spec = {
   hint: 'A zephyr does nothing to the country it blows through — it tears the LOOSE END off it. '
     + 'The run downwind of the zephyr ends at a gap, and the last tiles before that gap come away: power N pops N tiles off and carries each of them N squares. '
     + 'It gains a power off every zephyr blowing its own way and off every corner it turns, and it no longer stops at three. '
-    + 'A tile the wind shakes loose of everything HANGS THERE — that is where islands come from. What falls is a tile that lands where it fits nothing, and that one is lost for good. '
+    + 'A tile the wind shakes loose of everything HANGS THERE, and every fragment off the mainland is an ISLAND, down to one tile. What falls is a tile that lands where it fits nothing, and that one is lost for good. '
+    + 'The mainland is the only country too big for the wind to get under: everything else adrift sails whole, and slides until it comes to rest against something — so islands meet and merge. '
     + 'Nothing is paid for being finished: closing a SPHERE is the scoring round, and both its halves fire a pass over the whole board. '
     + 'Green scores the farms (1 per two tiles of field), blue the cities (1 a tile open, 2 finished), red the temples (1 per tile around one), yellow the roads (1 a tile plus what each city it reaches is worth). '
     + 'Any half fits any other, so the pairing is the decision. '

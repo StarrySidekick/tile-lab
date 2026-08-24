@@ -1,8 +1,8 @@
 // Written by tools/stamp.mjs. Don't edit by hand — run the tool, or the
 // copy in version.json goes out of step and the page starts crying wolf.
 export const VERSION = {
-  "version": "0.23.0",
-  "build": 25,
+  "version": "0.24.0",
+  "build": 26,
   "date": "2026-08-24",
-  "label": "Girando: nothing falls for being alone"
+  "label": "Girando: the archipelago moves"
 };

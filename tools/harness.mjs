@@ -531,6 +531,82 @@ function checkWind() {
     if (rose.x !== 0 || rose.y !== 0) return fail('a compass rose stands still', `it is at ${rose.x},${rose.y}`);
   }
 
+  // THE WIND CROSSES GAPS. A gap is open air, not a wall: the gust goes over it
+  // and takes the loose end of the next run too, all the way down the lane.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // north
+    lay(b, 0, -1, 'B'); lay(b, 0, -2, 'B'); // the near shore
+    lay(b, 0, -4, 'B'); lay(b, 0, -5, 'B'); // …and the far one, across a strait
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (!at(b, 0, -3)) return fail('the near run gives up its loose end', 'it did not move');
+    if (!at(b, 0, -6)) return fail('and so does the one across the gap', 'the far shore sat still');
+    if (r.reached.length !== 4) return fail('the whole lane is reached', `${r.reached.length} tiles`);
+  }
+
+  // …and its strength carries over the open air, so a zephyr on the near shore
+  // hardens the wind that hits the far one.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    lay(b, 0, -1, 'Kz');                    // absorbed: the wind hardens beyond it
+    lay(b, 0, -3, 'B'); lay(b, 0, -4, 'B'); // the far shore, across a gap
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (r.strength !== 2) return fail('strength carries across a gap', `strength ${r.strength}`);
+    if (!at(b, 0, -5) || !at(b, 0, -6)) return fail('the far shore loses two tiles two squares', 'it did not');
+  }
+
+  // …but the whale ends the lane outright: nothing in its lee is touched,
+  // whatever the gaps out there look like.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    lay(b, 0, -1, 'B').balena = true;
+    lay(b, 0, -3, 'B'); lay(b, 0, -4, 'B');
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (r.moved.length) return fail('the whale ends the lane', `${r.moved.length} tile(s) moved`);
+    if (!at(b, 0, -3) || !at(b, 0, -4)) return fail('nothing in its lee is touched', 'the lee moved');
+  }
+
+  // WHAT THE WIND CAN GET UNDER GOES WHOLE. Country a mode has not rooted is
+  // lifted entire — perpendicular arms included — rather than nibbled at.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // north
+    const isle = [lay(b, 0, -2, 'B'), lay(b, 0, -3, 'B'), lay(b, 1, -3, 'B')];
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 }, rooted: new Set(['0,0']) });
+    if (!at(b, 0, -3) || !at(b, 0, -4) || !at(b, 1, -4)) {
+      return fail('the whole island travels, arm and all', JSON.stringify(isle.map((c) => `${c.x},${c.y}`)));
+    }
+    if (r.lifted.length !== 1 || r.lifted[0].steps !== 1) {
+      return fail('…and it is reported as one lift', JSON.stringify(r.lifted.map((l) => l.steps)));
+    }
+  }
+
+  // …and it slides until it comes to rest ALONGSIDE what stops it, not short of
+  // it. Two rocks meeting is how an island is born.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kzz');                    // a double zephyr: power two, north
+    lay(b, 0, -2, 'B');                     // a rock, adrift
+    lay(b, 0, -5, 'B').anchored = true;     // …and another, three clear and pinned
+    gust(b, { dir: 0, from: { x: 0, y: 0 }, push: 2, rooted: new Set(['0,0']) });
+    if (!at(b, 0, -4)) return fail('a rock slides down the wind', 'it did not move');
+    if (b.groups().length !== 2) return fail('…and comes to rest against the next one', `${b.groups().length} group(s)`);
+  }
+
+  // …and a piece the wind cannot lift stays whole rather than shedding a tile
+  // off its end. It is one thing or it is nothing.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');
+    const isle = lay(b, 0, -2, 'B');
+    lay(b, 0, -3, 'B').anchored = true;     // something in it the wind can't move
+    gust(b, { dir: 0, from: { x: 0, y: 0 }, rooted: new Set(['0,0']) });
+    if (isle.y !== -2) return fail('an island the wind cannot lift does not move', `it is at y ${isle.y}`);
+    if (!at(b, 0, -3)) return fail('…and does not shed its far tile either', 'the end came off');
+  }
+
   // A turbine is reported for every gust that runs over it.
   {
     const b = new Board();
@@ -755,8 +831,8 @@ function checkWind() {
   console.log('  ✓ the loose end, rafts, power past three, corners that harden, the whale,'
     + ' crystals, loose zephyrs, turbines, vanes, straight roads, chains, rebounds,'
     + ' once-per-storm, the rose, mismatched landings, fragments that stay up,'
-    + ' new islands, double zephyrs, followers riding and blown, temples, Abbazias,'
-    + ' bad seams');
+    + ' gaps crossed, islands lifted whole, islands merging, double zephyrs,'
+    + ' followers riding and blown, temples, Abbazias, bad seams');
 }
 
 /**
@@ -797,11 +873,14 @@ function checkGirando() {
     if (!b.canPlace(0, 1, TILES.Kz, 0, opts)) {     // the seat's open south side
       return fail('you may build onto the mainland', 'a square beside the seat was refused');
     }
-    // A lone tile adrift is not an island — it is a tile adrift.
+    // EVERY fragment off the mainland is an island now, down to a single tile —
+    // which is what makes a rock you are standing on somewhere you may build,
+    // and the reason the archipelago can grow at all.
     lay(b, 9, 9, 'Kz');
     b.rebuild();
-    if (h.m.onIsland(b.get(9, 9))) return fail('one tile alone is not an island', 'it counted as one');
+    if (!h.m.onIsland(b.get(9, 9))) return fail('one tile alone is an island', 'it did not count');
     if (!h.m.onIsland(b.get(5, 5))) return fail('two tiles adrift are an island', 'it did not count');
+    if (h.m.onIsland(b.get(0, 0))) return fail('the mainland is not an island', 'the seat counted as one');
   }
 
   // NOTHING is paid for being finished any more. Closing a city puts it on the
@@ -1046,6 +1125,10 @@ function checkGirando() {
     const b = h.board;
     lay(b, 0, 0, 'U');
     lay(b, 0, -2, 'U');
+    // A spine of country round the gap, so both ends of the bridge are on the
+    // one mainland. Every fragment is an island now, and an island pays double
+    // — which would make this a test of the island rate rather than the bridge.
+    lay(b, 1, 0, 'B'); lay(b, 1, -1, 'B'); lay(b, 1, -2, 'B');
     b.addMeeple(0, 0, 0, 0);
     b.rebuild();
     const road = b.featureOf(0, 0, 0);
