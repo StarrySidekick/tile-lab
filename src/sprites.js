@@ -39,8 +39,11 @@ const MAX = BUCKETS[BUCKETS.length - 1];
 // entries; the budget only ever bites if you sit there zooming in and out.
 const BUDGET = 48 * 1024 * 1024;
 
-const cache = new Map();          // insertion order doubles as the LRU queue
+// Entries are { c: canvas, b: bytes, f: the frame they were last drawn in }.
+// Insertion order doubles as the LRU queue.
+const cache = new Map();
 let bytes = 0;
+let frameNo = 0;
 
 // A ceiling on how big a sprite may be rendered, regardless of how big it is
 // about to be drawn. Normally there isn't one — but a 1024px chart tile costs
@@ -52,6 +55,63 @@ let bytes = 0;
 let cap = Infinity;
 
 export function setSpriteCap(px) { cap = px || Infinity; }
+
+// Building a sprite is not cheap at the big buckets: a 768px chart tile costs
+// tens of milliseconds, most of it spent reading the canvas back out for the
+// two roughen passes. Zooming past a bucket boundary asks for every visible
+// tile at a new size AT ONCE, and paying for all of them in one frame is a
+// freeze you can see — a fifth of a second at a middling zoom, over a second
+// up close.
+//
+// So there is a budget per frame. Once it is spent, a tile is served from
+// whatever smaller size is already cached — soft for a frame or two, then it
+// sharpens, the way a map fills in — or built at the cheapest bucket so there
+// is always a picture. One full build is always allowed, so the work spreads
+// out instead of stalling. Steady play never comes near this: with a warm
+// cache nothing is built at all.
+const FRAME_BUDGET_MS = 8;
+const NEW_FRAME_MS = 30;      // this long since the last build means a new one
+
+let spent = 0;
+let made = 0;
+let builds = 0;
+let lastBuild = -Infinity;
+
+/** Reset the build budget and start a new frame. Called once a frame. */
+export function spriteFrame() { spent = 0; made = 0; frameNo++; }
+
+/** What the cache is doing. Not used by the game — this is for profiling. */
+export function spriteStats() {
+  return { entries: cache.size, mb: +(bytes / 1048576).toFixed(1), builds };
+}
+
+/** The best already-cached picture of this tile smaller than `size`, if any. */
+function softer(type, rot, terrain, size) {
+  for (let i = BUCKETS.indexOf(size) - 1; i >= 0; i--) {
+    const key = `${type.id}|${rot & 3}|${terrain}|${BUCKETS[i]}|${THEME.paletteName}`;
+    const hit = cache.get(key);
+    if (hit) { cache.delete(key); cache.set(key, hit); hit.f = frameNo; return hit.c; }
+  }
+  return null;
+}
+
+/**
+ * Trim to budget — but never throw away a picture that is on screen RIGHT NOW.
+ *
+ * Without that rule the cache livelocks: zoom in far enough that the visible
+ * board wants more than the budget and every frame evicts sprites it is about
+ * to need again, so the board is rebuilt from scratch sixty times a second and
+ * the whole thing crawls. Better to sit a little over budget for as long as
+ * that many tiles are actually being looked at.
+ */
+function trim() {
+  for (const [key, e] of cache) {
+    if (bytes <= BUDGET || cache.size <= 1) break;
+    if (e.f === frameNo) continue;
+    bytes -= e.b;
+    cache.delete(key);
+  }
+}
 
 function surface(px) {
   if (typeof OffscreenCanvas === 'function') return new OffscreenCanvas(px, px);
@@ -75,12 +135,22 @@ export function tileSprite(type, rot, terrain, px) {
   if (hit) {
     cache.delete(key);                          // touch: move to the fresh end
     cache.set(key, hit);
-    return hit;
+    hit.f = frameNo;
+    return hit.c;
   }
 
-  const canvas = surface(size);
+  const now = performance.now();
+  if (now - lastBuild > NEW_FRAME_MS) { spent = 0; made = 0; }
+  let build = size;
+  if (made && spent >= FRAME_BUDGET_MS) {
+    const ready = softer(type, rot, terrain, size);
+    if (ready) return ready;
+    build = BUCKETS[0] < size ? BUCKETS[0] : size;
+  }
+
+  const canvas = surface(build);
   const ctx = canvas.getContext('2d');
-  ctx.scale(size, size);
+  ctx.scale(build, build);
   ctx.translate(0.5, 0.5);
   ctx.rotate((rot & 3) * Math.PI / 2);
   ctx.translate(-0.5, -0.5);
@@ -94,21 +164,24 @@ export function tileSprite(type, rot, terrain, px) {
     //      other half of what a nib does — straight lines stay straight but
     //      their edges take the grain of the paper.
     drawTile(ctx, type, { terrain, rot, only: 'ground' });
-    roughen(canvas, WOBBLE(size));
+    roughen(canvas, WOBBLE(build));
     drawTile(ctx, type, { terrain, rot, only: 'built' });
-    roughen(canvas, TOOTH(size));
+    roughen(canvas, TOOTH(build));
   } else {
     drawTile(ctx, type, { terrain, rot });
   }
 
-  cache.set(key, canvas);
-  bytes += size * size * 4;
-  while (bytes > BUDGET && cache.size > 1) {
-    const [oldest] = cache.keys();
-    const c = cache.get(oldest);
-    bytes -= c.width * c.height * 4;
-    cache.delete(oldest);
-  }
+  const b = build * build * 4;
+  cache.set(build === size
+    ? key
+    : `${type.id}|${rot & 3}|${terrain}|${build}|${THEME.paletteName}`,
+    { c: canvas, b, f: frameNo });
+  builds++;
+  made++;
+  lastBuild = performance.now();
+  spent += lastBuild - now;
+  bytes += b;
+  trim();
   return canvas;
 }
 

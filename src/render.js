@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { drawTile, drawMeeple, drawPig, drawIngots, drawBuilding, PLAYER_COLORS } from './art.js';
-import { tileSprite } from './sprites.js';
+import { tileSprite, spriteFrame } from './sprites.js';
 import { LIGHT } from './light.js';
 import { THEME, applyDusk, usePalette } from './theme.js';
 import { DESIGN, rgba } from './design.js';
@@ -184,6 +184,7 @@ export class Renderer {
 
   draw(game) {
     const ctx = this.ctx;
+    spriteFrame();          // a fresh budget for building tile pictures
     this.glideStep();
     ctx.clearRect(0, 0, this.w, this.h);
     this.drawBackdrop(game);

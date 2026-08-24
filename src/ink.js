@@ -88,6 +88,32 @@ export const TOOTH = (w) => ({
 // browser decides to kill the tab.
 let scratch = null;
 
+// The displacement field depends only on the canvas size and the wavelength —
+// not on the tile, and not on the amplitude, which is just a multiplier at the
+// end. Every tile in a bucket therefore wants the SAME field, and evaluating
+// two smooth-noise samples per pixel for each of them is the bulk of what a
+// roughen pass costs. Compute it once and keep it as bytes: a 1/255 step of a
+// nine-pixel wander is a thirtieth of a pixel, which is nothing you could see.
+const fields = new Map();
+const FIELD_KEEP = 4;
+
+function field(w, h, inv) {
+  const key = `${w}x${h}|${inv}`;
+  const had = fields.get(key);
+  if (had) { fields.delete(key); fields.set(key, had); return had; }
+  const nx = new Uint8Array(w * h), ny = new Uint8Array(w * h);
+  for (let y = 0, i = 0; y < h; y++) {
+    for (let x = 0; x < w; x++, i++) {
+      nx[i] = noiseX(x * inv, y * inv) * 255;
+      ny[i] = noiseY(x * inv, y * inv) * 255;
+    }
+  }
+  const made = { nx, ny };
+  fields.set(key, made);
+  while (fields.size > FIELD_KEEP) fields.delete(fields.keys().next().value);
+  return made;
+}
+
 function destination(ctx, w, h) {
   if (!scratch || scratch.width !== w || scratch.height !== h) {
     scratch = ctx.createImageData(w, h);
@@ -104,14 +130,16 @@ export function roughen(canvas, { amp = null, grain = 0.09 } = {}) {
   const s = src.data, o = out.data;
   const a = amp ?? Math.max(0.8, w * 0.012);
   const inv = 1 / (w * grain);
+  const { nx, ny } = field(w, h, inv);
+  const k = a / 127.5;
   // Bilinear sampling, not nearest: rounding the displaced lookup to whole
   // pixels turns every bent edge into a staircase, which reads as chewed
   // rather than drawn. Blending the four neighbours keeps the perturbed edge
   // as soft as the original stroke.
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let fx = x + (noiseX(x * inv, y * inv) - 0.5) * 2 * a;
-      let fy = y + (noiseY(x * inv, y * inv) - 0.5) * 2 * a;
+  for (let y = 0, n = 0; y < h; y++) {
+    for (let x = 0; x < w; x++, n++) {
+      let fx = x + (nx[n] - 127.5) * k;
+      let fy = y + (ny[n] - 127.5) * k;
       if (fx < 0) fx = 0; else if (fx > w - 1.001) fx = w - 1.001;
       if (fy < 0) fy = 0; else if (fy > h - 1.001) fy = h - 1.001;
       const x0 = fx | 0, y0 = fy | 0;

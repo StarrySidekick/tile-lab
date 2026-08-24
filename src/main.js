@@ -42,6 +42,13 @@ const renderer = new Renderer(canvas);
  * forces the palette to rebuild. That is the whole cost, and it is paid on
  * drag rather than per frame.
  */
+// The committed look, BEFORE anything draws. A local fetch is cheap and it is
+// the difference between opening in the right colours and opening in the
+// defaults for a beat and then lurching — which is what happened when this was
+// loaded after the first frame. Your local draft goes on top of it, so the
+// file is a baseline rather than the last word.
+await loadCommitted();
+
 const designer = new Designer();
 designer.restore();
 // Dragging one slider fires dozens of these a second, and each one throws the
@@ -1588,20 +1595,6 @@ buildBots();
 syncPanel();
 paintCss();
 frame();
-
-// A committed assets/design.json — an exported session somebody decided to
-// keep — becomes the baseline for everyone. Loaded after the first frame so
-// boot is never blocked on a file that usually isn't there; when it is, the
-// change hook repaints everything.
-loadCommitted().then((found) => {
-  if (!found) return;
-  // The committed file is the BASELINE, not the last word: whatever you were
-  // trying locally goes back on top of it, or shipping a design.json would
-  // silently wipe out the draft you had open when you reloaded.
-  designer.restore();
-  designer.sync();
-  console.log('design: assets/design.json applied');
-});
 
 // Handy for poking at state from the devtools console while iterating.
 window.LAB = {
