@@ -668,6 +668,36 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > mid-flight.
 
 
+> **Nineteenth pass: the line learns the difference between a meadow and a wall.**
+>
+> Four corrections from the first session played on the drawn line, all of them
+> the kind you only find by looking:
+>
+> - **The effect vanished at the closest zoom.** Max zoom is 320 CSS px, and at
+>   a device-pixel ratio of 2 that outruns the sprite cache's 512px ceiling —
+>   past the last bucket the renderer falls back to clean vectors, so the
+>   hand-drawn line silently disappeared exactly where you were looking
+>   closest. Buckets now run to 1024.
+> - **The wobble calmed down** — amplitude 1.5% of the tile to 0.9%, wavelength
+>   a third longer.
+> - **Calculated shading is gone from the chart.** The three shading channels —
+>   sunward wash, shaded face, every cast drop-shadow — go fully transparent on
+>   the chart palette (the inline hard-coded shadow colours in art.js now route
+>   through `THEME.cast` so the palette controls all of them), the star
+>   people lose their sheen gradient, and the Balena becomes a woodcut
+>   sea-monster: flat wash, ink line, pale belly, no shadow. A print has no
+>   sun. Any future shading gets DRAWN — hatching or stipple — not computed.
+> - **Architecture stands straight.** A wobbled building reads as melting, so
+>   sprites render in two passes: the GROUND — country, roads, spheres, the
+>   wind-heads — drawn and gently bent, then the ARCHITECTURE drawn straight
+>   over it, then a whisper of short-wavelength, sub-pixel TOOTH over
+>   everything. The tooth is the other facet of a drawn line besides wander:
+>   a straight line stays straight, but its edge takes the grain of the paper
+>   the way ink does. Displacement sampling went bilinear at the same time —
+>   nearest-neighbour turned every bent edge into a staircase that read as
+>   chewed rather than drawn.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 

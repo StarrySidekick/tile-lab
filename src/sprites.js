@@ -28,7 +28,11 @@ import { roughen } from './ink.js';
 
 // Sprites are rendered at whichever bucket is the first one big enough, so
 // zooming re-uses a sprite until it would visibly soften, then steps up.
-const BUCKETS = [64, 96, 128, 192, 256, 384, 512];
+// 768 and 1024 exist for the chart: max zoom is 320 CSS px, and at a device
+// pixel ratio of 2 or 3 that outruns 512 — past the last bucket the renderer
+// draws clean vectors, and the hand-drawn line silently vanished exactly at
+// the zoom where you were looking closest.
+const BUCKETS = [64, 96, 128, 192, 256, 384, 512, 768, 1024];
 const MAX = BUCKETS[BUCKETS.length - 1];
 
 // Roughly 48MB of backing store. A full board at one zoom is a few hundred
@@ -69,10 +73,22 @@ export function tileSprite(type, rot, terrain, px) {
   ctx.translate(0.5, 0.5);
   ctx.rotate((rot & 3) * Math.PI / 2);
   ctx.translate(-0.5, -0.5);
-  drawTile(ctx, type, { terrain, rot });
-  // On the chart, every line in the picture is bent as if drawn by hand —
-  // once, here, so the whole board pays nothing per frame for it. See ink.js.
-  if (THEME.paletteName === 'chart') roughen(canvas);
+  if (THEME.paletteName === 'chart') {
+    // The hand-drawn line, in two passes (see ink.js for the philosophy):
+    //   1. the GROUND — country, roads, spheres, wind-heads — drawn and gently
+    //      bent, because a meadow's edge and a cloud's curl should wander;
+    //   2. the ARCHITECTURE drawn straight over it, because a wobbled building
+    //      reads as melting rather than drawn;
+    //   3. a whisper of short-wavelength TOOTH over everything, which is the
+    //      other half of what a nib does — straight lines stay straight but
+    //      their edges take the grain of the paper.
+    drawTile(ctx, type, { terrain, rot, only: 'ground' });
+    roughen(canvas, { amp: Math.max(0.7, size * 0.009), grain: 0.12 });
+    drawTile(ctx, type, { terrain, rot, only: 'built' });
+    roughen(canvas, { amp: Math.max(0.5, size * 0.0032), grain: 0.024 });
+  } else {
+    drawTile(ctx, type, { terrain, rot });
+  }
 
   cache.set(key, canvas);
   bytes += size * size * 4;

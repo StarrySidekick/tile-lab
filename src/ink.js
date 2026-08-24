@@ -58,6 +58,17 @@ const noiseY = makeNoise(707);
  * `grain` the wobble wavelength as a fraction of the width. Small amp, longish
  * wavelength is a steady hand; crank either and it becomes a child's crayon.
  */
+/** The gentle bend for the ground pass — amp ~0.9% of the tile. */
+export const WOBBLE = (w) => ({ amp: Math.max(0.7, w * 0.009), grain: 0.12 });
+
+/**
+ * The tooth pass for everything, architecture included: sub-pixel amplitude at
+ * a short wavelength. A straight line stays straight — what changes is its
+ * EDGE, which takes the grain of the paper the way ink does. This is the other
+ * facet of a drawn line besides wander, and it is the one buildings get.
+ */
+export const TOOTH = (w) => ({ amp: Math.max(0.4, w * 0.0022), grain: 0.032 });
+
 export function roughen(canvas, { amp = null, grain = 0.09 } = {}) {
   const w = canvas.width, h = canvas.height;
   if (!w || !h) return canvas;
@@ -65,16 +76,29 @@ export function roughen(canvas, { amp = null, grain = 0.09 } = {}) {
   const src = ctx.getImageData(0, 0, w, h);
   const out = ctx.createImageData(w, h);
   const s = src.data, o = out.data;
-  const a = amp ?? Math.max(0.8, w * 0.015);
+  const a = amp ?? Math.max(0.8, w * 0.012);
   const inv = 1 / (w * grain);
+  // Bilinear sampling, not nearest: rounding the displaced lookup to whole
+  // pixels turns every bent edge into a staircase, which reads as chewed
+  // rather than drawn. Blending the four neighbours keeps the perturbed edge
+  // as soft as the original stroke.
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const nx = (noiseX(x * inv, y * inv) - 0.5) * 2 * a;
-      const ny = (noiseY(x * inv, y * inv) - 0.5) * 2 * a;
-      let sx = (x + nx) | 0; if (sx < 0) sx = 0; else if (sx >= w) sx = w - 1;
-      let sy = (y + ny) | 0; if (sy < 0) sy = 0; else if (sy >= h) sy = h - 1;
-      const si = (sy * w + sx) * 4, oi = (y * w + x) * 4;
-      o[oi] = s[si]; o[oi + 1] = s[si + 1]; o[oi + 2] = s[si + 2]; o[oi + 3] = s[si + 3];
+      let fx = x + (noiseX(x * inv, y * inv) - 0.5) * 2 * a;
+      let fy = y + (noiseY(x * inv, y * inv) - 0.5) * 2 * a;
+      if (fx < 0) fx = 0; else if (fx > w - 1.001) fx = w - 1.001;
+      if (fy < 0) fy = 0; else if (fy > h - 1.001) fy = h - 1.001;
+      const x0 = fx | 0, y0 = fy | 0;
+      const tx = fx - x0, ty = fy - y0;
+      const i00 = (y0 * w + x0) * 4, i10 = i00 + 4;
+      const i01 = i00 + w * 4, i11 = i01 + 4;
+      const w00 = (1 - tx) * (1 - ty), w10 = tx * (1 - ty);
+      const w01 = (1 - tx) * ty, w11 = tx * ty;
+      const oi = (y * w + x) * 4;
+      o[oi] = s[i00] * w00 + s[i10] * w10 + s[i01] * w01 + s[i11] * w11;
+      o[oi + 1] = s[i00 + 1] * w00 + s[i10 + 1] * w10 + s[i01 + 1] * w01 + s[i11 + 1] * w11;
+      o[oi + 2] = s[i00 + 2] * w00 + s[i10 + 2] * w10 + s[i01 + 2] * w01 + s[i11 + 2] * w11;
+      o[oi + 3] = s[i00 + 3] * w00 + s[i10 + 3] * w10 + s[i01 + 3] * w01 + s[i11 + 3] * w11;
     }
   }
   ctx.putImageData(out, 0, 0);

@@ -730,18 +730,28 @@ export class Renderer {
     // is exactly the tile you most want to be able to identify.
     ctx.scale(z * 0.88, z * 0.88);
 
-    ctx.fillStyle = 'rgba(13,11,17,0.28)';                 // the shadow it throws
-    ctx.beginPath();
-    ctx.ellipse(0.02, 0.30, 0.44, 0.09, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // On the chart the whale is a woodcut sea-monster: flat grey-blue wash
+    // inside an ink line, pale belly as a second flat wash, no shadow — the
+    // creatures swimming in the margins of every reference map. Everywhere
+    // else it keeps its modelled skin.
+    const chart = THEME.paletteName === 'chart';
+    if (!chart) {
+      ctx.fillStyle = 'rgba(13,11,17,0.28)';               // the shadow it throws
+      ctx.beginPath();
+      ctx.ellipse(0.02, 0.30, 0.44, 0.09, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
-    const skin = ctx.createLinearGradient(0, -0.30, 0, 0.24);
-    skin.addColorStop(0, '#4a5570');
-    skin.addColorStop(0.62, '#2b3247');
-    skin.addColorStop(1, '#c9d4e4');
+    let skin = '#5b6b84';
+    if (!chart) {
+      skin = ctx.createLinearGradient(0, -0.30, 0, 0.24);
+      skin.addColorStop(0, '#4a5570');
+      skin.addColorStop(0.62, '#2b3247');
+      skin.addColorStop(1, '#c9d4e4');
+    }
     ctx.fillStyle = skin;
-    ctx.strokeStyle = 'rgba(13,11,17,0.7)';
-    ctx.lineWidth = 0.02;
+    ctx.strokeStyle = 'rgba(40,36,28,0.85)';
+    ctx.lineWidth = chart ? 0.028 : 0.02;
 
     ctx.beginPath();                                        // body, nose east
     ctx.moveTo(0.52, 0.02);
@@ -750,6 +760,18 @@ export class Renderer {
     ctx.bezierCurveTo(-0.14, 0.30, 0.28, 0.26, 0.52, 0.02);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
+    if (chart) {
+      // The pale belly, as a flat second wash with a scalloped waterline.
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0.52, 0.02);
+      ctx.bezierCurveTo(0.28, 0.26, -0.14, 0.30, -0.34, 0.14);
+      ctx.bezierCurveTo(-0.30, 0.06, 0.30, 0.08, 0.52, 0.02);
+      ctx.closePath();
+      ctx.fillStyle = '#d9d2ba';
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
 
     ctx.beginPath();                                        // tail, flicking
     ctx.moveTo(-0.32, 0.00);

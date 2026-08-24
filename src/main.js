@@ -19,7 +19,7 @@ import {
 } from './mechanics.js';
 import { Renderer } from './render.js';
 import { drawTile, drawMeeple, PLAYER_COLORS } from './art.js';
-import { roughen } from './ink.js';
+import { roughen, WOBBLE, TOOTH } from './ink.js';
 import { THEME } from './theme.js';
 import { TILE_TYPES, TILES, GROUPS, rotPoint } from './tiles.js';
 import { Sfx, SOUND_NAMES } from './audio.js';
@@ -909,9 +909,8 @@ function renderClaim() {
   claimCtx.rotate(cell.rot * Math.PI / 2);
   claimCtx.translate(-size / 2, -size / 2);
   claimCtx.scale(size, size);
-  drawTile(claimCtx, cell.type, { rot: cell.rot });
+  drawTileInked(claimCtx, cell.type, { rot: cell.rot });
   claimCtx.restore();
-  inkUp(claimCtx.canvas);
 
   // The dots start where the follower itself would stand, turned with the tile.
   // A busy tile — a four-way road with its four fields — puts several anchors
@@ -1017,8 +1016,7 @@ function renderConfirm() {
   claimCtx.rotate(pending.rot * Math.PI / 2);
   claimCtx.translate(-size / 2, -size / 2);
   claimCtx.scale(size, size);
-  drawTile(claimCtx, cur.type, { terrain: cur.terrain, rot: pending.rot });
-  inkUp(claimCtx.canvas);
+  drawTileInked(claimCtx, cur.type, { terrain: cur.terrain, rot: pending.rot });
   claimCtx.restore();
 
   claimCtx.save();
@@ -1109,18 +1107,27 @@ function drawPreview() {
   c.rotate(cur.rot * Math.PI / 2);
   c.translate(-size / 2, -size / 2);
   c.scale(size, size);
-  drawTile(c, cur.type, { terrain: cur.terrain, rot: cur.rot });
+  drawTileInked(c, cur.type, { terrain: cur.terrain, rot: cur.rot });
   c.restore();
-  inkUp(c.canvas);
 }
 
 /**
  * The previews draw tiles straight through art.js rather than the sprite
- * cache, so they get the hand-drawn line applied here — only on the chart,
- * and only when a preview is redrawn, which is on events rather than frames.
+ * cache, so the hand-drawn line is applied here — the same two passes the
+ * sprites get: ground drawn and bent, architecture drawn straight over it,
+ * a whisper of tooth over everything. Only on the chart, and only when a
+ * preview is redrawn, which is on events rather than frames.
  */
+function drawTileInked(ctx2, type, opts = {}) {
+  if (!document.body.classList.contains('parchment')) return drawTile(ctx2, type, opts);
+  drawTile(ctx2, type, { ...opts, only: 'ground' });
+  roughen(ctx2.canvas, WOBBLE(ctx2.canvas.width));
+  drawTile(ctx2, type, { ...opts, only: 'built' });
+  roughen(ctx2.canvas, TOOTH(ctx2.canvas.width));
+}
+
 function inkUp(canvas) {
-  if (document.body.classList.contains('parchment')) roughen(canvas);
+  if (document.body.classList.contains('parchment')) roughen(canvas, TOOTH(canvas.width));
 }
 
 const PHASE_TEXT = {
@@ -1169,8 +1176,7 @@ function renderMarket() {
     cv.width = cv.height = 56;
     const ctx = cv.getContext('2d');
     ctx.scale(56, 56);
-    drawTile(ctx, TILES[id]);
-    inkUp(cv);
+    drawTileInked(ctx, TILES[id]);
     wrap.appendChild(cv);
     wrap.insertAdjacentHTML('beforeend', `<kbd>${i + 1}</kbd>`);
     wrap.onclick = () => game.takeFromMarket(i);
@@ -1377,9 +1383,8 @@ function renderHud(doing, status) {
   c.rotate(cur.rot * Math.PI / 2);
   c.translate(-size / 2, -size / 2);
   c.scale(size, size);
-  drawTile(c, cur.type, { terrain: cur.terrain, rot: cur.rot });
+  drawTileInked(c, cur.type, { terrain: cur.terrain, rot: cur.rot });
   c.restore();
-  inkUp(c.canvas);
 }
 
 /**

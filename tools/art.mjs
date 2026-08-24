@@ -62,7 +62,7 @@ await page.evaluate(async () => {
   const { TILE_TYPES } = await import('./src/tiles.js');
   const { drawTile } = await import('./src/art.js');
   const { usePalette } = await import('./src/theme.js');
-  const { roughen } = await import('./src/ink.js');
+  const { roughen, WOBBLE, TOOTH } = await import('./src/ink.js');
   usePalette?.('chart');
 
   const SIZES = [24, 40, 64, 240];
@@ -85,8 +85,13 @@ await page.evaluate(async () => {
       cv.style.cssText = `width:${px}px;height:${px}px;image-rendering:auto`;
       const ctx = cv.getContext('2d');
       ctx.scale(px, px);
-      drawTile(ctx, t, {});
-      roughen(cv);                        // the sheet shows what the game shows
+      // The same two passes the sprite cache runs, because the sheet has to
+      // show what the game shows: ground bent, architecture straight, tooth
+      // over everything.
+      drawTile(ctx, t, { only: 'ground' });
+      roughen(cv, WOBBLE(px));
+      drawTile(ctx, t, { only: 'built' });
+      roughen(cv, TOOTH(px));
       cell.appendChild(cv);
     }
     const tag = document.createElement('div');

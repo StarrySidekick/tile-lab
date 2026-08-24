@@ -163,7 +163,7 @@ function drawHouse(ctx, x, y, w, turn, L, roof) {
   ctx.save();
   ctx.translate(x, y);
 
-  ctx.fillStyle = 'rgba(13,11,17,0.34)';     // shadow on the ground
+  ctx.fillStyle = THEME.cast;     // shadow on the ground
   ctx.fillRect(-a - L.x * 0.035, -b - L.y * 0.035, a * 2, b * 2);
 
   ctx.fillStyle = THEME.plaster;             // walls, peeking out of the sun
@@ -205,7 +205,7 @@ function drawHouse(ctx, x, y, w, turn, L, roof) {
 function drawTurret(ctx, x, y, r, L, roof) {
   ctx.beginPath();                           // shadow
   ctx.arc(x - L.x * r * 0.85, y - L.y * r * 0.85, r, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(13,11,17,0.42)';
+  ctx.fillStyle = THEME.cast;
   ctx.fill();
 
   for (const [rr, fill] of [[r * 1.16, THEME.cityWall], [r, THEME.city]]) {
@@ -346,7 +346,7 @@ function drawTemple(ctx, f, L) {
   // The ground shadow, thrown the way everything else on the board throws one.
   ctx.beginPath();
   ctx.ellipse(0.5 - L.x * 0.06, 0.68 - L.y * 0.06, 0.31, 0.13, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(13,11,17,0.30)';
+  ctx.fillStyle = THEME.cast;
   ctx.fill();
 
   ctx.strokeStyle = THEME.timber;
@@ -493,7 +493,7 @@ function drawAbbey(ctx, L) {
   ctx.save();
   ctx.beginPath();                             // shadow the precinct throws
   ctx.arc(cx - L.x * 0.045, cy - L.y * 0.045, r, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(13,11,17,0.34)';
+  ctx.fillStyle = THEME.cast;
   ctx.fill();
 
   ctx.beginPath();                             // the garth inside the walls
@@ -2017,11 +2017,11 @@ export function drawMark(ctx, kind, [x, y], s = 0.46, L = LIGHT, dir = null) {
     // Contact shadow — pooled at the foot, nudged away from the sun. Kept
     // faint and tucked close: the cast shadow does the real work, and two
     // shadows at full strength on one landmark just read as a smudge.
-    ctx.fillStyle = 'rgba(13,11,17,0.20)';
+    ctx.fillStyle = THEME.cast;
     ctx.beginPath();
     ctx.ellipse(-L.x * 0.10, 0.42 - L.y * 0.05, 0.50, 0.13, 0, 0, Math.PI * 2);
     ctx.fill();
-    shadow(ctx, L, 0.07, 0.10, 'rgba(13,11,17,0.50)');
+    shadow(ctx, L, 0.07, 0.10, THEME.cast);
   }
   art(ctx);
   noShadow(ctx);
@@ -2037,7 +2037,13 @@ export function drawMark(ctx, kind, [x, y], s = 0.46, L = LIGHT, dir = null) {
  * and the whole thing is clipped to the tile square — round line caps on roads
  * would otherwise bleed a few percent past the edge and break the seams.
  */
-export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 'surface', rot = 0 } = {}) {
+export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 'surface', rot = 0, only = null } = {}) {
+  // The two-pass split for the hand-drawn line: 'ground' draws the country —
+  // terrain, water, woods, roads, spheres, and the cloud figures — and 'built'
+  // draws the architecture over it. null draws everything, which is what every
+  // mode but the chart ever asks for.
+  const ground = only !== 'built';
+  const built = only !== 'ground';
   // A tile may insist on its own ground. Exactly one does: the ship's mooring
   // is a piece of open sky rather than a piece of country, which is what makes
   // it obvious that it fits anywhere and joins nothing — the tile looks like
@@ -2053,7 +2059,7 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
   ctx.rect(0, 0, 1, 1);
   ctx.clip();
 
-  if (terrain === 'cave') {
+  if (!ground) { /* transparent under the buildings */ } else if (terrain === 'cave') {
     ctx.fillStyle = '#2b2533';                  // solid rock
     ctx.fillRect(0, 0, 1, 1);
   } else if (terrain === 'city') {
@@ -2113,20 +2119,22 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
 
   // Water goes down before roads so a bridge crosses over it, and forests and
   // mountains go down before cities so a wall reads as built against them.
+  if (ground) {
   type.feats.forEach((f) => { if (f.type === 'lake') drawWater(ctx, f, false); });
   type.feats.forEach((f) => { if (f.type === 'forest') drawForest(ctx, f, L); });
   type.feats.forEach((f) => { if (f.type === 'mountain') drawMountain(ctx, f, L); });
   type.feats.forEach((f) => { if (f.type === 'river') drawRiver(ctx, f); });
+  }
 
   // A swinging tile's stubs stop short of the middle: they are the ways in
   // that this tile is currently refusing.
-  type.feats.forEach((f) => {
+  if (ground) type.feats.forEach((f) => {
     if (f.type === 'road' && !f.bridge) drawRoad(ctx, f, terrain, !!type.swing && f.sides.length === 1);
   });
 
   // Two or more dead-end road stubs meeting = a junction, not a through road.
   // Not on a vane: nothing meets there, that's the point of it.
-  if (!type.swing && type.feats.filter((f) => f.type === 'road' && f.sides.length === 1).length >= 2) {
+  if (ground && !type.swing && type.feats.filter((f) => f.type === 'road' && f.sides.length === 1).length >= 2) {
     const js = ROAD_STYLE[terrain] || ROAD_STYLE.surface;
     ctx.beginPath();
     ctx.arc(0.5, 0.5, js.inner * 0.8 + 0.03, 0, Math.PI * 2);
@@ -2137,7 +2145,7 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     ctx.stroke();
   }
 
-  type.feats.forEach((f, i) => {
+  if (built) type.feats.forEach((f, i) => {
     if (f.type !== 'city') return;
     drawCity(ctx, f, L);
     if (f.shield) {
@@ -2145,21 +2153,22 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
       drawShield(ctx, [sx, sy - 0.16], L);
     }
   });
-  type.feats.forEach((f, i) => {
+  if (ground) type.feats.forEach((f, i) => {
     if (f.type === 'forest' && f.shield) drawLog(ctx, type.spots[i], L);
   });
-  for (const f of type.feats) if (f.type === 'sfera') drawSfera(ctx, f, L);
-  for (const f of type.feats) {
+  if (ground) for (const f of type.feats) if (f.type === 'sfera') drawSfera(ctx, f, L);
+  if (built) for (const f of type.feats) {
     if (f.type !== 'monastery') continue;
     if (type.marks?.some((m) => m.kind === 'cult')) drawCultShrine(ctx, L);
     else drawAbbey(ctx, L);
   }
-  for (const f of type.feats) if (f.type === 'temple') drawTemple(ctx, f, L);
+  if (built) for (const f of type.feats) if (f.type === 'temple') drawTemple(ctx, f, L);
 
   // A bridge is drawn dead last: it stands OVER everything on the tile — the
   // field it never divides, and the walls and roads it crosses. Stone deck,
   // parapets, and the shadow that says it is up in the air.
   for (const f of type.feats) {
+    if (!built) break;
     if (f.type !== 'road' || !f.bridge) continue;
     const [a, b] = f.sides;
     const [ax, ay] = SIDE_MID[a];
@@ -2167,7 +2176,7 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     ctx.save();
     ctx.lineCap = 'butt';
     // The cast shadow, offset toward the ground.
-    ctx.strokeStyle = 'rgba(13,11,17,0.30)';
+    ctx.strokeStyle = THEME.cast;
     ctx.lineWidth = 0.20;
     ctx.beginPath(); ctx.moveTo(ax + 0.03, ay + 0.045); ctx.lineTo(bx + 0.03, by + 0.045); ctx.stroke();
     // The deck.
@@ -2193,7 +2202,7 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
   // shut gate across the throat. Same message, drawn the way a city can carry
   // it. Nothing in the pool uses this today; it costs four lines and it is what
   // a city vane would need the moment one comes back.
-  if (type.swing) {
+  if (built && type.swing) {
     for (const f of type.feats) {
       if (f.type !== 'city' || f.sides.length !== 1) continue;
       const [vx, vy] = SIDE_VEC[f.sides[0]];
@@ -2212,7 +2221,7 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
   // gust says so while it's still in your hand. Straight roads swing too but
   // get no pivot: there'd be one on a third of the deck, and the road visibly
   // lying a different way afterwards is cue enough.
-  if (type.swing) {
+  if (built && type.swing) {
     ctx.beginPath();
     ctx.arc(0.5, 0.5, 0.085, 0, Math.PI * 2);
     ctx.fillStyle = THEME.teal;
@@ -2223,6 +2232,10 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
   }
 
   type.marks.forEach((m, i) => {
+    // Weather marks belong to the ground pass (they bend); machines and
+    // masonry to the built one (they don't).
+    const isWeather = m.kind === 'zephyr';
+    if (isWeather ? !ground : !built) return;
     // A zephyr that blows more than one way is drawn as one gust per quarter,
     // pushed out toward its own edge and shrunk so four of them fit without
     // running into each other. One drawing, four facings, same as always.
@@ -2345,17 +2358,21 @@ export function drawMeeple(ctx, x, y, size, color, opts = {}) {
   ctx.strokeStyle = opts.hero ? 'rgba(20,14,6,0.85)' : 'rgba(0,0,0,0.65)';
   ctx.stroke();
 
-  // Rounding on the body: a warm edge where the sun hits, cool where it doesn't.
-  ctx.save();
-  meeplePath(ctx);
-  ctx.clip();
-  const sheen = ctx.createLinearGradient(LIGHT.x * 0.7, LIGHT.y * 0.7, -LIGHT.x * 0.7, -LIGHT.y * 0.7);
-  sheen.addColorStop(0, 'rgba(255,244,222,0.30)');
-  sheen.addColorStop(0.5, 'rgba(255,244,222,0)');
-  sheen.addColorStop(1, 'rgba(18,12,26,0.34)');
-  ctx.fillStyle = sheen;
-  ctx.fillRect(-1, -1, 2, 2);
-  ctx.restore();
+  // Rounding on the body: a warm edge where the sun hits, cool where it
+  // doesn't — except on the chart, where nothing is lit and a printed figure
+  // is a flat wash inside an ink line.
+  if (THEME.paletteName !== 'chart') {
+    ctx.save();
+    meeplePath(ctx);
+    ctx.clip();
+    const sheen = ctx.createLinearGradient(LIGHT.x * 0.7, LIGHT.y * 0.7, -LIGHT.x * 0.7, -LIGHT.y * 0.7);
+    sheen.addColorStop(0, 'rgba(255,244,222,0.30)');
+    sheen.addColorStop(0.5, 'rgba(255,244,222,0)');
+    sheen.addColorStop(1, 'rgba(18,12,26,0.34)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(-1, -1, 2, 2);
+    ctx.restore();
+  }
 
   // A special follower is the same body with a mark of office on its chest —
   // colour already means "whose", so it can't also mean "which", and a shape
@@ -2414,7 +2431,7 @@ function drawCultShrine(ctx, L) {
   ctx.lineWidth = 0.055;
   ctx.strokeStyle = THEME.timber;
   ctx.lineJoin = 'round';
-  shadow(ctx, L, 0.07, 0.10, 'rgba(13,11,17,0.50)');
+  shadow(ctx, L, 0.07, 0.10, THEME.cast);
   ctx.fillStyle = THEME.plaster;
   ctx.beginPath(); ctx.rect(-0.30, -0.06, 0.60, 0.42); ctx.fill(); ctx.stroke();
   noShadow(ctx);

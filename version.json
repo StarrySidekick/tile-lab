@@ -1,6 +1,6 @@
 {
-  "version": "0.30.0",
-  "build": 32,
+  "version": "0.31.0",
+  "build": 33,
   "date": "2026-08-24",
-  "label": "Girando: the drawn line, the cartouche, storms that accelerate"
+  "label": "Girando: straight walls, calm wobble, no computed shade"
 }

@@ -131,10 +131,15 @@ const CHART = {
   teal: '#2f6f68',
   tealDeep: '#1f4a45',
 
-  // An engraving is hatched, not lit: the sun all but goes out.
-  lit: 'rgba(255,244,214,0.16)',
-  shade: 'rgba(70,50,30,0.18)',
-  cast: 'rgba(58,42,26,0.28)',
+  // An engraving is not lit at all. The three shading channels — the sunward
+  // wash, the shaded face, and every cast drop-shadow in art.js — go fully
+  // transparent on the chart: a print has no sun, and any shading it wants in
+  // future has to be DRAWN, as hatching or stipple, not calculated. The flat
+  // two-tone pairs (roofLit/roofShade and friends) stay, because a flat pair
+  // is exactly what a hand-coloured wash looks like.
+  lit: 'rgba(0,0,0,0)',
+  shade: 'rgba(0,0,0,0)',
+  cast: 'rgba(0,0,0,0)',
 };
 
 /** What twilight had, for everything CHART touches — so the switch reverses. */
