@@ -488,6 +488,21 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > prices what it holds at the island rate and otherwise plays as if the mainland
 > were the whole board, so every number here is what the archipelago does to
 > players who are not trying to make one.
+>
+> **And the sky bridge is gone, all but the step.** A road that ran off one
+> tile, across one empty square and straight on out of the tile beyond used to
+> be ONE road — it scored as one, and a plank was drawn across the gap to say
+> so, because there was nothing else on the board to tell you. It looked like a
+> plank floating in mid-air, which is what it was. The two halves score apart
+> now; what stays is the WALK, which steps over a one-square gap the way it
+> always did. `Board.bridgeRoads()` becomes `roadHops()` and records the hops
+> instead of unioning them, and the walk follows them itself.
+>
+> The twelfth pass added the bridge because roads were paid by exactly the
+> quantity the weather destroys, and it is worth checking whether taking it out
+> undoes that. It does not: twenty games with and without differ by nothing that
+> is not noise — islands 7.5 against 8.0, top score 99 against 104. Whatever was
+> holding roads up by then, it was not the plank.
 
 
 **Question it answers:** is a small board you keep *editing* better than a big

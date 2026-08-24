@@ -192,7 +192,6 @@ export class Renderer {
     if (game.phase === 'recall') this.drawCellTargets(game.myMeeples(), MOVE_COSTLY.line, MOVE_COSTLY.rgb);
     if (game.phase === 'walk') this.drawCellTargets(game.pendingWalk?.targets || [], MOVE_OK.line, MOVE_OK.rgb);
     if (game.phase === 'place') this.drawPlacementHints(game);
-    this.drawBridges(game);
 
     this.drawMeeples(game);
     if (game.phase === 'meeple' && !this.hideMeepleTargets) this.drawMeepleTargets(game);
@@ -441,45 +440,6 @@ export class Renderer {
     ctx.fillRect(sx - LIGHT.x * d * z, sy - LIGHT.y * d * z, z, z);
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.fillRect(sx, sy - lift * z + z, z, lift * z);
-  }
-
-  /**
-   * The sky bridges: a plank across a one-square gap where a road runs
-   * straight on out the other side. It has to be drawn, because it is the
-   * difference between one road and two and there is nothing else on the
-   * board to tell you — and it has to look like something laid ACROSS the gap
-   * rather than ground filling it, because a tile can still be blown straight
-   * through where it is.
-   */
-  drawBridges(game) {
-    const list = game.board.bridges;
-    if (!list?.length) return;
-    const ctx = this.ctx;
-    const z = this.cam.zoom;
-    for (const b of list) {
-      if (!this.onScreen(b.x, b.y)) continue;
-      const [sx, sy] = this.toScreen(b.x, b.y);
-      ctx.save();
-      ctx.translate(sx + z / 2, sy + z / 2);
-      if (b.axis) ctx.rotate(Math.PI / 2);       // axis 1 = east–west
-      // The shadow it throws into the gap, so it reads as spanning rather than
-      // as a tile somebody forgot to draw.
-      ctx.fillStyle = 'rgba(13,11,17,0.28)';
-      ctx.fillRect(-z * 0.16, -z * 0.52, z * 0.32, z * 1.04);
-      ctx.fillStyle = '#8a7355';                  // the deck
-      ctx.fillRect(-z * 0.13, -z * 0.5, z * 0.26, z);
-      ctx.strokeStyle = 'rgba(13,11,17,0.5)';
-      ctx.lineWidth = Math.max(1, z * 0.012);
-      ctx.strokeRect(-z * 0.13, -z * 0.5, z * 0.26, z);
-      ctx.strokeStyle = 'rgba(232,222,208,0.35)'; // planks
-      for (let i = -3; i <= 3; i++) {
-        ctx.beginPath();
-        ctx.moveTo(-z * 0.13, i * z * 0.13);
-        ctx.lineTo(z * 0.13, i * z * 0.13);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
   }
 
   drawCellOverlay(cell, overlay, lift) {

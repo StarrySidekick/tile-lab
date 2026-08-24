@@ -60,7 +60,7 @@ export class Board {
      */
     this.version = 0;
     this.links = [];              // extra unions (tunnels) that survive a rebuild
-    this.bridges = [];            // one-square road hops, for the renderer
+    this.hops = [];               // one-square road hops a follower may cross
     this.linked = new Set();      // cells already wired this rebuild — see link()
   }
 
@@ -341,7 +341,7 @@ export class Board {
     this.linked.clear();
     const order = [...this.cells.values()].sort((a, b) => a.seq - b.seq);
     for (const cell of order) this.link(cell);
-    this.bridgeRoads();
+    this.roadHops();
     // The tunnels: unions between parts that are nowhere near each other, so
     // the adjacency replay above can't rediscover them. A link whose end was
     // lifted or blown away just goes quiet until the tile comes back.
@@ -364,29 +364,32 @@ export class Board {
   }
 
   /**
-   * SKY BRIDGES. A road that runs off one tile, across one empty square, and
-   * straight on out of the tile beyond is one road — the gap is bridged.
+   * ROAD HOPS. A road that runs off one tile, across one empty square, and
+   * straight on out of the tile beyond is a road a FOLLOWER CAN CROSS. It is
+   * not one road: the two halves score separately, and there is nothing
+   * standing in the gap.
    *
-   * This exists because of what the wind does. A gust cuts a road and the two
-   * halves can never rejoin: `link` refuses a seam whose edges disagree, and
-   * field ground reconnects freely where road ground does not, so roads are
-   * the most weather-fragile thing on the board and they are paid by exactly
-   * the quantity the weather destroys. A one-square hop gives them back the
-   * length a single shove took away.
+   * There used to be a plank drawn across it and the two halves scored as one,
+   * on the argument that roads are the most weather-fragile thing on the board
+   * — a gust cuts one and the halves can never rejoin, because `link` refuses a
+   * seam whose edges disagree — and were paid by exactly the quantity the
+   * weather destroys. The bridge gave them the length a single shove took away,
+   * and it looked like a plank floating in mid-air, which is what it was. The
+   * WALK is the half of it worth keeping: a figure can step across one square
+   * of open sky, and a road you can walk is enough of a road.
    *
    * STRAIGHT ONLY, and only across ONE square: the road has to leave the near
-   * tile on the same axis it enters the far one, so a bridge is a thing you
-   * can see rather than a rule you have to work out. It joins the roads for
-   * SCORING and for a follower walking along them; it is not ground, and the
-   * wind neither notices it nor is stopped by it.
+   * tile on the same axis it enters the far one. Recorded as pairs of part ids
+   * rather than resolved roots, because a walk asks about them long after this
+   * pass has finished and the union-find has moved on.
    *
-   * Rebuilt from scratch with everything else, so a bridge appears and
-   * disappears as the weather opens and closes the gap under it.
+   * Rebuilt from scratch with everything else, so a hop appears and disappears
+   * as the weather opens and closes the gap under it.
    */
-  bridgeRoads() {
-    this.bridges = [];
+  roadHops() {
+    this.hops = [];
     for (const cell of this.cells.values()) {
-      // Only two of the four directions, or every bridge is found twice.
+      // Only two of the four directions, or every hop is found twice.
       for (const s of [1, 2]) {
         if (this.edgeAt(cell, s) !== 'r') continue;
         const [dx, dy] = SIDE_STEP[s];
@@ -400,11 +403,32 @@ export class Board {
         const b = `${keyOf(far.x, far.y)}#${theirs}`;
         if (!this.parent.has(a) || !this.parent.has(b)) continue;
         if (this.find(a) === this.find(b)) continue;      // already one road
-        const root = this.union(a, b);
-        this.data.get(root).open -= 2;                    // both ends are met
-        this.bridges.push({ x: cell.x + dx, y: cell.y + dy, axis: s & 1 });
+        this.hops.push({ a, b });
       }
     }
+  }
+
+  /**
+   * Every road component a walker can reach from this one, itself included,
+   * following hops as far as they go. Roots, because that is what a caller has
+   * and what it can compare against.
+   */
+  hopsFrom(root) {
+    const out = new Set([root]);
+    if (!this.hops.length) return out;
+    const queue = [root];
+    while (queue.length) {
+      const at = queue.pop();
+      for (const { a, b } of this.hops) {
+        if (!this.parent.has(a) || !this.parent.has(b)) continue;
+        const ra = this.find(a), rb = this.find(b);
+        const other = ra === at ? rb : rb === at ? ra : null;
+        if (other == null || out.has(other)) continue;
+        out.add(other);
+        queue.push(other);
+      }
+    }
+    return out;
   }
 
   /**
@@ -428,12 +452,11 @@ export class Board {
       this.rebuild();
     } else {
       this.link(cell);
-      // A placement can complete a bridge as readily as a removal can — the
-      // tile you just laid may be the far end of a one-square hop. Without
-      // this a board only grew bridges after something forced a rebuild, so
-      // the same two tiles were one road or two depending on how they got
-      // there.
-      this.bridgeRoads();
+      // A placement can complete a hop as readily as a removal can — the tile
+      // you just laid may be the far end of one. Without this a board only
+      // grew hops after something forced a rebuild, so the same two tiles were
+      // walkable or not depending on how they got there.
+      this.roadHops();
     }
     return cell;
   }

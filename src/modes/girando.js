@@ -145,13 +145,14 @@
 // swing onto the wind as well, and a road you built should stay where you built
 // it.
 //
-// A ROAD BRIDGES a one-square gap. Run off one tile, across one empty square,
-// and straight on out of the tile beyond, and it is one road: it scores as one
-// and a follower may walk across. The gap is not ground — the wind neither
-// notices the bridge nor stops at it, and a tile can be blown straight through
-// where it stands. It exists because a gust cuts a road and the two halves can
-// never rejoin, which made roads the most weather-fragile thing on the board
-// and then paid them by exactly the quantity the weather destroys.
+// A FOLLOWER HOPS a one-square gap. Run off one tile, across one empty square,
+// and straight on out of the tile beyond, and a walker can step over it. What
+// it is NOT is one road — the two halves score separately, and there is nothing
+// standing in the gap to see. There used to be a plank drawn across it and the
+// halves scored as one, on the argument that a gust cuts a road and the two
+// ends can never rejoin, so roads were paid by exactly the quantity the weather
+// destroys; the bridge gave the length back and looked like a plank floating in
+// mid-air, which is what it was. The step is the half worth keeping.
 //
 // A TEMPLE is a monastery with no cloister left in it, and it is the one thing
 // on the board whose value is its NEIGHBOURS: red pays its keeper a point for
@@ -874,7 +875,21 @@ export class Girando extends Mode {
       seen.add(root);
       // Somebody else's road is not a road you may walk down.
       if (road.meeples.some((m) => m.player !== seat)) return;
-      const cells = board.cellsOf(road);
+      // A ONE-SQUARE GAP IS A STEP, not a wall. The two halves of a road the
+      // wind cut apart score separately — there is no bridge standing in the
+      // gap and nothing to see there — but a figure can cross it, so the walk
+      // follows every road hop-connected to this one. A half somebody else is
+      // standing on is still theirs, and the walk stops rather than steps over
+      // it.
+      const reach = [road];
+      for (const other of board.hopsFrom(root)) {
+        if (other === root || seen.has(other)) continue;
+        seen.add(other);
+        const d = board.data.get(other);
+        if (!d || d.meeples.some((m) => m.player !== seat)) continue;
+        reach.push(d);
+      }
+      const cells = reach.flatMap((d) => board.cellsOf(d));
       for (const c of cells) {
         if (c.meeple) continue;                       // one figure a tile
         for (const o of claimableFeatures(c.type, { fields: g.has('fields') })) {
@@ -887,11 +902,18 @@ export class Girando extends Mode {
         }
       }
       // …and the road itself, if there is nobody on it and nowhere else to go.
-      if (road.meeples.length || deadEnd) return;
-      const spare = cells.find((c) => !c.meeple);
-      if (!spare) return;
-      const idx = board.featIndexOn(spare, road);
-      if (idx != null) deadEnd = { x: spare.x, y: spare.y, i: idx, f: { type: 'road' }, stroll: true };
+      // Any of the halves will do — a walker that hopped the gap can stand on
+      // the far side of it as readily as the near one.
+      if (deadEnd) return;
+      for (const d of reach) {
+        if (d.meeples.length) continue;
+        const spare = board.cellsOf(d).find((c) => !c.meeple);
+        if (!spare) continue;
+        const idx = board.featIndexOn(spare, d);
+        if (idx == null) continue;
+        deadEnd = { x: spare.x, y: spare.y, i: idx, f: { type: 'road' }, stroll: true };
+        break;
+      }
     });
 
     // "It goes until it hits another feature or a dead end" — so the road is
@@ -1837,6 +1859,6 @@ Girando.spec = {
     + 'Green scores the farms (1 per two tiles of field), blue the cities (1 a tile open, 2 finished), red the temples (1 per tile around one), yellow the roads (1 a tile plus what each city it reaches is worth). '
     + 'Any half fits any other, so the pairing is the decision. '
     + 'You may only build onto the Palazzo’s mainland; everything adrift is an island, and islands pay more. '
-    + 'A feature that scores hands its followers back — or they walk on down a road. '
+    + 'A feature that scores hands its followers back — or they walk on down a road, hopping any one-square gap in it. '
     + 'Instead of a follower, send the Balena anywhere on the board — nothing under the whale can be moved by any wind.',
 };

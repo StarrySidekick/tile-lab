@@ -267,9 +267,8 @@ function mulberry(a) {
 function checkBoard() {
   console.log('board primitives');
 
-  // remove() must restore exactly the connectivity a fresh board would have —
-  // which now includes the sky bridge over the hole it just made, so the test
-  // is the invariant rather than a number.
+  // remove() must restore exactly the connectivity a fresh board would have,
+  // so the test is the invariant rather than a number.
   const a = new Board();
   a.place(0, 0, TILES.U, 0);
   a.place(0, -1, TILES.U, 0);
@@ -286,22 +285,28 @@ function checkBoard() {
       `${split.tiles.size} against ${fresh.featureOf(0, 0, 0).tiles.size}`);
   }
 
-  // A SKY BRIDGE: one square of open air, straight on, and the road is one
-  // road again. Only straight, and only one square.
+  // A ROAD HOP: one square of open air, straight on. It is a step a follower
+  // may take, and NOT one road — nothing stands in the gap and the two halves
+  // score apart. Only straight, and only one square.
   {
     const b = new Board();
     b.place(0, 0, TILES.U, 0);
     b.place(0, -2, TILES.U, 0);
-    if (b.featureOf(0, 0, 0).tiles.size !== 2) return fail('a road bridges one straight square', 'it did not');
-    if (b.bridges.length !== 1) return fail('the bridge is reported for drawing', `${b.bridges.length}`);
+    if (b.featureOf(0, 0, 0).tiles.size !== 1) return fail('a hop is not one road', 'the halves were joined');
+    if (b.hops.length !== 1) return fail('the hop is there to be walked', `${b.hops.length}`);
+    const near = b.find(b.featureOf(0, 0, 0).parts[0]);
+    const far = b.find(b.featureOf(0, -2, 0).parts[0]);
+    if (near === far) return fail('the two halves are two roads', 'they are one');
+    if (!b.hopsFrom(near).has(far)) return fail('…and a walker can reach one from the other', 'it could not');
+
     const c = new Board();
     c.place(0, 0, TILES.U, 0);
     c.place(0, -3, TILES.U, 0);
-    if (c.featureOf(0, 0, 0).tiles.size !== 1) return fail('a road does not bridge two squares', 'it did');
+    if (c.hops.length) return fail('a road does not hop two squares', `${c.hops.length} hop(s)`);
     const d = new Board();
     d.place(0, 0, TILES.U, 0);
     d.place(0, -2, TILES.U, 1);                 // turned across: no longer straight
-    if (d.featureOf(0, 0, 0).tiles.size !== 1) return fail('a bridge has to be straight', 'it bent');
+    if (d.hops.length) return fail('a hop has to be straight', `${d.hops.length} hop(s)`);
   }
   if (a.size !== 2) return fail('remove() drops the cell', `size ${a.size}`);
 
@@ -1117,26 +1122,42 @@ function checkGirando() {
     }
   }
 
-  // A ROAD BRIDGES a one-square gap for scoring, and a follower may walk
-  // across one. The gap is not ground: the wind neither notices it nor stops
-  // at it, and a tile can be blown straight through where the bridge was.
+  // A ONE-SQUARE GAP is a step a WALKER may take and nothing else. The two
+  // halves score apart — yellow pays the near one for the near one — and a
+  // follower whose feature just scored can walk across and take the temple on
+  // the far side.
   {
     const h = fresh(43);
     const b = h.board;
     lay(b, 0, 0, 'U');
     lay(b, 0, -2, 'U');
-    // A spine of country round the gap, so both ends of the bridge are on the
-    // one mainland. Every fragment is an island now, and an island pays double
-    // — which would make this a test of the island rate rather than the bridge.
+    // A spine of country round the gap, so both halves are on the one mainland.
+    // Every fragment is an island now, and an island pays double — which would
+    // make this a test of the island rate rather than of the gap.
     lay(b, 1, 0, 'B'); lay(b, 1, -1, 'B'); lay(b, 1, -2, 'B');
     b.addMeeple(0, 0, 0, 0);
     b.rebuild();
-    const road = b.featureOf(0, 0, 0);
-    if (road.tiles.size !== 2) return fail('a bridged road scores as one road', `${road.tiles.size} tiles`);
+    if (b.featureOf(0, 0, 0).tiles.size !== 1) return fail('a hop is not one road', 'the halves scored as one');
     h.m.fire('yellow');
     h.m.sweep();
-    if (h.players[0].score !== 2) {
-      return fail('yellow pays a bridged road for both halves', `paid ${h.players[0].score}`);
+    if (h.players[0].score !== 1) {
+      return fail('yellow pays each half for itself', `paid ${h.players[0].score}`);
+    }
+  }
+
+  // …and the walk crosses it, which is the half of the old bridge worth
+  // keeping.
+  {
+    const h = fresh(46);
+    const b = h.board;
+    lay(b, 0, 0, 'U');                        // the road it is standing on
+    lay(b, 0, -2, 'Kta');                     // a temple with a road out of its south
+    lay(b, 1, 0, 'B'); lay(b, 1, -1, 'B'); lay(b, 1, -2, 'B');
+    b.rebuild();
+    const targets = h.m.strollTargets({ x: 0, y: 0, i: 0 });
+    if (!targets.some((t) => t.x === 0 && t.y === -2 && t.f.type === 'temple')) {
+      return fail('a walker steps over a one-square gap',
+        JSON.stringify(targets.map((t) => `${t.f.type}@${t.x},${t.y}`)));
     }
   }
 
