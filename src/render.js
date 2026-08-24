@@ -1532,10 +1532,14 @@ export class Renderer {
           const k = ease(t);
           const wx = e.from.x + (e.to.x - e.from.x) * k;
           const wy = e.from.y + (e.to.y - e.from.y) * k - (e.lift0 + (e.lift1 - e.lift0) * k);
-          const scale = 1 + (1 - k) * 0.22;                 // a shade oversized, settling
+          // In from the panel: oversized, settling. Blown by the wind: flat
+          // while it waits, a small rise mid-flight, flat when it lands.
+          const scale = e.solid ? 1 + Math.sin(t * Math.PI) * 0.10 : 1 + (1 - k) * 0.22;
           const s = z * scale;
           const [sx, sy] = at(wx - 0.5, wy - 0.5);
-          ctx.globalAlpha = Math.min(1, 0.35 + t * 3);
+          // A tile flying in from the panel fades in; one the WIND is moving
+          // was already on the board and stays solid, waiting for its beat.
+          ctx.globalAlpha = e.solid ? 1 : Math.min(1, 0.35 + t * 3);
           this.paintTile(0, 0, e.rot, e.type, 'surface', s, () => [sx - (s - z) / 2, sy - (s - z) / 2]);
           break;
         }

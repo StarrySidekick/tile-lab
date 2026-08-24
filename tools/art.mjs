@@ -62,6 +62,7 @@ await page.evaluate(async () => {
   const { TILE_TYPES } = await import('./src/tiles.js');
   const { drawTile } = await import('./src/art.js');
   const { usePalette } = await import('./src/theme.js');
+  const { roughen } = await import('./src/ink.js');
   usePalette?.('chart');
 
   const SIZES = [24, 40, 64, 240];
@@ -85,6 +86,7 @@ await page.evaluate(async () => {
       const ctx = cv.getContext('2d');
       ctx.scale(px, px);
       drawTile(ctx, t, {});
+      roughen(cv);                        // the sheet shows what the game shows
       cell.appendChild(cv);
     }
     const tag = document.createElement('div');

@@ -24,6 +24,7 @@
 
 import { drawTile } from './art.js';
 import { THEME } from './theme.js';
+import { roughen } from './ink.js';
 
 // Sprites are rendered at whichever bucket is the first one big enough, so
 // zooming re-uses a sprite until it would visibly soften, then steps up.
@@ -69,6 +70,9 @@ export function tileSprite(type, rot, terrain, px) {
   ctx.rotate((rot & 3) * Math.PI / 2);
   ctx.translate(-0.5, -0.5);
   drawTile(ctx, type, { terrain, rot });
+  // On the chart, every line in the picture is bent as if drawn by hand —
+  // once, here, so the whole board pays nothing per frame for it. See ink.js.
+  if (THEME.paletteName === 'chart') roughen(canvas);
 
   cache.set(key, canvas);
   bytes += size * size * 4;

@@ -19,6 +19,7 @@ import {
 } from './mechanics.js';
 import { Renderer } from './render.js';
 import { drawTile, drawMeeple, PLAYER_COLORS } from './art.js';
+import { roughen } from './ink.js';
 import { THEME } from './theme.js';
 import { TILE_TYPES, TILES, GROUPS, rotPoint } from './tiles.js';
 import { Sfx, SOUND_NAMES } from './audio.js';
@@ -910,6 +911,7 @@ function renderClaim() {
   claimCtx.scale(size, size);
   drawTile(claimCtx, cell.type, { rot: cell.rot });
   claimCtx.restore();
+  inkUp(claimCtx.canvas);
 
   // The dots start where the follower itself would stand, turned with the tile.
   // A busy tile — a four-way road with its four fields — puts several anchors
@@ -1016,6 +1018,7 @@ function renderConfirm() {
   claimCtx.translate(-size / 2, -size / 2);
   claimCtx.scale(size, size);
   drawTile(claimCtx, cur.type, { terrain: cur.terrain, rot: pending.rot });
+  inkUp(claimCtx.canvas);
   claimCtx.restore();
 
   claimCtx.save();
@@ -1096,6 +1099,7 @@ function drawPreview() {
       drawTile(c, cell.type, { rot: cell.rot });
       c.restore();
     }
+    inkUp(c.canvas);
     return;
   }
 
@@ -1107,6 +1111,16 @@ function drawPreview() {
   c.scale(size, size);
   drawTile(c, cur.type, { terrain: cur.terrain, rot: cur.rot });
   c.restore();
+  inkUp(c.canvas);
+}
+
+/**
+ * The previews draw tiles straight through art.js rather than the sprite
+ * cache, so they get the hand-drawn line applied here — only on the chart,
+ * and only when a preview is redrawn, which is on events rather than frames.
+ */
+function inkUp(canvas) {
+  if (document.body.classList.contains('parchment')) roughen(canvas);
 }
 
 const PHASE_TEXT = {
@@ -1156,6 +1170,7 @@ function renderMarket() {
     const ctx = cv.getContext('2d');
     ctx.scale(56, 56);
     drawTile(ctx, TILES[id]);
+    inkUp(cv);
     wrap.appendChild(cv);
     wrap.insertAdjacentHTML('beforeend', `<kbd>${i + 1}</kbd>`);
     wrap.onclick = () => game.takeFromMarket(i);
@@ -1364,6 +1379,7 @@ function renderHud(doing, status) {
   c.scale(size, size);
   drawTile(c, cur.type, { terrain: cur.terrain, rot: cur.rot });
   c.restore();
+  inkUp(c.canvas);
 }
 
 /**

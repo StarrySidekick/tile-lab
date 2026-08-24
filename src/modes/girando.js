@@ -1287,6 +1287,7 @@ export class Girando extends Mode {
     // than the last, so a chain plays out on screen as a sequence you can
     // follow: streak, wake, slide, streak, wake, slide.
     this.stormAt = 0;
+    this.stormN = 0;
     try {
       let job = [spec, by];
       for (let n = 0; job && n < MAX_CHAIN; n++) {
@@ -1314,7 +1315,9 @@ export class Girando extends Mode {
     const g = this.game;
     this.gusts++;
     const at = this.stormAt || 0;
-    const BEAT = 650;
+    // The first gusts of a storm take a full beat; later ones come quicker, so
+    // a six-gust chain reads as weather picking up pace rather than a queue.
+    const BEAT = Math.max(340, 650 - 90 * (this.stormN || 0));
     // The gust's own streak, down the lane it actually reached — and a beat on
     // the clock only if there was anything to watch.
     const acted = r.moved.length || r.fell.length || r.swung.length
@@ -1334,7 +1337,7 @@ export class Girando extends Mode {
     for (const zz of r.zephyrs) {
       g.emit('wake', { at: { x: zz.cell.x + 0.5, y: zz.cell.y + 0.5 }, blast: !!zz.blast, delay: at + BEAT * 0.55 });
     }
-    if (acted) this.stormAt = at + BEAT;
+    if (acted) { this.stormAt = at + BEAT; this.stormN = (this.stormN || 0) + 1; }
     this.payTurbines(r.turbines);
     // A gust that found nothing has to SAY it found nothing. Nearly half the
     // zephyrs played point out over the edge of the country into open sky —

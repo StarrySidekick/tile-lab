@@ -640,6 +640,34 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > sitting at their origin until it arrives, so nothing blinks out of the world.
 
 
+> **Eighteenth pass: the drawn line.**
+>
+> Everything in art.js is machine geometry — arcs and rects, every edge dead
+> straight — and a sixteenth-century plate has no straight lines in it. Redrawing
+> two thousand path calls with hand-wobble would be a rewrite that never ends,
+> so the wobble is applied to the PICTURE instead: `ink.js` runs a rendered
+> sprite through a smooth, seeded value-noise displacement field, which bends
+> every edge in the image at once — outlines, hatching, roofs, breath-cones —
+> exactly the way a nib wanders. It runs once per cached sprite (chart palette
+> only), so the per-frame cost is zero; the preview and claim canvases get the
+> same pass on their event-driven redraws, and the contact sheet applies it too,
+> because the sheet has to show what the game shows. Amplitude ~1.5% of the
+> tile, wavelength ~9%: a steady hand, not a crayon.
+>
+> **The cartouche.** The panel header sits in an engraved title-plate now — a
+> double rule, four corner volutes, a diamond-and-scroll fleuron — drawn as
+> inline SVG in the stylesheet, the way every chart in the references frames
+> its title.
+>
+> **And the storm accelerates.** The first gusts of a chain take their full
+> 650ms beat; each later one comes 90ms sooner, floored at 340ms, so a six-gust
+> storm reads as weather picking up pace rather than a queue. Two fixes that
+> fell out of watching it: a tile waiting for its beat is drawn SOLID at its
+> origin (the fly-in fade was for tiles arriving from the panel, and a
+> mid-board ghost read as a bug), and it stays flat while it waits, rising only
+> mid-flight.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 

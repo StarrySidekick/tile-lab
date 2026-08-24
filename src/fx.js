@@ -129,9 +129,9 @@ export class Effects {
    * Strata tile rises onto the stack it just covered instead of appearing on
    * top of it.
    */
-  flyTile({ from, to, type, rot, lift = 0, from_lift = null, delay = 0, life = LIFE.tile }) {
+  flyTile({ from, to, type, rot, lift = 0, from_lift = null, delay = 0, life = LIFE.tile, solid = false }) {
     const e = this.add({
-      kind: 'tile', from: from || to, to, type, rot,
+      kind: 'tile', from: from || to, to, type, rot, solid,
       lift0: from_lift == null ? lift : from_lift, lift1: lift,
       delay, life,
     });
@@ -307,7 +307,7 @@ export class Effects {
         // rather than a single instantaneous rearrangement.
         const at = data.delay || 0;
         for (const m of data.moves || []) {
-          this.flyTile({ from: m.from, to: m.at, type: m.type, rot: m.rot, delay: at, life: LIFE.gustTile });
+          this.flyTile({ from: m.from, to: m.at, type: m.type, rot: m.rot, delay: at, life: LIFE.gustTile, solid: true });
         }
         if (data.fell?.length) this.fall(data.fell, 'blow', at);
         return;
