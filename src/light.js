@@ -59,6 +59,12 @@ export function pixelScale(ctx) {
  * the board, for three lines and no edits to the drawings themselves.
  */
 export function shadow(ctx, L, dist = 0.05, blur = 0.05, color = THEME.cast) {
+  // Not on the chart. A drawn map has no sun in it: a blurred drop shadow is
+  // the most obviously COMPUTED thing a renderer does, and one under every
+  // follower was the last of it left. Shading on the chart, when it comes
+  // back, will be dither and hatching — drawn, not calculated. Gating it here
+  // rather than at forty call sites means no caller can forget.
+  if (THEME.paletteName === 'chart') return noShadow(ctx);
   const s = pixelScale(ctx);
   ctx.shadowColor = color;
   ctx.shadowOffsetX = -L.x * dist * s;

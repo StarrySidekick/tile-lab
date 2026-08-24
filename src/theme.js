@@ -106,17 +106,22 @@ const chartPalette = () => ({
   roadCore: DESIGN.chart.roadCore,
   roadEdge: DESIGN.chart.roadEdge,
 
+  // Nothing on the chart is lit from anywhere, so every lit/shade PAIR the art
+  // asks for collapses onto its one flat colour. The art keeps its names — it
+  // is shared with the modes that do have a sun — but on this palette they
+  // are all the same wash, and the console no longer offers dials for a light
+  // that isn't there. Shading here, when it returns, will be hatching.
   city: DESIGN.chart.city,          // warm stone, one step off the paper
-  cityShade: '#b39a6e',
+  cityShade: DESIGN.chart.city,
   cityWall: DESIGN.chart.cityWall,
-  wallLit: DESIGN.chart.wallLit,
+  wallLit: DESIGN.chart.city,
   cityGround: DESIGN.chart.cityGround,
-  cityGrit: '#b9a175',
+  cityGrit: DESIGN.chart.cityGround,
 
   roof: DESIGN.chart.roof,          // vermillion — the accent every reference leans on
-  roofDark: '#8c3a20',
-  roofLit: DESIGN.chart.roofLit,
-  roofShade: DESIGN.chart.roofShade,
+  roofDark: DESIGN.chart.roof,
+  roofLit: DESIGN.chart.roof,
+  roofShade: DESIGN.chart.roof,
   plaster: DESIGN.chart.plaster,
   timber: DESIGN.chart.timber,
 
@@ -125,7 +130,7 @@ const chartPalette = () => ({
 
   forest: DESIGN.chart.forest,
   forestDark: '#616e42',
-  forestCanopy: DESIGN.chart.forestCanopy,
+  forestCanopy: DESIGN.chart.forest,
   rock: '#a08c6e',
   rockDark: '#7c6b51',
   rockSnow: '#e8dcc2',

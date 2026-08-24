@@ -646,7 +646,7 @@ export class Renderer {
     }
     if (DESIGN.tile.border) {
       ctx.strokeStyle = rgba(DESIGN.ink.tone, DESIGN.tile.border);
-      ctx.lineWidth = 1;
+      ctx.lineWidth = DESIGN.tile.borderWidth;
       ctx.strokeRect(Math.round(sx) + 0.5, Math.round(sy) + 0.5, Math.round(z) - 1, Math.round(z) - 1);
     }
   }
@@ -747,7 +747,7 @@ export class Renderer {
     // A shade under full size: the whale has to read as the heaviest thing on
     // the board without hiding which tile it is pinning, and the tile under it
     // is exactly the tile you most want to be able to identify.
-    ctx.scale(z * 0.88, z * 0.88);
+    ctx.scale(z * DESIGN.balena.size, z * DESIGN.balena.size);
 
     // On the chart the whale is a woodcut sea-monster: flat grey-blue wash
     // inside an ink line, pale belly as a second flat wash, no shadow — the
@@ -761,7 +761,7 @@ export class Renderer {
       ctx.fill();
     }
 
-    let skin = '#5b6b84';
+    let skin = DESIGN.balena.skin;
     if (!chart) {
       skin = ctx.createLinearGradient(0, -0.30, 0, 0.24);
       skin.addColorStop(0, '#4a5570');
@@ -769,8 +769,8 @@ export class Renderer {
       skin.addColorStop(1, '#c9d4e4');
     }
     ctx.fillStyle = skin;
-    ctx.strokeStyle = 'rgba(40,36,28,0.85)';
-    ctx.lineWidth = chart ? 0.028 : 0.02;
+    ctx.strokeStyle = chart ? rgba(DESIGN.balena.inkTone, 0.85) : 'rgba(40,36,28,0.85)';
+    ctx.lineWidth = (chart ? 0.028 : 0.02) * DESIGN.balena.ink;
 
     ctx.beginPath();                                        // body, nose east
     ctx.moveTo(0.52, 0.02);
@@ -787,7 +787,7 @@ export class Renderer {
       ctx.bezierCurveTo(0.28, 0.26, -0.14, 0.30, -0.34, 0.14);
       ctx.bezierCurveTo(-0.30, 0.06, 0.30, 0.08, 0.52, 0.02);
       ctx.closePath();
-      ctx.fillStyle = '#d9d2ba';
+      ctx.fillStyle = DESIGN.balena.belly;
       ctx.fill(); ctx.stroke();
       ctx.restore();
     }

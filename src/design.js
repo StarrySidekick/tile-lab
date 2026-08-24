@@ -81,7 +81,9 @@ export const SPEC = [
   { key: 'tile.washTone', group: 'Tiles on the page', type: 'color', def: '#d8c196',
     note: 'The colour of that wash.' },
   { key: 'tile.border', group: 'Tiles on the page', type: 'range', def: 0.28, min: 0, max: 1, step: 0.01,
-    note: 'The hairline of ink round each square — what an engraved plate has and a rendered board does not.' },
+    note: 'How dark the hairline of ink round each square is — what an engraved plate has and a rendered board does not. 0 removes it.' },
+  { key: 'tile.borderWidth', group: 'Tiles on the page', type: 'range', def: 1, min: 0.5, max: 5, step: 0.1,
+    note: 'How thick that hairline is, in screen pixels. It does not grow with zoom, the way a printed line does not.' },
   { key: 'tile.hatch', group: 'Tiles on the page', type: 'range', def: 0.10, min: 0, max: 0.5, step: 0.01,
     note: 'The crosshatch on open field. A printed map’s land is a wash, so this stays a whisper.' },
 
@@ -92,21 +94,25 @@ export const SPEC = [
   { key: 'chart.road', group: 'The country', type: 'color', def: '#e6d6ae', note: 'A road: bare paper showing between ink edges.' },
   { key: 'chart.roadCore', group: 'The country', type: 'color', def: '#eee0bf', note: 'The lit centre of the track.' },
   { key: 'chart.roadEdge', group: 'The country', type: 'color', def: '#45351f', note: 'The ink line either side of a road.' },
+  { key: 'road.width', group: 'The country', type: 'range', def: 0.14, min: 0.04, max: 0.30, step: 0.005,
+    note: 'Width of a road as a fraction of a tile, ink edges included.' },
+  { key: 'road.core', group: 'The country', type: 'range', def: 0.095, min: 0.01, max: 0.26, step: 0.005,
+    note: 'Width of the pale track inside it. The difference between the two IS the ink edge.' },
   { key: 'chart.forest', group: 'The country', type: 'color', def: '#7d8a58', note: 'Woodland.' },
-  { key: 'chart.forestCanopy', group: 'The country', type: 'color', def: '#8f9c66', note: 'The lit side of a tree.' },
   { key: 'chart.water', group: 'The country', type: 'color', def: '#8fa9b4', note: 'Lakes and rivers — the portolan’s near-grey sea.' },
   { key: 'chart.waterDeep', group: 'The country', type: 'color', def: '#6d8b9a', note: 'Deep water.' },
 
   // --- what is built -------------------------------------------------------
   { key: 'chart.city', group: 'What is built', type: 'color', def: '#cdb488', note: 'Curtain wall stone.' },
   { key: 'chart.cityWall', group: 'What is built', type: 'color', def: '#54402a', note: 'The wall’s shaded foot — an ink line at this scale.' },
-  { key: 'chart.wallLit', group: 'What is built', type: 'color', def: '#e5d2a6', note: 'The walkway on top.' },
   { key: 'chart.cityGround', group: 'What is built', type: 'color', def: '#c4ac81', note: 'Packed earth inside the walls.' },
   { key: 'chart.roof', group: 'What is built', type: 'color', def: '#b5502f', note: 'Vermillion — the accent every reference leans on.' },
-  { key: 'chart.roofLit', group: 'What is built', type: 'color', def: '#d0703f', note: 'The slope facing the sun.' },
-  { key: 'chart.roofShade', group: 'What is built', type: 'color', def: '#6e2c17', note: 'The slope that doesn’t. A flat pair, not a gradient.' },
   { key: 'chart.plaster', group: 'What is built', type: 'color', def: '#eee0c2', note: 'Rendered walls, temple columns.' },
   { key: 'chart.timber', group: 'What is built', type: 'color', def: '#54402a', note: 'Beams, poles, pennant staffs.' },
+  { key: 'mark.size', group: 'What is built', type: 'range', def: 1, min: 0.5, max: 1.8, step: 0.02,
+    note: 'Size of every stamp that sits on a tile — inns, cathedrals, shrines, and the wind-heads too.' },
+  { key: 'mark.ink', group: 'What is built', type: 'range', def: 1, min: 0.2, max: 3, step: 0.05,
+    note: 'Weight of the line those stamps are drawn in.' },
 
   // --- the weather ---------------------------------------------------------
   { key: 'storm.beat', group: 'The weather', type: 'range', def: 650, min: 120, max: 1600, step: 10,
@@ -121,6 +127,10 @@ export const SPEC = [
   { key: 'storm.cannonInk', group: 'The weather', type: 'color', def: '#7e2e20', note: 'Colour of a gust cannon’s — red, because artillery.' },
   { key: 'storm.tileGlide', group: 'The weather', type: 'range', def: 420, min: 80, max: 1200, step: 10,
     note: 'Milliseconds a tile takes to slide to where the wind put it.' },
+  { key: 'zephyr.size', group: 'The weather', type: 'range', def: 1, min: 0.5, max: 1.8, step: 0.02,
+    note: 'Size of the wind-heads specifically — zephyrs and gust cannons — on top of the stamp size.' },
+  { key: 'zephyr.ink', group: 'The weather', type: 'range', def: 1, min: 0.2, max: 3, step: 0.05,
+    note: 'Weight of the line THEY are drawn in, again on top of the stamp weight.' },
 
   // --- the figures ---------------------------------------------------------
   { key: 'star.arm', group: 'The figures', type: 'range', def: 0.56, min: 0.3, max: 0.9, step: 0.01,
@@ -131,6 +141,16 @@ export const SPEC = [
     note: 'The valley between the points. Tighter is a spikier, thinner figure.' },
   { key: 'star.ink', group: 'The figures', type: 'range', def: 1, min: 0, max: 3, step: 0.05,
     note: 'Weight of the outline round a follower.' },
+  { key: 'balena.size', group: 'The figures', type: 'range', def: 0.88, min: 0.4, max: 1.3, step: 0.01,
+    note: 'How much of its square the whale fills. Under 1 so you can still tell which tile it is pinning.' },
+  { key: 'balena.skin', group: 'The figures', type: 'color', def: '#5b6b84',
+    note: 'The whale’s back — one flat wash, the way a margin sea-monster is inked.' },
+  { key: 'balena.belly', group: 'The figures', type: 'color', def: '#d9d2ba',
+    note: 'Its pale underside, the second wash.' },
+  { key: 'balena.inkTone', group: 'The figures', type: 'color', def: '#282420',
+    note: 'The line it is drawn in.' },
+  { key: 'balena.ink', group: 'The figures', type: 'range', def: 1, min: 0.2, max: 3, step: 0.05,
+    note: 'Weight of that line.' },
 ];
 
 /** Defaults, as a nested object, built once from the book. */

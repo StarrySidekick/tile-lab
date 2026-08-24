@@ -1,9 +1,14 @@
 # ---------------------------------------------------------------------------
 # Synthesise the paper. Deterministic, seeded, and tileable: value noise for
-# the sheet's cockle, horizontal fibre streaks for the laid texture, chain
-# lines, and a scatter of darker flecks. No image generator anywhere near it —
-# this is the same fractal-noise construction every texture tool uses, written
-# out longhand.
+# the sheet's cockle and a scatter of darker flecks. No image generator
+# anywhere near it — this is the same fractal-noise construction every texture
+# tool uses, written out longhand.
+#
+# It used to have laid texture too — the horizontal wire lines and the vertical
+# chain lines a real hand-made sheet is pressed against. They were accurate and
+# they were wrong: at the scale this tiles at they read as ruled stripes lying
+# behind the whole game, menus included, rather than as the grain of a sheet.
+# A wove paper it is.
 #
 #   python3 tools/paper.py        writes assets/paper.png (tileable, 512px)
 #
@@ -37,17 +42,6 @@ base = (0.55 * tileable_noise(N, 8) + 0.28 * tileable_noise(N, 24)
         + 0.17 * tileable_noise(N, 64))
 base = (base - base.min()) / (base.max() - base.min())
 
-# Laid texture: fine horizontal fibre streaks (wire lines), slightly wavering.
-y = np.arange(N)
-wobble = tileable_noise(N, 6)[:, 0] * 3.0
-wire = 0.5 + 0.5 * np.sin((y[:, None] + wobble[None, :] * 4) * (2 * np.pi * 96 / N))
-wire = wire ** 3
-fibre_gain = 0.5 + 0.5 * tileable_noise(N, 16)      # streaks come and go
-
-# Chain lines: sparse vertical lines every ~64px, soft.
-x = np.arange(N)
-chain = np.exp(-((x[None, :] % 64) - 32) ** 2 / 6.0)
-
 # Flecks: darker specks of pulp.
 flecks = np.zeros((N, N))
 for _ in range(240):
@@ -61,9 +55,7 @@ flecks = np.clip(flecks, 0, 1)
 
 # Compose as a light-map around 1.0: >1 lighter paper, <1 darker.
 light = (1.0
-         + (base - 0.5) * 0.10          # cockle
-         - wire * fibre_gain * 0.035    # wire lines
-         - chain * 0.05                 # chain lines
+         + (base - 0.5) * 0.12          # cockle
          - flecks * 0.10)               # pulp
 
 # The gold-buff paper of the references (#e8d0a0 family), modulated.

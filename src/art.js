@@ -299,21 +299,36 @@ function roadPath(ctx, f, short = false) {
   }
 }
 
-const ROAD_STYLE = {
-  surface: { outer: 0.14, inner: 0.095, edge: THEME.roadEdge, core: THEME.roadCore },
-  cave:    { outer: 0.30, inner: 0.25,  edge: THEME.roadEdge, core: '#8d7f66' },
-  city:    { outer: 0.42, inner: 0.36,  edge: '#3a3340',      core: '#9a9086' },
-};
+// A function, not a table. It used to be an object literal, which meant it
+// read THEME and DESIGN once at import — before any palette had been chosen —
+// and then never again. That is exactly the mistake the design book exists to
+// stop, and it is why the road dials appeared to do nothing: they were being
+// read, correctly, four hundred milliseconds before they mattered.
+function roadStyle(terrain) {
+  const w = DESIGN.road.width, c = Math.min(DESIGN.road.core, w);
+  if (terrain === 'cave') return { outer: w * 2.1, inner: c * 2.6, edge: THEME.roadEdge, core: '#8d7f66' };
+  if (terrain === 'city') return { outer: w * 3.0, inner: c * 3.8, edge: '#3a3340', core: '#9a9086' };
+  return { outer: w, inner: c, edge: THEME.roadEdge, core: THEME.roadCore, fill: THEME.road };
+}
 
 // A road is a road. It lies flat on the ground and gets no lighting of its own
 // — the only thing on the board with height is something you could walk into.
 function drawRoad(ctx, f, terrain, short = false) {
-  const s = ROAD_STYLE[terrain] || ROAD_STYLE.surface;
+  const s = roadStyle(terrain);
   ctx.lineCap = 'round';
   roadPath(ctx, f, short);
   ctx.lineWidth = s.outer;
   ctx.strokeStyle = s.edge;
   ctx.stroke();
+  // The body of the track, between the ink edges. It is what `road` has always
+  // named and nothing has ever drawn — the pale core was covering the whole
+  // width, so the colour had no space to appear in.
+  if (s.fill && s.outer - s.inner > 0.005) {
+    roadPath(ctx, f, short);
+    ctx.lineWidth = (s.outer + s.inner) / 2;
+    ctx.strokeStyle = s.fill;
+    ctx.stroke();
+  }
   roadPath(ctx, f, short);
   ctx.lineWidth = s.inner;
   ctx.strokeStyle = s.core;
@@ -2002,16 +2017,44 @@ const FLAT_MARKS = new Set(['mouth', 'spring', 'ford', 'shaft', 'hill', 'zephyr'
  * the same direction as everything else on the board, for three lines and no
  * edits to the drawings themselves.
  */
+const WEATHER_MARKS = new Set(['zephyr', 'zephyr2', 'cannon', 'cannon2', 'head']);
+
+/**
+ * A context that quietly scales every line width set on it.
+ *
+ * The forty little mark drawings each set their own widths — a curl is 0.04,
+ * a chevron 0.11 — because that IS the drawing; they are not one line thick.
+ * So a single dial for "how heavy is this stamp drawn" cannot be a lineWidth
+ * assignment in the caller: the art overwrites it on the next line. Handing
+ * the art a context that multiplies whatever it asks for keeps the drawings
+ * exactly as written and still lets the whole stamp thicken or thin as one.
+ * Marks are drawn when a sprite is built, never per frame, so the proxy costs
+ * nothing worth measuring.
+ */
+function inked(ctx, k) {
+  if (k === 1) return ctx;
+  return new Proxy(ctx, {
+    get(t, p) { const v = t[p]; return typeof v === 'function' ? v.bind(t) : v; },
+    set(t, p, v) { t[p] = (p === 'lineWidth') ? v * k : v; return true; },
+  });
+}
+
 export function drawMark(ctx, kind, [x, y], s = 0.46, L = LIGHT, dir = null) {
   const art = MARK_ART[kind];
   if (!art) return;
+  // Two dials, multiplied: one for every stamp on a tile, one for the
+  // wind-heads on top of it — they are the marks you spend the game reading,
+  // so they get to be sized without dragging the cathedrals along.
+  const weather = WEATHER_MARKS.has(kind);
+  const scale = s * DESIGN.mark.size * (weather ? DESIGN.zephyr.size : 1);
   ctx.save();
   ctx.translate(x, y);
-  ctx.scale(s, s);
+  ctx.scale(scale, scale);
   // A mark that carries a direction is drawn pointing north and turned here,
   // so its art never has to know which way its tile ended up facing.
   if (dir) ctx.rotate((dir & 3) * Math.PI / 2);
-  ctx.lineWidth = 0.055;
+  const pen = DESIGN.mark.ink * (weather ? DESIGN.zephyr.ink : 1);
+  ctx.lineWidth = 0.055 * pen;
   ctx.strokeStyle = THEME.timber;
   ctx.lineJoin = 'round';
   if (!FLAT_MARKS.has(kind)) {
@@ -2024,7 +2067,7 @@ export function drawMark(ctx, kind, [x, y], s = 0.46, L = LIGHT, dir = null) {
     ctx.fill();
     shadow(ctx, L, 0.07, 0.10, THEME.cast);
   }
-  art(ctx);
+  art(inked(ctx, pen));
   noShadow(ctx);
   ctx.restore();
 }
@@ -2136,7 +2179,7 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
   // Two or more dead-end road stubs meeting = a junction, not a through road.
   // Not on a vane: nothing meets there, that's the point of it.
   if (ground && !type.swing && type.feats.filter((f) => f.type === 'road' && f.sides.length === 1).length >= 2) {
-    const js = ROAD_STYLE[terrain] || ROAD_STYLE.surface;
+    const js = roadStyle(terrain);
     ctx.beginPath();
     ctx.arc(0.5, 0.5, js.inner * 0.8 + 0.03, 0, Math.PI * 2);
     ctx.fillStyle = js.core;
@@ -2355,9 +2398,9 @@ export function drawMeeple(ctx, x, y, size, color, opts = {}) {
   ctx.fillStyle = color;
   ctx.fill();
   noShadow(ctx);
-  ctx.lineWidth = 0.09;
+  ctx.lineWidth = 0.09 * DESIGN.star.ink;
   ctx.strokeStyle = opts.hero ? 'rgba(20,14,6,0.85)' : 'rgba(0,0,0,0.65)';
-  ctx.stroke();
+  if (ctx.lineWidth) ctx.stroke();
 
   // Rounding on the body: a warm edge where the sun hits, cool where it
   // doesn't — except on the chart, where nothing is lit and a printed figure
