@@ -48,8 +48,16 @@ export class Designer {
     } catch { /* a corrupt draft is not worth a crash */ }
   }
 
+  /**
+   * Keep the draft, but not on every twitch: a slider drag fires input events
+   * far faster than a synchronous storage write wants to happen, and the last
+   * one is the only one worth keeping.
+   */
   remember() {
-    try { localStorage.setItem(STORE, JSON.stringify(changes())); } catch { /* full, private mode */ }
+    clearTimeout(this.saving);
+    this.saving = setTimeout(() => {
+      try { localStorage.setItem(STORE, JSON.stringify(changes())); } catch { /* full, private mode */ }
+    }, 250);
   }
 
   toggle() {

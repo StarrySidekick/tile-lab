@@ -42,6 +42,17 @@ const BUDGET = 48 * 1024 * 1024;
 const cache = new Map();          // insertion order doubles as the LRU queue
 let bytes = 0;
 
+// A ceiling on how big a sprite may be rendered, regardless of how big it is
+// about to be drawn. Normally there isn't one — but a 1024px chart tile costs
+// ~20ms and a good deal of scratch memory to roughen, and the design console
+// throws the whole cache away on every twitch of a slider. While the dials are
+// moving we render small and blurry, which is free, and go back to full
+// resolution the moment you stop. Entries are keyed by size, so the two
+// resolutions coexist in the cache rather than evicting each other.
+let cap = Infinity;
+
+export function setSpriteCap(px) { cap = px || Infinity; }
+
 function surface(px) {
   if (typeof OffscreenCanvas === 'function') return new OffscreenCanvas(px, px);
   const c = document.createElement('canvas');
@@ -56,7 +67,7 @@ function surface(px) {
  * `px` is the size the caller intends to draw it at, in device pixels.
  */
 export function tileSprite(type, rot, terrain, px) {
-  const size = BUCKETS.find((b) => b >= px);
+  const size = BUCKETS.find((b) => b >= Math.min(px, cap));
   if (!size) return null;                       // past 512px, draw vectors
   const key = `${type.id}|${rot & 3}|${terrain}|${size}|${THEME.paletteName}`;
 

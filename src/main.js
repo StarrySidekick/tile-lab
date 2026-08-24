@@ -23,7 +23,7 @@ import { roughen, WOBBLE, TOOTH } from './ink.js';
 import { DESIGN, onDesignChange, loadCommitted } from './design.js';
 import { Designer } from './designer.js';
 import { THEME, usePalette } from './theme.js';
-import { clearSprites } from './sprites.js';
+import { clearSprites, setSpriteCap } from './sprites.js';
 import { TILE_TYPES, TILES, GROUPS, rotPoint } from './tiles.js';
 import { Sfx, SOUND_NAMES } from './audio.js';
 import { Effects } from './fx.js';
@@ -44,11 +44,33 @@ const renderer = new Renderer(canvas);
  */
 const designer = new Designer();
 designer.restore();
+// Dragging one slider fires dozens of these a second, and each one throws the
+// whole sprite cache away. At the closest zoom a chart tile is a 1024px sprite
+// that costs about 20ms and several megabytes of scratch to redraw, so paying
+// that per input event pins the main thread and hands the collector garbage
+// faster than it can take it — which is how a phone browser decides the tab is
+// out of control and kills it.
+//
+// Two guards. Coalesce: at most one rebuild per frame, however many events
+// arrived. Draft: while the dials are moving, sprites render at 256px, which
+// is 15× cheaper — a little soft while your thumb is down, and back to full
+// resolution a fifth of a second after you let go.
+const DRAFT_PX = 256;
+const SETTLE_MS = 220;
+let designQueued = 0;
+let designSettle = 0;
 onDesignChange(() => {
-  clearSprites();
-  usePalette(THEME.paletteName, true);
-  paintCss();
-  if (game) { drawPreview(); renderClaim(); }
+  setSpriteCap(DRAFT_PX);
+  clearTimeout(designSettle);
+  designSettle = setTimeout(() => { setSpriteCap(0); clearSprites(); }, SETTLE_MS);
+  if (designQueued) return;
+  designQueued = requestAnimationFrame(() => {
+    designQueued = 0;
+    clearSprites();
+    usePalette(THEME.paletteName, true);
+    paintCss();
+    if (game) { drawPreview(); renderClaim(); }
+  });
 });
 
 /** The design book's colours, pushed into the stylesheet for the panels. */
@@ -1572,7 +1594,13 @@ frame();
 // boot is never blocked on a file that usually isn't there; when it is, the
 // change hook repaints everything.
 loadCommitted().then((found) => {
-  if (found) { designer.sync(); console.log('design: assets/design.json applied'); }
+  if (!found) return;
+  // The committed file is the BASELINE, not the last word: whatever you were
+  // trying locally goes back on top of it, or shipping a design.json would
+  // silently wipe out the draft you had open when you reloaded.
+  designer.restore();
+  designer.sync();
+  console.log('design: assets/design.json applied');
 });
 
 // Handy for poking at state from the devtools console while iterating.

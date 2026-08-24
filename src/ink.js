@@ -80,12 +80,27 @@ export const TOOTH = (w) => ({
   grain: DESIGN.line.toothGrain,
 });
 
+// One scratch buffer, reused. Every pixel of it is written before it is put
+// back, so there is nothing to clear between calls. This matters more than it
+// looks: at 1024px an ImageData is 4MB, and the design console can ask for a
+// dozen sprites a second — allocating a fresh destination each time hands the
+// collector hundreds of megabytes of garbage a second, which is how a phone
+// browser decides to kill the tab.
+let scratch = null;
+
+function destination(ctx, w, h) {
+  if (!scratch || scratch.width !== w || scratch.height !== h) {
+    scratch = ctx.createImageData(w, h);
+  }
+  return scratch;
+}
+
 export function roughen(canvas, { amp = null, grain = 0.09 } = {}) {
   const w = canvas.width, h = canvas.height;
   if (!w || !h) return canvas;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   const src = ctx.getImageData(0, 0, w, h);
-  const out = ctx.createImageData(w, h);
+  const out = destination(ctx, w, h);
   const s = src.data, o = out.data;
   const a = amp ?? Math.max(0.8, w * 0.012);
   const inv = 1 / (w * grain);
