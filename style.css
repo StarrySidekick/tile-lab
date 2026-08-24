@@ -11,6 +11,84 @@
   --teal: #5fbfae;
 }
 
+/* ---------------------------------------------------------------------------
+   PARCHMENT. The cloud kingdom is printed rather than lit: an old chart, ink
+   on aged paper, filigree in the margins. It is one mode out of a dozen, so it
+   is a class on <body> that repaints the variables rather than a second
+   stylesheet — everything downstream already reads through them, and the modes
+   that want twilight keep it untouched.
+   --------------------------------------------------------------------------- */
+body.parchment {
+  --bg: #cdb890;
+  --panel: #e6d8b8;
+  --panel-2: #dccaa4;
+  --line: #a98f66;
+  --text: #33251a;
+  --dim: #7c6549;
+  --accent: #8a3f28;          /* the red ink a portolan draws its rhumbs in */
+  --accent-dim: #a97a4a;
+  --teal: #2f6f68;
+}
+
+/* The sheet itself: a warm wash, a laid-paper grain, and a stain at the edges
+   where a page is handled. Three gradients rather than an image, because the
+   game has no build step and no assets to fetch. */
+body.parchment #panel,
+body.parchment #hud,
+body.parchment #claim {
+  /* The floating panels carry their own dark background colour, so the paper
+     has to repaint it as well as texture it — otherwise the chart is parchment
+     and the two things sitting on top of it are still night. */
+  background-color: #e6d8b8;
+  color: var(--text);
+  background-image:
+    repeating-linear-gradient(90deg, rgba(120,92,58,0.055) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, rgba(120,92,58,0.035) 0 1px, transparent 1px 7px),
+    radial-gradient(120% 80% at 50% 0%, rgba(255,247,228,0.55), transparent 70%);
+  background-blend-mode: multiply, multiply, normal;
+}
+
+/* Filigree: a double rule down the panel edge, the way an engraved cartouche
+   is bounded — a heavy line and a hair one, not a single border. */
+body.parchment #panel {
+  border-left: 2px solid #6f5333;
+  box-shadow: inset 3px 0 0 0 #e6d8b8, inset 4px 0 0 0 #a98f66;
+}
+
+body.parchment h1,
+body.parchment h2,
+body.parchment .pname,
+body.parchment .hudTile b {
+  font-family: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+  letter-spacing: 0.04em;
+}
+
+body.parchment h1 {
+  color: #5c2f1c;
+  text-shadow: 0 1px 0 rgba(255,247,228,0.6);
+}
+
+body.parchment button {
+  background-image: linear-gradient(180deg, rgba(255,247,228,0.65), rgba(160,128,86,0.20));
+  border-color: #8a7048;
+  color: #33251a;
+}
+body.parchment button.primary {
+  background-image: linear-gradient(180deg, #d9a94f, #a97a2f);
+  border-color: #6f5333;
+  color: #2a1b0d;
+}
+body.parchment button:disabled { opacity: 0.45; }
+
+body.parchment .swatch { box-shadow: 0 0 0 1px #6f5333; }
+body.parchment #hud, body.parchment #claim { border-color: #8a7048; }
+body.parchment .claimHead { color: #5c2f1c; }
+body.parchment #hudTile, body.parchment #claimTile, body.parchment #preview {
+  border-color: #8a7048;
+  background-color: #dccaa4;
+}
+body.parchment .hint { color: #6b563c; }
+
 * { box-sizing: border-box; }
 
 /* Safari (and Chrome on Android) reserve a ~300ms window after any tap to see

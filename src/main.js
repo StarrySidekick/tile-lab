@@ -234,6 +234,10 @@ function onModeChange() {
     hint = 'No meeples — a feature pays whoever closes it.';
   }
   $('modeHint').textContent = hint;
+  // The cloud kingdom is printed on parchment rather than lit in twilight, and
+  // the panel has to agree with the board or the whole thing looks like two
+  // games in one window. One class, and the palette variables do the rest.
+  document.body.classList.toggle('parchment', !!s?.antique);
 }
 
 /**

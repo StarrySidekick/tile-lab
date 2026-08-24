@@ -30,6 +30,13 @@ const WINDS = [
   { name: 'MERIDIES', dir: 2 }, { name: 'OCCIDENS', dir: 3 },
 ];
 
+/** Foxing on the page: [x, y, radius, alpha], all fractions of the viewport. */
+const FOXING = [
+  [0.11, 0.19, 0.10, 0.10], [0.44, 0.08, 0.07, 0.07], [0.73, 0.26, 0.12, 0.08],
+  [0.21, 0.56, 0.08, 0.09], [0.61, 0.66, 0.11, 0.06], [0.90, 0.49, 0.06, 0.10],
+  [0.35, 0.88, 0.09, 0.07], [0.79, 0.93, 0.07, 0.09], [0.05, 0.78, 0.08, 0.06],
+];
+
 /** Fast then slow — the shape almost everything transient here moves on. */
 const ease = (t) => 1 - (1 - t) ** 3;
 
@@ -170,6 +177,10 @@ export class Renderer {
     if (game.options?.tide) this.drawWater(game);
 
     const fog = game.options?.fog ? this.fogSet(game) : null;
+    // A mode printed on parchment wants its country printed on it too, not
+    // painted over the top of it. One warm wash and a hairline of ink round
+    // every tile turns the board from a set of models into a plate.
+    const antique = game.m?.backdrop === 'sky';
 
     for (const cell of game.board.cells.values()) {
       if (!this.onScreen(cell.x, cell.y)) continue;
@@ -181,6 +192,7 @@ export class Renderer {
       if (fog && !fog.has(`${cell.x},${cell.y}`)) ctx.globalAlpha = 0.26;
       this.paintTile(cell.x, cell.y - lift, cell.rot, cell.type);
       ctx.restore();
+      if (antique) this.drawFoxedTile(cell.x, cell.y - lift);
       if (overlay) this.drawCellOverlay(cell, overlay, lift);
     }
 
@@ -271,20 +283,68 @@ export class Renderer {
     const ctx = this.ctx;
     const z = this.cam.zoom;
 
-    const sea = ctx.createLinearGradient(0, 0, 0, this.h);
-    sea.addColorStop(0, '#26405c');
-    sea.addColorStop(0.5, '#375a7c');
-    sea.addColorStop(1, '#5c7f9e');
-    ctx.fillStyle = sea;
+    // PARCHMENT. It was a blue sea-chart, which is a fine thing but not the
+    // thing this mode is: the sky here is a printed page, and everything on it
+    // — the rhumbs, the rose, the wind-heads on the zephyrs — is ink. So the
+    // ground is aged paper, warm in the middle and browner at the edges the way
+    // a sheet is where it has been handled, with foxing blotted into it.
+    const paper = ctx.createLinearGradient(0, 0, this.w * 0.4, this.h);
+    paper.addColorStop(0, '#e9dcbd');
+    paper.addColorStop(0.45, '#e2d3b0');
+    paper.addColorStop(1, '#cfbc94');
+    ctx.fillStyle = paper;
     ctx.fillRect(0, 0, this.w, this.h);
+    this.drawFoxing();
 
     // The rhumb network and the rose are the expensive half and the half that
     // stops meaning anything when the squares get small, so both drop out with
     // the grid rather than piling detail into an unreadable zoom.
-    if (z < 26) return;
+    if (z < 26) return this.drawEdgeStain();
     this.drawRhumbs();
     this.drawGraticule();
     if (z >= 40) this.drawRose();
+    this.drawEdgeStain();
+  }
+
+  /**
+   * Foxing: the rust-brown blotches an old sheet grows where it was damp. Laid
+   * out from a fixed table and parallaxed with the camera like everything else
+   * on this backdrop, so the page is a page you are moving over rather than a
+   * texture stuck to the glass — and so it never reshuffles between frames.
+   */
+  drawFoxing() {
+    const ctx = this.ctx;
+    const drift = this.cam.zoom * 0.10;
+    ctx.save();
+    for (const [ox, oy, r, a] of FOXING) {
+      const x = ox * this.w - this.cam.x * drift;
+      const y = oy * this.h - this.cam.y * drift;
+      const rad = r * Math.min(this.w, this.h);
+      const blot = ctx.createRadialGradient(x, y, 0, x, y, rad);
+      blot.addColorStop(0, `rgba(140,102,58,${a})`);
+      blot.addColorStop(0.6, `rgba(140,102,58,${a * 0.45})`);
+      blot.addColorStop(1, 'rgba(140,102,58,0)');
+      ctx.fillStyle = blot;
+      ctx.beginPath();
+      ctx.ellipse(x, y, rad, rad * 0.78, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /**
+   * …and the shadow round the edge of the sheet, which is what stops a flat
+   * wash from reading as a flat wash. Pinned to the screen rather than the
+   * world: it is the page you are looking through, not a place on it.
+   */
+  drawEdgeStain() {
+    const ctx = this.ctx;
+    const r = Math.hypot(this.w, this.h) * 0.62;
+    const v = ctx.createRadialGradient(this.w / 2, this.h / 2, r * 0.42, this.w / 2, this.h / 2, r);
+    v.addColorStop(0, 'rgba(90,62,32,0)');
+    v.addColorStop(1, 'rgba(90,62,32,0.34)');
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, this.w, this.h);
   }
 
   /** The plain hairline grid, for every mode that isn't a chart. */
@@ -320,7 +380,7 @@ export class Renderer {
     const [x0, y0] = this.toWorld(0, 0);
     const [x1, y1] = this.toWorld(this.w, this.h);
 
-    for (const [step, color, width] of [[1, 'rgba(232,222,208,0.11)', 1], [5, 'rgba(212,175,95,0.28)', 1.6]]) {
+    for (const [step, color, width] of [[1, 'rgba(74,52,30,0.13)', 1], [5, 'rgba(74,52,30,0.34)', 1.6]]) {
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       ctx.beginPath();
@@ -350,7 +410,7 @@ export class Renderer {
     const R = RHUMB_RING;                                  // node ring, in squares
     const reach = (Math.hypot(this.w, this.h) / z) + R * 2;
     ctx.save();
-    ctx.strokeStyle = 'rgba(232,222,208,0.085)';
+    ctx.strokeStyle = 'rgba(122,58,40,0.13)';        // rhumbs are drawn in red ink
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let n = 0; n < RHUMB_NODES; n++) {
@@ -384,7 +444,7 @@ export class Renderer {
 
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.strokeStyle = 'rgba(212,175,95,0.22)';
+    ctx.strokeStyle = 'rgba(74,52,30,0.38)';
     ctx.lineWidth = 1.2;
     for (const k of [1, 0.72, 0.16]) {
       ctx.beginPath();
@@ -401,14 +461,14 @@ export class Renderer {
       ctx.lineTo(Math.cos(a + Math.PI / 2) * w, Math.sin(a + Math.PI / 2) * w);
       ctx.lineTo(Math.cos(a - Math.PI / 2) * w, Math.sin(a - Math.PI / 2) * w);
       ctx.closePath();
-      if (i % 2 === 0) { ctx.fillStyle = 'rgba(212,175,95,0.16)'; ctx.fill(); }
+      if (i % 2 === 0) { ctx.fillStyle = 'rgba(122,58,40,0.24)'; ctx.fill(); }
       ctx.stroke();
     }
     // Small caps, letter-spaced, and clamped: the names are an inscription on
     // the chart, not a headline. Left unclamped they scale with the zoom and
     // SEPTENTRIO ends up the size of a tile.
     const size = Math.max(8, Math.min(15, r * 0.12));
-    ctx.fillStyle = 'rgba(212,175,95,0.40)';
+    ctx.fillStyle = 'rgba(74,52,30,0.55)';
     ctx.font = `600 ${size}px ui-serif, Georgia, serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -440,6 +500,33 @@ export class Renderer {
     ctx.fillRect(sx - LIGHT.x * d * z, sy - LIGHT.y * d * z, z, z);
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.fillRect(sx, sy - lift * z + z, z, lift * z);
+  }
+
+  /**
+   * The aged-paper pass over one tile. A LIGHT warm wash pulls every colour on
+   * the board toward the same ink-and-parchment family, and a hairline border
+   * round the square is what an engraved plate has and a rendered board does
+   * not — it says "this was printed" more than any amount of texture would.
+   *
+   * Light on purpose. At any real strength the wash eats the greens and the
+   * terracotta together and the board goes to beige mush: the country is still
+   * country, it is just country printed on an old sheet.
+   *
+   * Done here rather than in the tile art so the art stays the art: every other
+   * mode draws the same tiles and does not want to look four hundred years old.
+   */
+  drawFoxedTile(x, y) {
+    const ctx = this.ctx;
+    const [sx, sy] = this.toScreen(x, y);
+    const z = this.cam.zoom;
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = 'rgba(216,193,150,0.15)';
+    ctx.fillRect(sx, sy, z, z);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(64,44,26,0.28)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(Math.round(sx) + 0.5, Math.round(sy) + 0.5, Math.round(z) - 1, Math.round(z) - 1);
   }
 
   drawCellOverlay(cell, overlay, lift) {

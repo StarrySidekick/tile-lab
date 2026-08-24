@@ -449,8 +449,16 @@ for (const [what, mode, mech, kind] of [
   await page.click('#newGame');
   const wind = await page.evaluate(async () => {
     const g = window.LAB.game;
+    // A gust that FIRES a tile out of the world did something, and did it
+    // visibly — the tumble is drawn the same way the slide is. Counting only
+    // `moves` made this a test of whether the wind happened to have somewhere
+    // to push, which is luck rather than a rule.
     let gusts = 0, moved = 0;
-    g.on((kind, data) => { if (kind === 'gust') { gusts++; moved += data.moves.length; } });
+    g.on((kind, data) => {
+      if (kind !== 'gust') return;
+      gusts++;
+      moved += data.moves.length + (data.fell?.length || 0);
+    });
     const legal = () => {
       const out = [];
       const saved = g.rot;
@@ -491,9 +499,9 @@ for (const [what, mode, mech, kind] of [
   if (wind.mode !== 'girando') problems.push(`the mode was ${wind.mode}`);
   else if (!wind.gusts) {
     problems.push(`no zephyr in ${wind.steps} steps (${JSON.stringify(wind.seen)}, ended in "${wind.phase}")`);
-  } else if (!wind.moved) problems.push('the wind moved nothing');
+  } else if (!wind.moved) problems.push('the wind did nothing at all');
   if (problems.length) { failures++; console.log(`  ✗ girando wind: ${problems.join(' · ')}`); }
-  else console.log(`  ✓ girando wind      ${wind.gusts} gust(s), ${wind.moved} tiles shoved`);
+  else console.log(`  ✓ girando wind      ${wind.gusts} gust(s), ${wind.moved} tiles moved or lost`);
 }
 
 // The endgame tally: many features settle in one frame, and they have to be

@@ -415,7 +415,7 @@ export const TILE_TYPES = [
 
   // A flying machine and its strip. Placing one lets a follower fly out along
   // the way it points, riding any zephyr it crosses.
-  { id: 'Kfl', n: 3, group: 'cloud', name: 'Flying machine', feats: [road([S])], marks: [mark('flier', null, N)], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Kfl', n: 5, group: 'cloud', name: 'Flying machine', feats: [road([S])], marks: [mark('flier', null, N)], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
 
   // Not dealt: Girando swaps these in for the base 3-way junctions. They END
   // the three roads that run into them, the way the base set's do, and they
@@ -830,7 +830,7 @@ function prepare(list) {
       t.fieldCount++;
     }
 
-    t.spots = t.feats.map(featureSpot);
+    t.spots = t.feats.map((f) => featureSpot(f, t));
     // A mark anchored to a feature borrows that feature's spot, pulled in from
     // the rim so a tall landmark can't hang off the edge of its tile.
     t.markSpots = t.marks.map((m) => {
@@ -894,16 +894,37 @@ function citiesBeside(t, halves) {
   return [...out];
 }
 
-function featureSpot(f) {
+function featureSpot(f, type = null) {
   if (f.type === 'monastery') return [0.5, 0.5];
   // A farmer lies in the middle of his own ground: the average of the field's
-  // half-edges, pulled off the rim so he isn't standing in the seam.
+  // half-edges, pulled well off the rim so he isn't standing in the seam.
+  //
+  // …and then SHOVED OFF ANY CITY on the tile. The average of a field that
+  // wraps round a city edge lands hard against the curtain wall, and a follower
+  // drawn touching a wall reads as standing IN the city — which is the one
+  // claim that spot cannot make. It is the commonest misread on the board, and
+  // it is worst exactly where it matters, on the claim panel where you are
+  // choosing between the two. Each city side pushes him back to arm's length
+  // from its own edge, which costs nothing on a tile with no city on it.
   if (f.type === 'field') {
     if (!f.halves.length) return [0.5, 0.5];
     let fx = 0, fy = 0;
     for (const h of f.halves) { fx += HALF_MID[h][0]; fy += HALF_MID[h][1]; }
     fx /= f.halves.length; fy /= f.halves.length;
-    return [0.5 + (fx - 0.5) * 0.54, 0.5 + (fy - 0.5) * 0.54];
+    let x = 0.5 + (fx - 0.5) * 0.46;
+    let y = 0.5 + (fy - 0.5) * 0.46;
+    const KEEP = 0.30;                     // how far off a wall a farmer stands
+    for (const c of type?.feats || []) {
+      if (c.type !== 'city') continue;
+      for (const side of c.sides) {
+        const [vx, vy] = SIDE_VEC[side];
+        const reach = (x - 0.5) * vx + (y - 0.5) * vy;
+        const over = reach - (0.5 - KEEP);
+        if (over <= 0) continue;
+        x -= vx * over; y -= vy * over;
+      }
+    }
+    return [x, y];
   }
   let vx = 0, vy = 0;
   for (const s of f.sides) { vx += SIDE_VEC[s][0]; vy += SIDE_VEC[s][1]; }

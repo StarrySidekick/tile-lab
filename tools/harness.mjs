@@ -299,10 +299,19 @@ function checkBoard() {
     if (near === far) return fail('the two halves are two roads', 'they are one');
     if (!b.hopsFrom(near).has(far)) return fail('…and a walker can reach one from the other', 'it could not');
 
+    // …across ANY amount of open air, which is how a follower walks out to an
+    // island without a flying machine.
     const c = new Board();
     c.place(0, 0, TILES.U, 0);
-    c.place(0, -3, TILES.U, 0);
-    if (c.hops.length) return fail('a road does not hop two squares', `${c.hops.length} hop(s)`);
+    c.place(0, -6, TILES.U, 0);
+    if (c.hops.length !== 1) return fail('a road hops as much air as there is', `${c.hops.length} hop(s)`);
+    // …but never over COUNTRY. A road that runs into the back of a tile has
+    // arrived, and stops there.
+    const e = new Board();
+    e.place(0, 0, TILES.U, 0);
+    e.place(0, -2, TILES.E, 0);                 // a city, back turned to the road
+    e.place(0, -4, TILES.U, 0);
+    if (e.hops.length) return fail('a hop does not cross country', `${e.hops.length} hop(s)`);
     const d = new Board();
     d.place(0, 0, TILES.U, 0);
     d.place(0, -2, TILES.U, 1);                 // turned across: no longer straight
@@ -374,19 +383,24 @@ function checkWind() {
 
   const at = (b, x, y) => b.get(x, y);
   const lay = (b, x, y, id, rot = 0) => b.place(x, y, TILES[id], rot, { free: true });
+  // A far shore for a shot to stop against. Pinned, because the same gust
+  // crosses the strait and would otherwise fire the far shore's own loose end
+  // out of the world — which is true, and is not what these tests are about.
+  const shore = (b, x, y, id = 'B', rot = 0) => { const c = lay(b, x, y, id, rot); c.anchored = true; return c; };
 
   // THE RULE. A row of five, a zephyr on the right of it blowing west: the wind
   // does nothing at all to the country it passes through, and takes the LOOSE
-  // END off the far side. One tile, one square. And the zephyr stays where it
-  // is — it no longer travels with its own wind, because it no longer opens a
-  // hole beside itself to travel into.
+  // END off the far side — which it then FIRES. It travels until the square in
+  // front of it is taken, however far away that is, so it crosses a strait it
+  // could never have crossed a square at a time. And the zephyr stays where it
+  // is: it no longer travels with its own wind.
   {
     const b = new Board();
     lay(b, 4, 0, 'Kz', 3);                  // the gust, pointing west
     for (const x of [3, 2, 1, 0]) lay(b, x, 0, 'B');
-    lay(b, -1, 1, 'B');                     // what the loose end lands beside
+    lay(b, -6, 0, 'B');                     // the far shore, five squares of air away
     gust(b, { dir: 3, from: { x: 4, y: 0 } });
-    if (!at(b, -1, 0)) return fail('the wind takes the loose end one square', 'it did not move');
+    if (!at(b, -5, 0)) return fail('the loose end is fired until it hits something', 'it is not there');
     if (at(b, 0, 0)) return fail('the loose end leaves its square', 'it is still there');
     for (const x of [1, 2, 3]) {
       if (!at(b, x, 0)) return fail('the country in between does not move', `x=${x} moved`);
@@ -394,32 +408,49 @@ function checkWind() {
     if (!at(b, 4, 0)) return fail('a zephyr does not travel with its own wind', 'it moved');
   }
 
-  // …and at power two it is two tiles, two squares each — the user's own worked
-  // example. They were touching before and they all travel together, so they
-  // arrive still touching, as a raft.
+  // …and at power two it is two tiles, fired one after the other, so they pile
+  // up against whatever stopped the first and arrive still a raft.
   {
     const b = new Board();
     lay(b, 4, 0, 'Kz', 3);                  // the gust, west
     lay(b, 3, 0, 'B');
     lay(b, 2, 0, 'Kz', 3);                  // another west zephyr: absorbed
     lay(b, 1, 0, 'B'); lay(b, 0, 0, 'B');
+    lay(b, -6, 0, 'B');                     // the far shore
     const r = gust(b, { dir: 3, from: { x: 4, y: 0 } });
     if (r.strength !== 2) return fail('an absorbed zephyr hardens the wind beyond it', `strength ${r.strength}`);
-    if (!at(b, -2, 0) || !at(b, -1, 0)) return fail('power two pops two tiles two squares', 'they are not there');
+    if (!at(b, -5, 0) || !at(b, -4, 0)) return fail('two tiles come off and land as a raft', 'they are not there');
     if (at(b, 0, 0) || at(b, 1, 0)) return fail('both loose tiles leave their squares', 'one stayed');
     if (!at(b, 2, 0)) return fail('the absorbed zephyr is not blown by its own breath', 'it moved');
   }
 
+  // A tile fired down a lane with NOTHING in it never stops, which is to say it
+  // falls out of the sky. That is the one thing the wind destroys.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // north, into open air
+    lay(b, 0, -1, 'B');
+    lay(b, 1, 0, 'B');                      // a neighbour off the lane
+    const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (at(b, 0, -1)) return fail('a tile fired at nothing leaves', 'it stayed');
+    if (r.fell.length !== 1 || r.fell[0].why !== 'fired') {
+      return fail('…and is reported as fired out of the world', JSON.stringify(r.fell.map((f) => f.why)));
+    }
+  }
+
   // Power no longer stops at three. Four zephyrs blowing one way take the wind
-  // to five, and five tiles come off the end five squares each.
+  // to five, and five tiles come off the end.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');                     // the gust, north
-    for (const y of [-1, -2, -3, -4]) lay(b, y === 0 ? 0 : 0, y, 'Kz');
+    for (const y of [-1, -2, -3, -4]) lay(b, 0, y, 'Kz');
     for (const y of [-5, -6, -7, -8, -9]) lay(b, 0, y, 'B');
+    lay(b, 0, -20, 'B');                    // the far shore
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (r.strength !== 5) return fail('a gust stacks past three', `strength ${r.strength}`);
-    if (!at(b, 0, -14)) return fail('five tiles travel five squares', 'the far tile is not there');
+    for (const y of [-19, -18, -17, -16, -15]) {
+      if (!at(b, 0, y)) return fail('five tiles are fired and pile up against the shore', `nothing at y=${y}`);
+    }
     if (at(b, 0, -9) || at(b, 0, -5)) return fail('all five leave their squares', 'one stayed');
     if (!at(b, 0, -4)) return fail('the absorbed zephyrs stay put', 'one blew away');
   }
@@ -455,10 +486,10 @@ function checkWind() {
     const paved = lay(b, 0, -1, 'B');
     paved.anchored = true;
     lay(b, 0, -2, 'B');
-    lay(b, 1, -3, 'B');                     // somewhere for the loose end to land
+    lay(b, 0, -6, 'B');                     // the far shore
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (!at(b, 0, -1)) return fail('crystallised ground does not move', 'it moved');
-    if (!at(b, 0, -3)) return fail('the wind goes over it to the loose end', 'the far side sat still');
+    if (!at(b, 0, -5)) return fail('the wind fires the loose end past it', 'the far side sat still');
   }
 
   // …but the loose end itself, crystallised, stays where it is.
@@ -466,6 +497,7 @@ function checkWind() {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
     lay(b, 0, -1, 'B').anchored = true;
+    lay(b, 0, -6, 'B');
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (!at(b, 0, -1)) return fail('a crystallised loose end holds', 'the wind took it');
   }
@@ -476,11 +508,10 @@ function checkWind() {
     lay(b, 0, 0, 'Kz');
     const frozen = lay(b, 0, -1, 'Kz', 1);  // pointing east, so it is not absorbed
     frozen.anchored = true;
-    lay(b, 1, -2, 'B');                     // somewhere for it to land beside
-    lay(b, 1, 0, 'B');                      // a neighbour off the lane, so the board stays one piece
-
+    lay(b, 0, -6, 'B');                     // where it comes to rest
+    lay(b, 1, 0, 'B');
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (frozen.y !== -2) return fail('a crystallised zephyr still blows about', `it is at y ${frozen.y}`);
+    if (frozen.y !== -5) return fail('a crystallised zephyr still blows about', `it is at y ${frozen.y}`);
   }
 
   // Every corner the storm turns, it hits one power harder — and the raft it
@@ -490,13 +521,14 @@ function checkWind() {
     lay(b, 0, 0, 'Kz');                     // north
     lay(b, 0, -1, 'Kz', 1);                 // caught across the wind: fires east
     lay(b, 0, -2, 'B'); lay(b, 0, -3, 'B');
-    lay(b, 1, -4, 'B');                     // where the first raft lands
+    lay(b, 0, -9, 'B');                     // where the first shot lands
     lay(b, 1, -1, 'B'); lay(b, 2, -1, 'B'); // the lane the turn blows down
+    lay(b, 9, -1, 'B');                     // …and where that shot lands
     const reports = storm(b, { dir: 0, from: { x: 0, y: 0 } });
     if (reports.length !== 2) return fail('a blown zephyr fires in its turn', `${reports.length} gust(s)`);
     if (reports[1].dir !== 1) return fail('the turn goes the new zephyr\'s way', `dir ${reports[1].dir}`);
     if (reports[1].push !== 2) return fail('a turn gains a power', `push ${reports[1].push}`);
-    if (!at(b, 3, -1) || !at(b, 4, -1)) return fail('the harder wind takes two tiles two squares', 'it did not');
+    if (!at(b, 8, -1) || !at(b, 7, -1)) return fail('the harder wind fires two tiles', 'it did not');
   }
 
   // A zephyr caught HEAD ON rebounds: every zephyr the wind reaches fires in
@@ -505,9 +537,8 @@ function checkWind() {
     const b = new Board();
     lay(b, 0, 0, 'Kz');                     // north
     lay(b, 0, -1, 'Kz', 2);                 // straight back at it, south
-    lay(b, 1, -2, 'B');                     // where it lands, so it survives to fire
-    lay(b, 1, 0, 'B');                      // a neighbour off the lane, so the board stays one piece
-
+    lay(b, 0, -6, 'B');                     // where it lands, so it survives to fire
+    lay(b, 1, 0, 'B');
     const reports = storm(b, { dir: 0, from: { x: 0, y: 0 } });
     if (reports.length !== 2) return fail('a facing zephyr rebounds the storm', `${reports.length} gust(s)`);
     if (reports[1].dir !== 2) return fail('the rebound goes the facing zephyr\'s way', `dir ${reports[1].dir}`);
@@ -543,10 +574,11 @@ function checkWind() {
     lay(b, 0, 0, 'Kz');                     // north
     lay(b, 0, -1, 'B'); lay(b, 0, -2, 'B'); // the near shore
     lay(b, 0, -4, 'B'); lay(b, 0, -5, 'B'); // …and the far one, across a strait
+    lay(b, 0, -9, 'B');                     // …and something beyond both
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (!at(b, 0, -3)) return fail('the near run gives up its loose end', 'it did not move');
-    if (!at(b, 0, -6)) return fail('and so does the one across the gap', 'the far shore sat still');
-    if (r.reached.length !== 4) return fail('the whole lane is reached', `${r.reached.length} tiles`);
+    if (!at(b, 0, -8)) return fail('and so does the one across the gap', 'the far shore sat still');
+    if (r.reached.length !== 5) return fail('the whole lane is reached', `${r.reached.length} tiles`);
   }
 
   // …and its strength carries over the open air, so a zephyr on the near shore
@@ -556,9 +588,10 @@ function checkWind() {
     lay(b, 0, 0, 'Kz');
     lay(b, 0, -1, 'Kz');                    // absorbed: the wind hardens beyond it
     lay(b, 0, -3, 'B'); lay(b, 0, -4, 'B'); // the far shore, across a gap
+    lay(b, 0, -9, 'B');
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (r.strength !== 2) return fail('strength carries across a gap', `strength ${r.strength}`);
-    if (!at(b, 0, -5) || !at(b, 0, -6)) return fail('the far shore loses two tiles two squares', 'it did not');
+    if (!at(b, 0, -8) || !at(b, 0, -7)) return fail('the far shore loses two tiles', 'it did not');
   }
 
   // …but the whale ends the lane outright: nothing in its lee is touched,
@@ -574,7 +607,9 @@ function checkWind() {
   }
 
   // WHAT THE WIND CAN GET UNDER GOES WHOLE. Country a mode has not rooted is
-  // lifted entire — perpendicular arms included — rather than nibbled at.
+  // lifted entire — perpendicular arms included — rather than nibbled at, and
+  // it slides by the power rather than being fired: an island is a place, and
+  // the wind does not shoot places out of the world.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');                     // north
@@ -617,9 +652,8 @@ function checkWind() {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
     lay(b, 0, -1, 'Ktb');
-    lay(b, 1, -2, 'B');
-    lay(b, 1, 0, 'B');                      // a neighbour off the lane, so the board stays one piece
-
+    lay(b, 0, -6, 'B');
+    lay(b, 1, 0, 'B');
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (r.turbines.length !== 1) return fail('a gust turns a turbine', `${r.turbines.length} reported`);
   }
@@ -629,10 +663,10 @@ function checkWind() {
     const b = new Board();
     lay(b, 0, 0, 'Kz', 1);                  // pointing east
     lay(b, 1, 0, 'Kw');                     // through-road N-S at rot 0
-    lay(b, 2, 1, 'U');                      // an 'r' edge to land against
+    lay(b, 6, 0, 'U');                      // an 'r' edge to land against
     lay(b, 0, 1, 'B');                      // a neighbour off the lane
     gust(b, { dir: 1, from: { x: 0, y: 0 } });
-    const after = b.get(2, 0) || b.get(1, 0);
+    const after = b.get(5, 0) || b.get(1, 0);
     if (!after || (after.rot & 1) !== 1) return fail('a vane swings onto the wind axis', `rot ${after && after.rot}`);
   }
 
@@ -641,23 +675,24 @@ function checkWind() {
     const b = new Board();
     lay(b, 0, 0, 'Kz', 1);                  // blowing east
     const straight = lay(b, 1, 0, 'U');     // road N-S at rot 0, side on to it
-    lay(b, 2, 1, 'U');
-    lay(b, 0, 1, 'B');                      // a neighbour off the lane
+    lay(b, 6, 0, 'U');
+    lay(b, 0, 1, 'B');
     gust(b, { dir: 1, from: { x: 0, y: 0 } });
     if ((straight.rot & 1) !== 0) return fail('a straight road holds its line', `rot ${straight.rot}`);
   }
 
   // A tile that lands touching country it cannot legally JOIN has nothing
-  // holding it up. It falls, and it is the ONLY thing that falls any more —
-  // reported as a `mismatch`, and gone from the game.
+  // holding it up. It falls, reported as a `mismatch`.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
     lay(b, 0, -1, 'U');                     // a road, and the loose end
-    lay(b, 1, -2, 'E', 3);                  // a city wall facing west, where it lands
+    lay(b, 1, -6, 'E', 3);                  // a city wall facing west, where it lands
+    lay(b, 0, -7, 'B');                     // …and what stops the shot
+    lay(b, 2, -6, 'B');
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (at(b, 0, -2)) return fail('a road shoved against a city wall falls', 'it stayed in the sky');
-    if (r.fell.length !== 1 || r.fell[0].why !== 'mismatch') {
+    if (at(b, 0, -6)) return fail('a road shoved against a city wall falls', 'it stayed in the sky');
+    if (!r.fell.some((f) => f.why === 'mismatch')) {
       return fail('…and it is reported as a mismatch', JSON.stringify(r.fell.map((f) => f.why)));
     }
   }
@@ -667,72 +702,59 @@ function checkWind() {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
     lay(b, 0, -1, 'U');
-    lay(b, 1, -2, 'B');                     // a field edge, which a road's flank meets
+    lay(b, 1, -6, 'B');                     // a field edge, which a road's flank meets
+    shore(b, 0, -7);
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (!at(b, 0, -2)) return fail('one legal connection holds a tile up', 'it fell anyway');
+    if (!at(b, 0, -6)) return fail('one legal connection holds a tile up', 'it fell anyway');
     if (r.fell.length) return fail('…and nothing falls', JSON.stringify(r.fell.map((f) => f.why)));
   }
 
-  // NOTHING FALLS FOR BEING ALONE. The tile the wind blows clear of everything
-  // hangs there over open sky, and so does the one it strands behind it — which
-  // is the whole point, because those two fragments are where the next islands
-  // come from. This board used to lose both of them.
+  // NOTHING FALLS FOR BEING ALONE. The tile the wind strands behind the shot
+  // hangs there over open sky — which is the whole point, because that fragment
+  // is where the next island comes from.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');                     // the gust, north
     lay(b, 0, -1, 'B');
     lay(b, 0, -2, 'B');                     // the loose end, and the victim's only prop
     lay(b, 1, -2, 'B');                     // the victim, stranded when the end goes
+    shore(b, 0, -8);                        // where the shot stops
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (!at(b, 0, -3)) return fail('the loose end hangs there with nothing beside it', 'it fell');
-    if (!at(b, 1, -2)) return fail('a stranded tile hangs there too', 'it fell');
+    if (!at(b, 0, -7)) return fail('the loose end lands and stays', 'it fell');
+    if (!at(b, 1, -2)) return fail('a stranded tile hangs there', 'it fell');
     if (r.fell.length) return fail('and nothing falls at all', JSON.stringify(r.fell.map((f) => f.why)));
   }
 
-  // …so a raft of two blown clear of the kingdom is an island, standing in open
-  // sky with nothing but itself holding it up.
-  {
-    const b = new Board();
-    lay(b, 4, 0, 'Kz', 3);                  // west
-    lay(b, 3, 0, 'B');
-    lay(b, 2, 0, 'Kz', 3);                  // absorbed: the wind arrives at two
-    lay(b, 1, 0, 'B'); lay(b, 0, 0, 'B');
-    const r = gust(b, { dir: 3, from: { x: 4, y: 0 } });
-    if (!at(b, -2, 0) || !at(b, -1, 0)) return fail('the raft lands and stays', 'it fell');
-    if (b.groups().length !== 2) return fail('and it is a piece of country of its own', `${b.groups().length} group(s)`);
-    if (r.fell.length) return fail('nothing falls', JSON.stringify(r.fell.map((f) => f.why)));
-  }
-
-  // A DOUBLE ZEPHYR opens at two squares rather than one, which is two tiles
-  // off the end as well as two squares each.
+  // A DOUBLE ZEPHYR opens at two, which is two tiles off the end.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kzz');                    // double, pointing north
     lay(b, 0, -1, 'B'); lay(b, 0, -2, 'B');
-    lay(b, 1, 0, 'B');                      // a neighbour off the lane, so the board stays one piece
+    lay(b, 0, -8, 'B');
+    lay(b, 1, 0, 'B');
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 }, push: 2 });
     if (r.strength !== 2) return fail('a double zephyr opens at two', `strength ${r.strength}`);
-    if (!at(b, 0, -3) || !at(b, 0, -4)) return fail('two tiles go two squares', 'they are not there');
+    if (!at(b, 0, -7) || !at(b, 0, -6)) return fail('two tiles are fired and land as a raft', 'they are not there');
     if (!at(b, 0, 0)) return fail('a double zephyr still does not travel', 'it moved');
   }
 
-  // Followers ride the raft: it moves, they move, and neither notices.
+  // Followers ride the raft: it moves, they move, and neither notices — however
+  // far the cannon carries it.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
     const under = lay(b, 0, -1, 'B');
     b.addMeeple(0, -1, 0, 0);
-    lay(b, 1, -2, 'B');
-    lay(b, 1, 0, 'B');                      // a neighbour off the lane, so the board stays one piece
+    lay(b, 0, -6, 'B');
+    lay(b, 1, 0, 'B');
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (under.y !== -2) return fail('the tile under the follower moves', `it is at y ${under.y}`);
-    if (!b.get(0, -2)?.meeple) return fail('a follower travels with its tile', JSON.stringify(r.carried));
+    if (under.y !== -5) return fail('the tile under the follower is fired', `it is at y ${under.y}`);
+    if (!b.get(0, -5)?.meeple) return fail('a follower travels with its tile', JSON.stringify(r.carried));
     if (r.homed.length) return fail('nobody goes home from a tile that landed', JSON.stringify(r.homed));
   }
 
   // …and one on the country the wind leaves alone is picked up off it and put
-  // down downwind, on whatever it finds there. That is the whole difference:
-  // the wind moves people it does not move the ground under them.
+  // down SQUARES downwind, not fired: a person is not a projectile.
   {
     const b = new Board();
     lay(b, 0, 0, 'Kz');
@@ -740,12 +762,32 @@ function checkWind() {
     b.addMeeple(0, -1, 0, 0);
     lay(b, 0, -2, 'B');
     lay(b, 0, -3, 'B');
-    lay(b, 1, -4, 'B');                     // where the loose end lands
+    lay(b, 0, -9, 'B');                     // where the loose end lands
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (staying.y !== -1) return fail('the ground under a follower stays put', `it is at y ${staying.y}`);
     if (staying.meeple) return fail('a follower is lifted off ground the wind leaves', 'it stayed put');
     if (!b.get(0, -2)?.meeple || r.carried.length !== 1) {
       return fail('the wind puts it down one square on', JSON.stringify(r.carried));
+    }
+  }
+
+  // A FOLLOWER PUT DOWN ON A ZEPHYR IS IN THAT WIND. It carries on down the new
+  // zephyr's lane at that zephyr's strength, and again if that lands it on
+  // another — which is how a figure crosses the sky without a flying machine.
+  {
+    const b = new Board();
+    lay(b, 0, 0, 'Kz');                     // north
+    lay(b, 0, -1, 'B');
+    b.addMeeple(0, -1, 0, 1);
+    lay(b, 0, -2, 'Kz', 1);                 // it lands here, and this blows EAST
+    lay(b, 0, -3, 'B');                     // …the loose end, so the landing stays put
+    lay(b, 1, -2, 'Kz', 2);                 // …onto this, which blows SOUTH
+    lay(b, 1, -1, 'B');                     // …and it ends up here
+    lay(b, 0, -9, 'B');
+    gust(b, { dir: 0, from: { x: 0, y: 0 } });
+    if (b.get(1, -1)?.meeple?.player !== 1) {
+      const where = [...b.cells.values()].filter((c) => c.meeple).map((c) => `${c.x},${c.y}`);
+      return fail('a follower rides the winds it lands on', `it is at ${where.join(' ') || 'nowhere'}`);
     }
   }
 
@@ -756,7 +798,7 @@ function checkWind() {
     lay(b, 0, -1, 'B');
     b.addMeeple(0, -1, 0, 2);
     lay(b, 0, -2, 'B');
-    lay(b, 1, -3, 'B');                     // the loose end lands here, leaving a hole
+    lay(b, 0, -9, 'B');                     // the loose end lands here, leaving a hole
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (r.homed.length !== 1 || r.homed[0].player !== 2 || r.homed[0].why !== 'sky') {
       return fail('a follower blown into open sky comes home', JSON.stringify(r.homed));
@@ -770,9 +812,11 @@ function checkWind() {
     lay(b, 0, 0, 'Kz');
     lay(b, 0, -1, 'U');                     // a road, and the loose end
     b.addMeeple(0, -1, 0, 3);
-    lay(b, 1, -2, 'E', 3);                  // a city wall facing west, where it lands
+    lay(b, 1, -6, 'E', 3);                  // a city wall facing west, where it lands
+    lay(b, 0, -7, 'B');
+    lay(b, 2, -6, 'B');
     const r = gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    if (at(b, 0, -2)) return fail('the tile that fits nothing falls', 'it is still there');
+    if (at(b, 0, -6)) return fail('the tile that fits nothing falls', 'it is still there');
     if (!r.homed.some((m) => m.player === 3 && m.why === 'fell')) {
       return fail('its follower comes home rather than going down with it', JSON.stringify(r.homed));
     }
@@ -784,8 +828,8 @@ function checkWind() {
     lay(b, 0, 0, 'Kz');
     const temple = lay(b, 0, -1, 'Kt');
     b.addMeeple(0, -1, 0, 1);
-    lay(b, 1, -2, 'B');
-    lay(b, 1, 0, 'B');                      // a neighbour off the lane, so the board stays one piece
+    lay(b, 0, -6, 'B');
+    lay(b, 1, 0, 'B');
     gust(b, { dir: 0, from: { x: 0, y: 0 } });
     if (b.get(0, -1) === temple) return fail('a temple is blown about', 'it stood still');
     if (temple.meeple?.player !== 1) return fail('its keeper rides along with it', JSON.stringify(temple.meeple));
@@ -805,22 +849,6 @@ function checkWind() {
     if (road().open !== 1) return fail('taking one away opens it again', road().open);
   }
 
-  // Mismatched seams join nothing — a road blown up against a city wall is
-  // touching it and joined to none of it, which is why the tile falls unless
-  // something ELSE on it fits.
-  {
-    const b = new Board();
-    lay(b, 0, 0, 'Kz');
-    lay(b, 0, -1, 'U');                     // road N-S, the loose end
-    lay(b, 0, -3, 'E', 2);                  // a city wall facing south, two clear
-    lay(b, 1, -2, 'U');                     // …and a field flank that DOES fit
-    lay(b, 1, 0, 'B');                      // a neighbour off the lane, so the board stays one piece
-    gust(b, { dir: 0, from: { x: 0, y: 0 } });
-    const road = b.featureOf(0, -2, 0);
-    if (!road || road.type !== 'road') return fail('the shoved road survives as a road', road && road.type);
-    if (road.tiles.size !== 1) return fail('a mismatched seam joins nothing', `road spans ${road.tiles.size}`);
-  }
-
   // The whale outranks everything, zephyrs included.
   {
     const b = new Board();
@@ -833,11 +861,11 @@ function checkWind() {
     if (!b.get(0, -2)) return fail('the whale shelters its lee from a zephyr', 'the lee blew away');
   }
 
-  console.log('  ✓ the loose end, rafts, power past three, corners that harden, the whale,'
-    + ' crystals, loose zephyrs, turbines, vanes, straight roads, chains, rebounds,'
-    + ' once-per-storm, the rose, mismatched landings, fragments that stay up,'
-    + ' gaps crossed, islands lifted whole, islands merging, double zephyrs,'
-    + ' followers riding and blown, temples, Abbazias, bad seams');
+  console.log('  ✓ the cannon, rafts, fired into nothing, power past three, corners that harden,'
+    + ' the whale, crystals, loose zephyrs, turbines, vanes, straight roads, chains, rebounds,'
+    + ' once-per-storm, the rose, gaps crossed, islands lifted whole, islands merging,'
+    + ' mismatched landings, fragments that stay up, double zephyrs, followers riding,'
+    + ' blown and carried on, temples, Abbazias');
 }
 
 /**
@@ -869,8 +897,12 @@ function checkGirando() {
     lay(b, 5, 5, 'Kz');
     lay(b, 5, 6, 'Kz');                       // two tiles adrift: an island
     b.rebuild();
+    // THE MAINLAND IS WHATEVER IS BIGGEST, and the seat is only a passenger:
+    // build the kingdom out so it outweighs the pair adrift.
+    lay(b, 0, -1, 'Kz'); lay(b, 0, -2, 'Kz');
+    b.rebuild();
     const opts = h.m.placeOpts();
-    if (!opts.onto.has('0,0')) return fail('the Palazzo is the mainland', 'the seat is not in it');
+    if (!opts.onto.has('0,0')) return fail('the biggest landmass is the mainland', 'the big one is not in it');
     if (opts.onto.has('5,5')) return fail('an island is not the mainland', 'it was offered anyway');
     if (b.canPlace(6, 5, TILES.Kz, 0, opts)) {
       return fail('you may not build onto an island', 'a square beside one was legal');
@@ -1216,6 +1248,7 @@ function checkGirando() {
     const h = fresh(46);
     const b = h.board;
     lay(b, 0, 0, 'Kpz');
+    lay(b, 0, -1, 'Kz'); lay(b, 0, -2, 'Kz');   // …so the kingdom outweighs the rock
     lay(b, 5, 5, 'Kz');
     lay(b, 5, 6, 'Kz');
     b.rebuild();
@@ -1339,7 +1372,8 @@ function checkGirando() {
   {
     const h = fresh(14);
     const b = h.board;
-    lay(b, 0, 0, 'Kpz');                      // the mainland, far away
+    lay(b, 0, 0, 'Kpz');                      // the mainland, far away…
+    lay(b, 0, -1, 'Kz'); lay(b, 0, -2, 'Kz'); // …and big enough to BE the mainland
     lay(b, 5, 5, 'Ktb');                      // a two-tile city, adrift
     lay(b, 5, 4, 'E', 2);
     b.addMeeple(5, 5, 0, 0);
@@ -1381,6 +1415,7 @@ function checkGirando() {
     const h = fresh(16);
     const b = h.board;
     lay(b, 0, 0, 'Kpz');
+    lay(b, 0, -1, 'Kz'); lay(b, 0, -2, 'Kz'); // …so the seat is on the mainland
     lay(b, 4, 0, 'Kz');
     lay(b, 4, 1, 'Kz');
     b.rebuild();
@@ -1411,6 +1446,7 @@ function checkGirando() {
     const h = fresh(17);
     const b = h.board;
     lay(b, 0, 0, 'Kpz');
+    for (const [x, y] of [[0, -1], [0, -2], [0, -3]]) lay(b, x, y, 'Kz');   // the mainland
     for (const [x, y] of [[5, 0], [5, 1], [9, 0], [9, 1]]) lay(b, x, y, 'Kz');
     b.rebuild();
     b.get(5, 0).meeple = { player: 0, feat: null, big: false };

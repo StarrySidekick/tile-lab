@@ -505,6 +505,106 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > holding roads up by then, it was not the plank.
 
 
+> **Sixteenth pass: the gust becomes a cannon, and the mode gets printed rather than lit.**
+>
+> **Where the wind actually snags, measured rather than guessed.** Every zephyr
+> played across ten bot games was instrumented and bucketed by what the engine
+> did with it. The answer is not a bug: **42% of zephyrs blow down a lane with
+> nothing in it at all.** A zephyr is oriented when you lay it and you lay at the
+> frontier, so nearly half of them point out over the edge of the country. The
+> whale accounts for 2% — 1% ends a lane outright, 1% pins an island the gust got
+> under — and everything else moved something. What was wrong was that the mode
+> said nothing at all in the empty-lane case, and a silent nothing reads as a
+> broken rule. It says so now.
+>
+> **THE GUST IS A CANNON.** Power still says how many tiles come off the loose
+> end; it no longer says how far. They are *fired*, and they travel until the
+> square in front of them is occupied, however far away that is — so a raft
+> crosses a strait it could never have crossed a square at a time, the leading
+> tile going furthest and the ones behind piling up against it. Fired down a lane
+> with nothing in it, a tile never stops, which is to say it falls out of the sky.
+> That is the one thing the wind destroys, and it is what gives the empty-lane
+> case teeth: pointing a zephyr at open air is now a decision with a cost.
+>
+> **And what falls comes back — once.** Whatever the wind takes out of the sky
+> goes on top of the deck, and whoever set the wind off may throw **one** of them
+> straight back down that turn, while the hole is still open. That is the old
+> catch-and-throw, restored on a rule that can actually feed it, and it now
+> counts a tile that landed where it fits nothing as readily as one fired into
+> nothing.
+>
+> **The mainland is whatever is biggest.** It was whichever piece the Palazzo
+> stood on, which meant a gust that blew the seat onto a two-tile rock demoted
+> the entire kingdom to an island and doubled every rate on the board in one
+> move. Size is the reading a player makes anyway. The Palazzo keeps the job it
+> is actually good at: when the wind gets hold of the seat, every island slides
+> one square with it.
+>
+> Then a run of rules that all say the same thing — *the sky is crossable*:
+>
+> - **A follower put down on a zephyr is IN that wind.** It carries on down the
+>   new zephyr's lane at that zephyr's strength, and again if that lands it on
+>   another. Being blown across a board full of weather is a journey rather than
+>   a step.
+> - **The walk crosses any amount of open air**, not one square, as long as a
+>   road points off the cliff on both sides. It is how somebody reaches an island
+>   without a flying machine, which is the thing an archipelago most wants. What
+>   it can never cross is country: a road that runs into the back of a tile has
+>   arrived.
+> - **Five flying machines** rather than three.
+> - **An Abbazia with somebody standing on it is a temple.** It has no features
+>   at all — that is the whole of what makes it a cap — so it can never be
+>   claimed when you lay it. But the wind can put a follower down on one, and red
+>   then pays it for its parish like any other temple. Being blown into one is
+>   the only way anybody ever gets there, which is exactly the kind of thing this
+>   mode should reward.
+>
+> **And the whole mode is printed rather than lit.** It was a blue sea-chart under
+> the same twilight palette as everything else, and it wanted to be the plate
+> that chart was struck from. So: **parchment**, foxed and stained at the edges,
+> the graticule and the rose in brown ink, the rhumb lines in the red a portolan
+> actually uses, a light warm wash and a hairline border on every tile, and the
+> panel repainted onto the same sheet — one `body.parchment` class over the CSS
+> variables, so the other eleven modes keep their twilight untouched.
+>
+> Two drawings carry it. **The zephyrs are wind-heads**: a bearded face in a ring
+> of curls, cheeks full, blowing a ruled cone of air, which is how every
+> sixteenth-century chart draws wind and is a far better tile than three curls
+> and an arrow ever were. And **followers are little star people** — the classic
+> silhouette goes to mush at board size, and a five-pointed star already stands
+> the way a person does: head at the top, arms out, legs down. The farmer's spot
+> is shoved off any city wall on its tile as well, because a figure drawn
+> touching a curtain wall reads as standing *in* the city, which is the one claim
+> that spot cannot make.
+>
+> **And the cannon undid the archipelago, which has to be said plainly.** Twenty
+> bot games, against the pass before it:
+>
+> | | slide by power | cannon |
+> |---|---|---|
+> | islands | 8.0 | **1.4** |
+> | island tiles | 24.0 | **3.9** |
+> | biggest island | 12.5 | 3.0 |
+> | mainland | 57.4 | 68.3 |
+> | tiles lost a game | 6.7 | 14.3 |
+> | top score | 104 | 118 |
+>
+> The reason is structural rather than a tuning problem, and it is worth writing
+> down because it is the opposite of what it looks like. A fired tile travels
+> *until it hits something* — which means it almost always comes to rest
+> **against** country, and the mainland is a blob with bays, so the commonest
+> shot in the game is one fired across a bay into the far side of the same
+> landmass. The cannon is a filling-in machine. It makes the kingdom rounder,
+> not more broken. The extra losses do the rest: a shot down an empty lane is
+> gone, and the fragments are exactly the things sitting in empty lanes.
+>
+> Islands themselves are still lifted whole and still slide by the power — the
+> wind does not shoot places out of the world — so the machinery that built the
+> archipelago is all still there. It is being outrun. If the archipelago is worth
+> more than the cannon, the one-line lever is the nibble's distance in
+> `gust()`: `firingRange` back to `power` restores 8.0 islands exactly.
+
+
 **Question it answers:** is a small board you keep *editing* better than a big
 one you keep *growing*?
 

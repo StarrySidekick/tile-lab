@@ -378,23 +378,45 @@ export class Board {
    * WALK is the half of it worth keeping: a figure can step across one square
    * of open sky, and a road you can walk is enough of a road.
    *
-   * STRAIGHT ONLY, and only across ONE square: the road has to leave the near
-   * tile on the same axis it enters the far one. Recorded as pairs of part ids
-   * rather than resolved roots, because a walk asks about them long after this
-   * pass has finished and the union-find has moved on.
+   * STRAIGHT ONLY, and across ANY amount of open air: the road has to leave the
+   * near tile on the same axis it enters the far one, and what lies between
+   * them has to be nothing at all. One square or nine makes no difference to a
+   * figure that is going to step off the edge either way, and it is what lets
+   * somebody walk out to an island without a flying machine — which is most of
+   * what an archipelago wants. What it can never cross is COUNTRY: a road that
+   * runs into the back of a tile has arrived, and stops there.
+   *
+   * Recorded as pairs of part ids rather than resolved roots, because a walk
+   * asks about them long after this pass has finished and the union-find has
+   * moved on.
    *
    * Rebuilt from scratch with everything else, so a hop appears and disappears
    * as the weather opens and closes the gap under it.
    */
   roadHops() {
     this.hops = [];
+    if (!this.size) return;
+    // As far as the board goes and no further: a straight line inside the
+    // bounding box can be at most this long, and nothing outside it can be the
+    // far side of anything.
+    let span = 0;
+    let lo = { x: Infinity, y: Infinity }, hi = { x: -Infinity, y: -Infinity };
+    for (const c of this.cells.values()) {
+      lo.x = Math.min(lo.x, c.x); hi.x = Math.max(hi.x, c.x);
+      lo.y = Math.min(lo.y, c.y); hi.y = Math.max(hi.y, c.y);
+    }
+    span = Math.max(hi.x - lo.x, hi.y - lo.y) + 1;
     for (const cell of this.cells.values()) {
       // Only two of the four directions, or every hop is found twice.
       for (const s of [1, 2]) {
         if (this.edgeAt(cell, s) !== 'r') continue;
         const [dx, dy] = SIDE_STEP[s];
         if (this.cells.has(keyOf(cell.x + dx, cell.y + dy))) continue;   // no gap
-        const far = this.get(cell.x + dx * 2, cell.y + dy * 2);
+        // Out over the open air until something is there. The board is finite,
+        // so this ends; if it ends at nothing, there was nothing to walk to.
+        let n = 2;
+        while (n <= span && !this.cells.has(keyOf(cell.x + dx * n, cell.y + dy * n))) n++;
+        const far = this.get(cell.x + dx * n, cell.y + dy * n);
         if (!far || this.edgeAt(far, opposite(s)) !== 'r') continue;
         const mine = this.featAt(cell, s);
         const theirs = this.featAt(far, opposite(s));

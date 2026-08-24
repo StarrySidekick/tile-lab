@@ -32,11 +32,15 @@
 //     sliding until it comes to rest ALONGSIDE whatever stops it, rather than
 //     short of it. That is what makes an archipelago move: islands travel,
 //     meet, and merge.
-//   HOW MANY, AND HOW FAR, IS THE POWER. A gust arriving at the loose end with
-//     power N pops the last N tiles of the run off and carries each of them N
-//     squares. One is one tile, one square. Two is two tiles, two squares
-//     each — and because they were touching before and all travel together,
-//     they arrive still touching, as a raft.
+//   THE GUST IS A CANNON. Power says HOW MANY come off — a gust arriving at
+//     the loose end with power N pops the last N tiles of the run — and then
+//     it fires them. They do not travel N squares; they travel until the
+//     square in front of them is occupied, however far away that is. The
+//     leading tile goes furthest and the ones behind stack up against it, so a
+//     raft arrives still a raft, on the far side of a strait it could never
+//     have crossed a square at a time. And a tile fired down a lane with
+//     NOTHING in it goes on for ever, which is to say it falls out of the sky:
+//     that is the one thing the wind destroys.
 //   IT PICKS UP STRENGTH — AND ONLY FROM ITS OWN KIND. A gust that runs over a
 //     zephyr blowing the same way absorbs it and blows a square harder. It no
 //     longer stops at three: a lane packed with zephyrs is a lane that tears a
@@ -72,9 +76,15 @@
 //   FOLLOWERS ARE BLOWN LIKE TILES — WHICH IS NOT WHAT HAPPENS TO THE TILES.
 //     A follower on one of the tiles that comes away rides it and never
 //     notices. Every OTHER follower in the lane is picked up and put down that
-//     many squares downwind, on whatever it finds there, which may be a
+//     many squares downwind — squares, not the cannon's range, because a
+//     person is not a projectile — on whatever it finds there, which may be a
 //     feature somebody else holds, or nothing at all. Nothing at all means it
 //     goes back to its owner's hand.
+//   AND A FOLLOWER PUT DOWN ON A ZEPHYR IS IN THAT WIND. It does not stand
+//     there next to it: it goes on down the new zephyr's lane, at that
+//     zephyr's strength, and if THAT lands it on another zephyr it goes on
+//     again. Being blown across a board full of weather is a journey, not a
+//     step.
 //   THE FAR END GOES FIRST. The raft is moved downwind-first, so it slides
 //     along behind its own leading edge instead of piling up.
 // ---------------------------------------------------------------------------
@@ -239,6 +249,29 @@ function regionOf(board, seed) {
 }
 
 /**
+ * How far a cannon carries something: until the square in front of any part of
+ * it is occupied by something that is not itself. `null` means it never hits
+ * anything at all — it has been fired clean out of the world, and whatever was
+ * fired is gone.
+ *
+ * The range is bounded by the board rather than by a constant: nothing beyond
+ * the furthest tile downwind can ever stop anything, so one square past that is
+ * where a shot stops being a shot and starts being a loss.
+ */
+function firingRange(board, cells, dx, dy, far) {
+  const mine = new Set(cells.map((c) => kOf(c.x, c.y)));
+  const start = Math.min(...cells.map((c) => c.x * dx + c.y * dy));
+  const reach = far - start + 1;
+  for (let n = 1; n <= reach; n++) {
+    for (const c of cells) {
+      const [tx, ty] = [c.x + dx * n, c.y + dy * n];
+      if (board.get(tx, ty) && !mine.has(kOf(tx, ty))) return n - 1;
+    }
+  }
+  return null;
+}
+
+/**
  * One gust.
  *
  * @param board  the Board to shove
@@ -345,6 +378,13 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1, ro
   // --- the shove -------------------------------------------------------------
   // Far end first, always, so anything moving slides along behind its own
   // leading edge instead of piling up into itself.
+  //
+  // How far anything can possibly go: nothing past the furthest tile downwind
+  // can ever stop a shot, so that is where a cannon runs out of world.
+  let far = -Infinity;
+  for (const c of board.cells.values()) far = Math.max(far, along(c));
+  const fired = [];                               // shot clean out of the world
+
   for (const raft of rafts) {
     const order = raft.cells.slice().sort((a, b) => along(b) - along(a));
 
@@ -376,14 +416,15 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1, ro
       continue;
     }
 
-    // The loose end of the mainland: `power` tiles, each as far as it can get.
+    // The loose end: `power` tiles come off, and each of them is FIRED. It
+    // travels until the square in front of it is taken, however far that is —
+    // so the leading tile goes furthest and the ones behind pile up against it
+    // and arrive still a raft. Fired down a lane with nothing in it, it goes
+    // on for ever, which is to say out of the sky.
     for (const cell of order) {
       if (immovable(cell)) continue;
-      let steps = 0;
-      for (let n = 1; n <= raft.power; n++) {
-        if (board.get(cell.x + dx * n, cell.y + dy * n)) break;   // pressed up against something
-        steps = n;
-      }
+      const steps = firingRange(board, [cell], dx, dy, far);
+      if (steps === null) { fired.push(cell); continue; }
       if (!steps) continue;
       const was = { x: cell.x, y: cell.y };
       if (!board.shift(was, { x: was.x + dx * steps, y: was.y + dy * steps })) continue;
@@ -392,17 +433,17 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1, ro
   }
 
   // --- what the move did to them --------------------------------------------
-  // ONE way to fall, and it is not the obvious one. A tile touching nothing at
-  // all no longer drops: the sky holds it, and a rock adrift over open air is
-  // where the next island comes from. That rule was the mode's great eraser —
-  // it deleted the fragments before they could ever become country, and the
-  // board healed back into one mass every single turn.
+  // TWO ways out of the sky, and neither is "it was on its own". A tile the
+  // wind shakes free of everything hangs there: the fragments are where the
+  // islands come from, and dropping them was an eraser that healed the board
+  // back into one mass every turn.
   //
-  // What still falls is a tile the wind MOVED that no longer FITS: one that
-  // comes down beside country whose edges it can't meet is touching the kingdom
-  // and joined to none of it — a road shoved up against a city wall — and there
-  // is nothing holding THAT up. It is gone for good; nobody picks it up again.
-  // A tile with no neighbours at all has nothing to disagree with, so it floats.
+  // What falls is a tile that has been FIRED into a lane with nothing in it —
+  // there was never anything out there to stop it, so it is still going — and
+  // a tile the wind moved that no longer FITS, one that comes down beside
+  // country whose edges it can't meet, touching the kingdom and joined to none
+  // of it. A tile with no neighbours at all has nothing to disagree with, so it
+  // floats.
   //
   // The whale's tile is never dropped: a hundred tons of sky whale outranks the
   // seam it happens to be sitting on.
@@ -415,6 +456,12 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1, ro
     board.remove(cell.x, cell.y, { quiet: true });   // one rebuild at the end
   };
 
+  for (const cell of fired) {
+    if (board.size <= 1) break;
+    if (board.get(cell.x, cell.y) !== cell || cell.balena) continue;
+    drop(cell, 'fired');
+  }
+
   for (const m of report.moved) {
     if (board.size <= 1) break;
     const cell = m.cell;
@@ -425,8 +472,33 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1, ro
   }
 
   // --- put the followers down ------------------------------------------------
+  //
+  // A follower blown onto a zephyr is IN that wind, not standing beside it: it
+  // carries on down the new zephyr's lane at that zephyr's own strength, and
+  // if that lands it on another zephyr it goes again. Being blown across a
+  // board full of weather is a journey rather than a step, and it is the one
+  // way a figure crosses the sky without a flying machine.
+  //
+  // Bounded by the tiles it has already been blown off, so a ring of zephyrs
+  // pointed at each other is a short ride rather than a hung tab.
+  const carried = (from) => {
+    let { x, y } = from;
+    const been = new Set();
+    for (let hop = 0; hop < MAX_GUSTS; hop++) {
+      const on = board.get(x, y);
+      if (!on || been.has(on)) break;
+      been.add(on);
+      const winds = zephyrDirs(on);
+      if (!winds.length) break;
+      const [ax, ay] = SIDE_STEP[winds[0]];
+      const n = zephyrPush(on);
+      x += ax * n; y += ay * n;
+    }
+    return { x, y };
+  };
+
   for (const r of riders.sort((a, b) => (b.was.x * dx + b.was.y * dy) - (a.was.x * dx + a.was.y * dy))) {
-    const to = { x: r.was.x + dx * r.steps, y: r.was.y + dy * r.steps };
+    const to = carried({ x: r.was.x + dx * r.steps, y: r.was.y + dy * r.steps });
     const dest = board.get(to.x, to.y);
     // Open sky. This is the only way a follower ever leaves the board.
     if (!dest) { report.homed.push({ ...r.meeple, x: r.was.x, y: r.was.y, why: 'sky' }); continue; }

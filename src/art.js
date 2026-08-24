@@ -1194,41 +1194,106 @@ const MARK_ART = {
     ctx.beginPath(); ctx.arc(0, -0.34, 0.09, 0, Math.PI * 2); ctx.fill();
   },
   /**
-   * A zephyr: three curls of moving air and the arrowhead they're headed for.
-   * Drawn pointing north and turned by `drawMark`, so one drawing serves all
-   * four facings and the tile can be rotated on top of that.
+   * A ZEPHYR, drawn the way a sixteenth-century chart draws one: a bearded
+   * wind-head in a bank of cloud, cheeks full, blowing a cone of air out of a
+   * pursed mouth. Every portolan and every Münster world map has these in the
+   * corners, and they are the reason this mode looks the way it does — the wind
+   * on an old chart is a PERSON, not an arrow, and once you have drawn the
+   * compass rose and the rhumb lines you have to finish the sentence.
+   *
+   * Drawn blowing north and turned by `drawMark`, so one drawing serves all four
+   * facings and the tile can be rotated on top of that. Ink and paper rather
+   * than the board's palette: an engraving is a line on parchment, and the
+   * whole point is that it reads as printed rather than modelled.
    */
   zephyr(ctx) {
-    ctx.strokeStyle = 'rgba(228,240,248,0.85)';
-    ctx.lineWidth = 0.09;
+    const INK = 'rgba(52,36,22,0.95)';
+    const PAPER = '#f2e7cd';
+    ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    for (const [x, len] of [[-0.22, 0.30], [0, 0.46], [0.22, 0.30]]) {
+
+    // The breath first, so the face sits on top of it: a cone opening away
+    // from the mouth with the lines of moving air ruled inside it, which is
+    // exactly how an engraver draws wind and is the reason the tile reads as
+    // a direction from across the table.
+    ctx.beginPath();
+    ctx.moveTo(-0.07, 0.06); ctx.lineTo(-0.34, -0.70);
+    ctx.lineTo(0.34, -0.70); ctx.lineTo(0.07, 0.06);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(242,231,205,0.78)';
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.045;
+    for (const t of [-1, -0.35, 0.35, 1]) {
       ctx.beginPath();
-      ctx.moveTo(x, 0.44);
-      ctx.quadraticCurveTo(x + 0.10, 0.44 - len * 0.6, x, 0.44 - len);
+      ctx.moveTo(t * 0.07, 0.04);
+      ctx.lineTo(t * 0.34, -0.70);
       ctx.stroke();
     }
-    ctx.fillStyle = 'rgba(228,240,248,0.9)';
-    ctx.beginPath();
-    ctx.moveTo(0, -0.48); ctx.lineTo(0.22, -0.10); ctx.lineTo(-0.22, -0.10);
-    ctx.closePath(); ctx.fill();
+
+    // Hair and beard: a ring of curls round the head, drawn as overlapping
+    // lobes so the silhouette is scalloped the way an engraved head is.
+    ctx.fillStyle = PAPER;
+    ctx.lineWidth = 0.05;
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + 0.35;
+      const [cx, cy] = [Math.cos(a) * 0.40, Math.sin(a) * 0.40 + 0.34];
+      ctx.beginPath(); ctx.arc(cx, cy, 0.17, 0, Math.PI * 2); ctx.fill();
+    }
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + 0.35;
+      const [cx, cy] = [Math.cos(a) * 0.40, Math.sin(a) * 0.40 + 0.34];
+      ctx.beginPath(); ctx.arc(cx, cy, 0.17, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    // The face — big, because at a third of a tile there is only room for one
+    // thing and the one thing has to be a person.
+    ctx.beginPath(); ctx.arc(0, 0.34, 0.34, 0, Math.PI * 2);
+    ctx.fillStyle = PAPER; ctx.fill();
+    ctx.lineWidth = 0.055; ctx.strokeStyle = INK; ctx.stroke();
+
+    // Cheeks blown out, and the mouth they are pushing the air through.
+    ctx.lineWidth = 0.042;
+    ctx.beginPath(); ctx.arc(-0.19, 0.30, 0.13, -0.4, Math.PI * 1.1); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0.19, 0.30, 0.13, Math.PI * 1.9, Math.PI * 1.4, true); ctx.stroke();
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.ellipse(0, 0.13, 0.075, 0.06, 0, 0, Math.PI * 2); ctx.fill();
+    // Eyes, screwed up with the effort, and a brow over each.
+    ctx.beginPath(); ctx.arc(-0.12, 0.36, 0.042, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0.12, 0.36, 0.042, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 0.04;
+    ctx.beginPath(); ctx.arc(-0.12, 0.46, 0.10, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0.12, 0.46, 0.10, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+
     ctx.lineWidth = 0.055;
     ctx.lineCap = 'butt';
   },
 
   /**
-   * A DOUBLE zephyr: the same wind with a second arrowhead stacked behind the
-   * first. It opens at two squares rather than one, and the difference has to
-   * be visible from across the table — two chevrons is the shorthand every map
-   * uses for "and again", and it survives being shrunk to a quarter tile when
-   * a multi-way zephyr draws four of them.
+   * A DOUBLE zephyr: the same wind-head blowing twice as hard, which an
+   * engraver would show by making the breath a gale — a wider cone and a second
+   * rank of air lines behind it. It has to be visible from across the table,
+   * and it has to survive being shrunk to a quarter tile when a multi-way
+   * zephyr draws four of them.
    */
   zephyr2(ctx) {
     MARK_ART.zephyr(ctx);
-    ctx.fillStyle = 'rgba(228,240,248,0.9)';
-    ctx.beginPath();
-    ctx.moveTo(0, -0.16); ctx.lineTo(0.22, 0.22); ctx.lineTo(-0.22, 0.22);
-    ctx.closePath(); ctx.fill();
+    // TWO CHEVRONS in the breath — the shorthand every chart uses for "and
+    // again", and the one mark that survives being shrunk to a quarter tile
+    // when a multi-way zephyr draws four of these.
+    ctx.strokeStyle = 'rgba(52,36,22,0.95)';
+    ctx.lineWidth = 0.11;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const y of [-0.26, -0.54]) {
+      ctx.beginPath();
+      ctx.moveTo(-0.29, y + 0.20);
+      ctx.lineTo(0, y);
+      ctx.lineTo(0.29, y + 0.20);
+      ctx.stroke();
+    }
+    ctx.lineWidth = 0.055;
+    ctx.lineCap = 'butt';
   },
 
   /**
@@ -2077,24 +2142,35 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
 
 // --- meeples ----------------------------------------------------------------
 
+/**
+ * A STAR PERSON. The classic follower is a rounded silhouette that goes to mush
+ * the moment you shrink it, and on a board of parchment and compass roses the
+ * thing standing on the tile ought to belong to the same drawing as the wind
+ * heads and the rhumb lines. So: a five-pointed star, and the star IS the
+ * figure — the top point is the head, the two side points are arms flung out,
+ * the two lower points are legs. Nothing is added to make it read as a person;
+ * the proportions do it, because a star already stands the way a person does.
+ *
+ * Built from real polar geometry rather than hand-placed points, so it stays
+ * exactly symmetrical at any size and the notches never drift. The head point
+ * runs longer than the other four and the waist is pinched a little tighter
+ * than a true pentagram, which is the whole difference between a star and
+ * somebody standing with their arms out.
+ */
 export function meeplePath(ctx) {
+  const OUT = 0.56;                    // arms, legs
+  const HEAD = 0.68;                   // …and the head, which reaches further
+  const IN = 0.235;                    // the waist between them
   ctx.beginPath();
-  ctx.arc(0, -0.30, 0.21, 0, Math.PI * 2);
-  ctx.moveTo(0, -0.12);
-  ctx.quadraticCurveTo(0.17, -0.10, 0.23, 0.02);
-  ctx.lineTo(0.50, 0.10);
-  ctx.lineTo(0.46, 0.25);
-  ctx.lineTo(0.17, 0.22);
-  ctx.lineTo(0.31, 0.50);
-  ctx.lineTo(0.09, 0.50);
-  ctx.lineTo(0, 0.34);
-  ctx.lineTo(-0.09, 0.50);
-  ctx.lineTo(-0.31, 0.50);
-  ctx.lineTo(-0.17, 0.22);
-  ctx.lineTo(-0.46, 0.25);
-  ctx.lineTo(-0.50, 0.10);
-  ctx.lineTo(-0.23, 0.02);
-  ctx.quadraticCurveTo(-0.17, -0.10, 0, -0.12);
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + i * (Math.PI * 2 / 5);
+    const r = i === 0 ? HEAD : OUT;
+    const [px, py] = [Math.cos(a) * r, Math.sin(a) * r + 0.05];
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    // …and the valley on the far side of it, halfway round to the next point.
+    const b = a + Math.PI / 5;
+    ctx.lineTo(Math.cos(b) * IN, Math.sin(b) * IN + 0.05);
+  }
   ctx.closePath();
 }
 

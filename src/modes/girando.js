@@ -13,13 +13,16 @@
 // — the run of tiles downwind of the zephyr stops somewhere, at a gap or at
 // open sky, and the last tiles before that gap are the ones that come away.
 //
-// HOW MANY, AND HOW FAR, IS THE POWER. A gust arriving at the loose end with
-// power N pops the last N tiles off and carries each of them N squares. A row
-// of five with a zephyr on the right of it blowing west: power one, so the
-// leftmost tile alone goes one square west. Put a second west-blowing zephyr
-// in that row and the gust absorbs it, arrives at power two, and the leftmost
-// TWO tiles come away two squares each — as a raft, because they were touching
-// before and they all travel together.
+// THE GUST IS A CANNON. Power says HOW MANY come off — a gust arriving at the
+// loose end with power N pops the last N tiles of the run — and then it FIRES
+// them. They do not travel N squares; they travel until the square in front of
+// them is occupied, however far away that is. The leading tile goes furthest
+// and the ones behind pile up against it, so a raft arrives still a raft, on
+// the far side of a strait it could never have crossed a square at a time.
+// And a tile fired down a lane with NOTHING in it goes on for ever, which is to
+// say it falls out of the sky. That is the one thing the wind destroys — and
+// whoever set the wind off may throw ONE of what fell straight back down, this
+// turn, while the hole is still open.
 //
 // AND IT BUILDS. Power used to stop at three; it doesn't any more. A gust that
 // runs over a zephyr blowing the SAME way absorbs it and blows a square harder
@@ -123,9 +126,13 @@
 //
 // AT THE END the sky fires every colour once, and that is all.
 //
-// THE PALAZZO is what "mainland" means. Whichever piece of country the seat of
-// government is standing on is the kingdom; every other group of two or more
-// tiles is an ISLAND. You may not build onto an island unless you are ALREADY
+// THE MAINLAND IS WHATEVER IS BIGGEST, and every other piece of country is an
+// ISLAND, down to a single tile. It used to be whichever piece the Palazzo
+// happened to be standing on, which meant a gust that blew the seat onto a
+// two-tile rock demoted the whole kingdom to an island and doubled every rate
+// on the board in one move.
+//
+// You may not build onto an island unless you are ALREADY
 // STANDING on it — being blown out there is meant to be an opportunity rather
 // than a sentence, but you cannot sail out to an empty rock and start.
 // Islands are made, not chosen: you were standing there when the country blew
@@ -185,7 +192,7 @@ import {
   TILE_TYPES, CENTRE_FEATURES, SIDE_STEP, opposite, buildDeck,
 } from '../tiles.js';
 import { PLAYER_COLORS } from '../theme.js';
-import { claimableFeatures, citiesFed } from '../mechanics.js';
+import { claimableFeatures, citiesFed, hasMark } from '../mechanics.js';
 import {
   storm, zephyrDirs, zephyrPush, worldDir, turbineOn, isTemple, MAX_STRENGTH,
 } from '../wind.js';
@@ -369,7 +376,8 @@ export class Girando extends Mode {
     this.lifted = null;
     this.laid = 0;
     this.gusts = 0;
-    this.fallen = 0;           // tiles that landed where they fit nothing, and left
+    this.fallen = 0;           // tiles the wind has taken out of the sky
+    this.caught = false;       // …and whether one has come back to hand this turn
     this.spheres = 0;          // spheres closed so far
     this.hues = {};            // …and how many of each colour
     this.drifts = 0;           // times the Palazzo has towed the islands along
@@ -413,9 +421,13 @@ export class Girando extends Mode {
     if (this._land && this._land.stamp === stamp) return this._land;
 
     const groups = board.groups();                    // biggest first
-    // The seat, if it is still on the board at all; the biggest piece of
-    // country if the wind has blown the Palazzo out of the sky entirely.
-    const main = groups.find(hasPalazzo) || groups[0] || [];
+    // THE MAINLAND IS WHATEVER IS BIGGEST. It used to be whichever piece the
+    // Palazzo happened to be standing on, which meant a gust that blew the seat
+    // onto a two-tile rock demoted the entire kingdom to an island and doubled
+    // every rate on the board in one move. Size is the reading a player makes
+    // anyway — the big one is the mainland — and it leaves the Palazzo doing
+    // the one job it is actually good at, which is towing the archipelago.
+    const main = groups[0] || [];
     // EVERY piece of country off the mainland is an island, down to a single
     // tile. It used to take two — "a lone tile adrift is not an island, it is a
     // tile adrift" — and that sentence was the reason the archipelago never
@@ -517,6 +529,7 @@ export class Girando extends Mode {
 
   endTurn() {
     this.flight = null;
+    this.caught = false;
     this.lifted = null;
     this.stroll = null;
     this.strollers.length = 0;
@@ -713,12 +726,20 @@ export class Girando extends Mode {
   scoreTemples() {
     const board = this.game.board;
     for (const cell of board.cells.values()) {
-      if (!isTemple(cell) || !cell.meeple) continue;
+      // AN ABBAZIA WITH SOMEBODY ON IT IS A TEMPLE. Nothing on it can be
+      // claimed when you lay it — it has no features at all, which is the whole
+      // of what makes it a cap — but the wind can put a follower down on one,
+      // and a walled house in the sky with somebody living in it is a temple by
+      // every test that matters. Red pays it for its parish like any other.
+      // Being blown into one is the only way anybody ever gets there, which is
+      // exactly the kind of thing this mode should reward.
+      const abbey = hasMark(cell, 'abbazia') && cell.meeple;
+      if ((!isTemple(cell) && !abbey) || !cell.meeple) continue;
       const around = board.surroundCount(cell.x, cell.y);
       if (!around) continue;
       const per = this.onIsland(cell) ? RATE.temple.isle : RATE.temple.main;
       this.pay(cell.meeple.player, around * per,
-        `A temple with ${around} tile${around === 1 ? '' : 's'} around it`
+        `${abbey ? 'An Abbazia kept as a temple' : 'A temple'} with ${around} tile${around === 1 ? '' : 's'} around it`
         + `${per > RATE.temple.main ? ' out on an island' : ''}`
         + ` — ${this.game.players[cell.meeple.player].name}`,
         [{ x: cell.x, y: cell.y }]);
@@ -1274,7 +1295,18 @@ export class Girando extends Mode {
     const g = this.game;
     this.gusts++;
     this.payTurbines(r.turbines);
-    if (!r.moved.length && !r.swung.length && !r.homed.length && !r.lifted.length) return;
+    // A gust that found nothing has to SAY it found nothing. Nearly half the
+    // zephyrs played point out over the edge of the country into open sky —
+    // there is no run downwind, so there is no loose end and nothing happens —
+    // and a silent nothing reads as a broken rule rather than as an empty lane.
+    if (!r.moved.length && !r.swung.length && !r.homed.length && !r.lifted.length) {
+      if (!r.reached.length) {
+        g.say(`The zephyr blows out over open sky and finds nothing to push.`);
+      } else if (!r.fell.length) {
+        g.say(`The zephyr blows, and the country in its lane is packed too tight to shift.`);
+      }
+      return;
+    }
 
     g.emit('gust', {
       dir: r.dir,
@@ -1289,16 +1321,28 @@ export class Girando extends Mode {
       g.say(`The gust picks up — ${r.strength} tiles off the end, ${r.strength} squares each.`);
     }
 
-    // NOTHING FALLS FOR BEING ALONE any more, so nothing comes back into the
-    // deck and nobody catches anything out of the air. A tile the wind shakes
-    // free of everything hangs there over open sky, and that is the whole
-    // point: it is the seed of the next island. What still falls is a tile that
-    // came down where it no longer FITS — touching country and joined to none
-    // of it — and that one is a loss rather than a return. Nobody picks it up
-    // again; it is out of the game.
+    // A TILE OUT OF THE SKY IS A TILE BACK IN YOUR HAND. Whatever took it —
+    // fired down a lane with nothing in it, or landed where it fits nothing —
+    // it goes back on top of the deck, and whoever set the wind off may throw
+    // ONE of them straight back down this turn, while the hole the wind just
+    // made is still open. That is what turns a big storm from bookkeeping into
+    // a swing, and it is the only thing that gives back what the cannon takes.
+    // Once a turn, however many fall.
     if (r.fell.length) {
       this.fallen += r.fell.length;
-      g.say(`${r.fell.length} tile${r.fell.length > 1 ? 's fit nothing they landed against and are' : ' fits nothing it landed against and is'} lost out of the sky for good.`);
+      for (const f of r.fell) g.deck.unshift(f.id);
+      const fired = r.fell.filter((f) => f.why === 'fired').length;
+      const bad = r.fell.length - fired;
+      const said = [];
+      if (fired) said.push(`${fired} tile${fired > 1 ? 's are' : ' is'} fired clean out of the world`);
+      if (bad) said.push(`${bad} land${bad > 1 ? '' : 's'} where nothing fits`);
+      g.say(`${said.join(' and ')} — back to the top of the deck.`);
+    }
+    if (r.fell.length && this.blame === g.current && !this.caught) {
+      this.caught = true;
+      g.tilesLeft++;
+      g.say(`${g.player.name} catches one out of the air, and may throw it straight back down.`);
+      g.emit('landmark');
     }
 
     // Followers travel with the weather. One the wind put down somewhere is
@@ -1845,20 +1889,24 @@ Girando.spec = {
   name: 'Girando (cloud kingdom)',
   Mode: Girando,
   groups: ['base', 'cloud'],
+  // Ink on aged paper rather than twilight: the whole mode is a chart, the
+  // zephyrs are the wind-heads drawn in its corners, and the panel has to be
+  // the same sheet as the board.
+  antique: true,
   meeples: true,
   minPlayers: 1,
   maxPlayers: 4,
   tideStart: 5,
   opening: 'A first stone hangs in the cloud. Everything else is weather.',
   hint: 'A zephyr does nothing to the country it blows through — it tears the LOOSE END off it. '
-    + 'The run downwind of the zephyr ends at a gap, and the last tiles before that gap come away: power N pops N tiles off and carries each of them N squares. '
+    + 'The run downwind ends at a gap, and the last tiles before it come away — and are FIRED: power N pops N tiles off and each flies until the square in front of it is taken, however far that is. One fired down an empty lane never stops, which is to say it falls out of the sky. '
     + 'It gains a power off every zephyr blowing its own way and off every corner it turns, and it no longer stops at three. '
-    + 'A tile the wind shakes loose of everything HANGS THERE, and every fragment off the mainland is an ISLAND, down to one tile. What falls is a tile that lands where it fits nothing, and that one is lost for good. '
+    + 'A tile the wind shakes loose of everything HANGS THERE, and every fragment off the biggest landmass is an ISLAND, down to one tile. Anything that does fall goes back on top of the deck, and you may throw one of them straight back down — once a turn. '
     + 'The mainland is the only country too big for the wind to get under: everything else adrift sails whole, and slides until it comes to rest against something — so islands meet and merge. '
     + 'Nothing is paid for being finished: closing a SPHERE is the scoring round, and both its halves fire a pass over the whole board. '
     + 'Green scores the farms (1 per two tiles of field), blue the cities (1 a tile open, 2 finished), red the temples (1 per tile around one), yellow the roads (1 a tile plus what each city it reaches is worth). '
     + 'Any half fits any other, so the pairing is the decision. '
-    + 'You may only build onto the Palazzo’s mainland; everything adrift is an island, and islands pay more. '
-    + 'A feature that scores hands its followers back — or they walk on down a road, hopping any one-square gap in it. '
+    + 'You may only build onto the mainland, or an island you are already standing on; islands pay double. '
+    + 'A follower blown onto a zephyr rides it, and again, and again. A feature that scores hands its followers back — or they walk on down a road, out over any amount of open air as long as a road points off the cliff on both sides. '
     + 'Instead of a follower, send the Balena anywhere on the board — nothing under the whale can be moved by any wind.',
 };
