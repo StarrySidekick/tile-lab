@@ -106,8 +106,12 @@ left it.
 **The sky is the space, not the ground.** The gaps between tiles are open air —
 it is what a tile the wind blows clear of everything hangs in, and what runs
 between islands — while the tiles themselves stay ordinary countryside. It is drawn as an old
-chart of that sky, and the mode is printed rather than lit: **parchment**, foxed
-and stained at the edges, a graticule with heavy meridians every five squares,
+chart of that sky, and the mode is printed rather than lit: **sky painted onto
+parchment** — the sheet first, then the wash laid over it, pooled and uneven the
+way a brush leaves it, and then the paper coming back through on top, its laid
+lines and its foxing multiplied over the paint. Paint under grain reads as
+pigment sunk into a sheet; paint over grain reads as a blue rectangle with a
+texture stuck on it. Foxed and stained at the edges, a graticule with heavy meridians every five squares,
 the rhumb lines a portolan strikes from its compass nodes in red ink, a rose on
 the origin with the Latin winds named round it, and a **bearded wind-head** on
 every zephyr, cheeks full, blowing its cone of air the way every sixteenth‑century

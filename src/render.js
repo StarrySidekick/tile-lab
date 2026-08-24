@@ -30,6 +30,12 @@ const WINDS = [
   { name: 'MERIDIES', dir: 2 }, { name: 'OCCIDENS', dir: 3 },
 ];
 
+/** Where the brush pooled: [x, y, radius, alpha], fractions of the viewport. */
+const POOLING = [
+  [0.18, 0.12, 0.34, 0.20], [0.72, 0.30, 0.40, 0.16],
+  [0.42, 0.74, 0.36, 0.13], [0.92, 0.86, 0.30, 0.17],
+];
+
 /** Foxing on the page: [x, y, radius, alpha], all fractions of the viewport. */
 const FOXING = [
   [0.11, 0.19, 0.10, 0.10], [0.44, 0.08, 0.07, 0.07], [0.73, 0.26, 0.12, 0.08],
@@ -230,7 +236,10 @@ export class Renderer {
 
     if (this.showDebug) this.drawDebug(game);
 
-    applyDusk(ctx, this.w, this.h);
+    // A chart is not lit at dusk — it is a sheet on a table. The vignette that
+    // frames every other mode would only fight the stain already painted round
+    // the edge of the paper, and two vignettes are a smudge rather than a frame.
+    if (!antique) applyDusk(ctx, this.w, this.h);
 
     // Effects sit above the dusk wash. A score you can't read is not a score
     // you can read dimly — it's one you miss.
@@ -278,6 +287,15 @@ export class Renderer {
    * thing here that wasn't the chart: soft white blobs sliding across a drawn
    * map, smudging the graticule and reading as dirt on the glass. The chart is
    * the backdrop. Nothing floats in front of it.
+   *
+   * And it is SKY PAINTED ONTO PARCHMENT rather than a bare sheet. The order is
+   * the whole trick and it is the order a painter works in: the paper first,
+   * then the wash laid over it — pooled and uneven, the way a brush leaves it —
+   * and then the paper coming BACK THROUGH on top, its laid lines and its
+   * foxing multiplied over the paint. Paint under grain reads as pigment sunk
+   * into a sheet; paint over grain reads as a blue rectangle with a texture
+   * stuck on it. Only then the ink: the graticule, the rhumbs and the rose are
+   * drawn last because they were drawn last.
    */
   drawChart() {
     const ctx = this.ctx;
@@ -294,6 +312,9 @@ export class Renderer {
     paper.addColorStop(1, '#cfbc94');
     ctx.fillStyle = paper;
     ctx.fillRect(0, 0, this.w, this.h);
+
+    this.drawSkyWash();
+    this.drawLaidLines();
     this.drawFoxing();
 
     // The rhumb network and the rose are the expensive half and the half that
@@ -307,6 +328,71 @@ export class Renderer {
   }
 
   /**
+   * The sky, painted on. A vertical wash — deeper overhead, thinning toward the
+   * bottom of the sheet the way a horizon does — laid at part opacity so the
+   * warm paper under it comes through and takes the chill off the blue, which
+   * is what separates gouache on toned paper from a blue rectangle.
+   *
+   * Then the POOLING: three or four soft patches where a brush left more
+   * pigment than it meant to. Parallaxed with the camera like the foxing, so
+   * they belong to the sheet rather than to the screen, and laid out from a
+   * fixed table so they never reshuffle between frames.
+   */
+  drawSkyWash() {
+    const ctx = this.ctx;
+    ctx.save();
+    const sky = ctx.createLinearGradient(0, 0, 0, this.h);
+    sky.addColorStop(0, 'rgba(86,116,146,0.80)');
+    sky.addColorStop(0.42, 'rgba(116,146,171,0.74)');
+    sky.addColorStop(0.78, 'rgba(150,175,188,0.62)');
+    sky.addColorStop(1, 'rgba(178,194,192,0.50)');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, this.w, this.h);
+
+    const drift = this.cam.zoom * 0.10;
+    for (const [ox, oy, r, a] of POOLING) {
+      const x = ox * this.w - this.cam.x * drift;
+      const y = oy * this.h - this.cam.y * drift;
+      const rad = r * Math.max(this.w, this.h);
+      const pool = ctx.createRadialGradient(x, y, 0, x, y, rad);
+      pool.addColorStop(0, `rgba(62,96,128,${a})`);
+      pool.addColorStop(0.65, `rgba(62,96,128,${a * 0.4})`);
+      pool.addColorStop(1, 'rgba(62,96,128,0)');
+      ctx.fillStyle = pool;
+      ctx.beginPath();
+      ctx.ellipse(x, y, rad, rad * 0.66, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /**
+   * The laid lines of the sheet, brought back through the paint. Fine chain
+   * lines one way and closer wire lines the other, multiplied so they darken
+   * the wash rather than sitting on it — the single cheapest thing that says
+   * "this is paper" and the reason the wash reads as sunk in.
+   *
+   * Pinned to the screen rather than the world: the sheet is what you are
+   * looking THROUGH, and a grain that slid about under the board would read as
+   * something moving rather than as something you are holding.
+   */
+  drawLaidLines() {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.strokeStyle = 'rgba(126,102,68,0.09)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x < this.w; x += 3) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, this.h); }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(126,102,68,0.07)';
+    ctx.beginPath();
+    for (let y = 0; y < this.h; y += 9) { ctx.moveTo(0, y + 0.5); ctx.lineTo(this.w, y + 0.5); }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
    * Foxing: the rust-brown blotches an old sheet grows where it was damp. Laid
    * out from a fixed table and parallaxed with the camera like everything else
    * on this backdrop, so the page is a page you are moving over rather than a
@@ -316,14 +402,17 @@ export class Renderer {
     const ctx = this.ctx;
     const drift = this.cam.zoom * 0.10;
     ctx.save();
+    // Multiplied, because foxing is a stain IN the sheet: it has to darken the
+    // sky painted over it rather than sit on top of the paint as a beige smear.
+    ctx.globalCompositeOperation = 'multiply';
     for (const [ox, oy, r, a] of FOXING) {
       const x = ox * this.w - this.cam.x * drift;
       const y = oy * this.h - this.cam.y * drift;
       const rad = r * Math.min(this.w, this.h);
       const blot = ctx.createRadialGradient(x, y, 0, x, y, rad);
-      blot.addColorStop(0, `rgba(140,102,58,${a})`);
-      blot.addColorStop(0.6, `rgba(140,102,58,${a * 0.45})`);
-      blot.addColorStop(1, 'rgba(140,102,58,0)');
+      blot.addColorStop(0, `rgba(146,104,54,${a * 1.7})`);
+      blot.addColorStop(0.6, `rgba(146,104,54,${a * 0.8})`);
+      blot.addColorStop(1, 'rgba(146,104,54,0)');
       ctx.fillStyle = blot;
       ctx.beginPath();
       ctx.ellipse(x, y, rad, rad * 0.78, 0, 0, Math.PI * 2);
@@ -341,8 +430,9 @@ export class Renderer {
     const ctx = this.ctx;
     const r = Math.hypot(this.w, this.h) * 0.62;
     const v = ctx.createRadialGradient(this.w / 2, this.h / 2, r * 0.42, this.w / 2, this.h / 2, r);
-    v.addColorStop(0, 'rgba(90,62,32,0)');
-    v.addColorStop(1, 'rgba(90,62,32,0.34)');
+    v.addColorStop(0, 'rgba(84,56,28,0)');
+    v.addColorStop(0.72, 'rgba(84,56,28,0.10)');
+    v.addColorStop(1, 'rgba(84,56,28,0.40)');
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, this.w, this.h);
   }
@@ -380,7 +470,7 @@ export class Renderer {
     const [x0, y0] = this.toWorld(0, 0);
     const [x1, y1] = this.toWorld(this.w, this.h);
 
-    for (const [step, color, width] of [[1, 'rgba(74,52,30,0.13)', 1], [5, 'rgba(74,52,30,0.34)', 1.6]]) {
+    for (const [step, color, width] of [[1, 'rgba(38,28,16,0.17)', 1], [5, 'rgba(38,28,16,0.42)', 1.6]]) {
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       ctx.beginPath();
@@ -410,7 +500,7 @@ export class Renderer {
     const R = RHUMB_RING;                                  // node ring, in squares
     const reach = (Math.hypot(this.w, this.h) / z) + R * 2;
     ctx.save();
-    ctx.strokeStyle = 'rgba(122,58,40,0.13)';        // rhumbs are drawn in red ink
+    ctx.strokeStyle = 'rgba(126,46,32,0.17)';        // rhumbs are drawn in red ink
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let n = 0; n < RHUMB_NODES; n++) {
@@ -444,7 +534,7 @@ export class Renderer {
 
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.strokeStyle = 'rgba(74,52,30,0.38)';
+    ctx.strokeStyle = 'rgba(38,28,16,0.46)';
     ctx.lineWidth = 1.2;
     for (const k of [1, 0.72, 0.16]) {
       ctx.beginPath();
@@ -461,14 +551,14 @@ export class Renderer {
       ctx.lineTo(Math.cos(a + Math.PI / 2) * w, Math.sin(a + Math.PI / 2) * w);
       ctx.lineTo(Math.cos(a - Math.PI / 2) * w, Math.sin(a - Math.PI / 2) * w);
       ctx.closePath();
-      if (i % 2 === 0) { ctx.fillStyle = 'rgba(122,58,40,0.24)'; ctx.fill(); }
+      if (i % 2 === 0) { ctx.fillStyle = 'rgba(126,46,32,0.30)'; ctx.fill(); }
       ctx.stroke();
     }
     // Small caps, letter-spaced, and clamped: the names are an inscription on
     // the chart, not a headline. Left unclamped they scale with the zoom and
     // SEPTENTRIO ends up the size of a tile.
     const size = Math.max(8, Math.min(15, r * 0.12));
-    ctx.fillStyle = 'rgba(74,52,30,0.55)';
+    ctx.fillStyle = 'rgba(38,28,16,0.62)';
     ctx.font = `600 ${size}px ui-serif, Georgia, serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -825,9 +915,12 @@ export class Renderer {
       if (!this.onScreen(x, y)) continue;
       const [sx, sy] = this.toScreen(x, y);
       const z = this.cam.zoom;
-      ctx.fillStyle = 'rgba(212,175,95,0.07)';
+      // On a chart the hints are drawn in the red ink the rhumbs are drawn in;
+      // gold was invisible on night and far too loud on a painted sky.
+      const chart = game.m?.backdrop === 'sky';
+      ctx.fillStyle = chart ? 'rgba(126,46,32,0.07)' : 'rgba(212,175,95,0.07)';
       ctx.fillRect(sx + z * 0.06, sy + z * 0.06, z * 0.88, z * 0.88);
-      ctx.strokeStyle = 'rgba(212,175,95,0.24)';
+      ctx.strokeStyle = chart ? 'rgba(126,46,32,0.34)' : 'rgba(212,175,95,0.24)';
       ctx.lineWidth = 1.5;
       ctx.strokeRect(sx + z * 0.06, sy + z * 0.06, z * 0.88, z * 0.88);
     }
