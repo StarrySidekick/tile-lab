@@ -903,8 +903,24 @@ $('lean').onclick = () => setLean(true);
 $('hudExpand').onclick = () => setLean(false);
 // The console has no keyboard on a phone, so it gets two thumbs' worth of door:
 // one in the settings drawer, one on the HUD for when the drawer is folded away.
+// Both open the same console — there is only one — they just have to be
+// reachable from both states the page can be in.
 $('openDesign').onclick = () => designer.toggle();
 $('hudDesign').onclick = () => designer.toggle();
+
+// On a phone the console is a bottom sheet over the lower half, so the board
+// has to move out from under it: fold the settings drawer away (the HUD covers
+// playing), let the board have the top half, and put things back on close.
+const narrow = () => window.matchMedia('(max-width: 560px)').matches;
+let leanBefore = null;
+designer.onToggle = (open) => {
+  document.body.classList.toggle('designing', open);
+  if (narrow()) {
+    if (open) { leanBefore = lean; if (!lean) setLean(true); }
+    else if (leanBefore === false) { leanBefore = null; setLean(false); }
+  }
+  renderer.resize();
+};
 
 // --- the box in the corner ----------------------------------------------------
 //

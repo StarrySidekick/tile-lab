@@ -651,10 +651,19 @@ footer { font-size: 10.5px; line-height: 1.6; }
 #openDesign { display: block; width: 100%; margin-top: 6px; text-align: center; }
 #openDesign kbd { margin-left: 4px; opacity: 0.75; }
 
-/* On a narrow screen a 380px rail would cover the board anyway, so the console
-   takes the whole sheet, and every control grows to a thumb's width. */
+/* On a narrow screen a 380px rail would cover the board, so the console becomes
+   a bottom sheet over the lower half and the board keeps the upper — you can
+   see what a dial does while your thumb is still on it. Every control grows to
+   a thumb's width to match. */
 @media (max-width: 560px) {
-  #designer { left: 0; width: auto; border-left: none; }
+  #designer {
+    left: 0; right: 0; width: auto; top: auto; height: 52dvh;
+    border-left: none; border-top: 1px solid #3d3547;
+    box-shadow: 0 -14px 40px rgba(0,0,0,0.5);
+  }
+  /* The board gives up the half it would otherwise be hiding under. */
+  body.designing main { height: 48dvh; }
+  body.designing #panel { display: none; }
   #designer header { padding: 12px; }
   #designer header button { min-width: 44px; min-height: 36px; font-size: 15px; }
   #designer .rows { padding: 4px 14px 20px; }

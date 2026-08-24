@@ -56,6 +56,9 @@ export class Designer {
     if (!this.el) this.build();
     this.open = !this.open;
     this.el.hidden = !this.open;
+    // The page may want to make room for it — see main.js, which on a narrow
+    // screen gives the console the bottom half and the board the top.
+    this.onToggle?.(this.open);
   }
 
   build() {
