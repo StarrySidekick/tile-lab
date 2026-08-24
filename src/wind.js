@@ -32,15 +32,20 @@
 //     sliding until it comes to rest ALONGSIDE whatever stops it, rather than
 //     short of it. That is what makes an archipelago move: islands travel,
 //     meet, and merge.
-//   THE GUST IS A CANNON. Power says HOW MANY come off — a gust arriving at
-//     the loose end with power N pops the last N tiles of the run — and then
-//     it fires them. They do not travel N squares; they travel until the
-//     square in front of them is occupied, however far away that is. The
-//     leading tile goes furthest and the ones behind stack up against it, so a
-//     raft arrives still a raft, on the far side of a strait it could never
-//     have crossed a square at a time. And a tile fired down a lane with
-//     NOTHING in it goes on for ever, which is to say it falls out of the sky:
-//     that is the one thing the wind destroys.
+//   HOW MANY, AND HOW FAR, IS THE POWER. A gust arriving at the loose end with
+//     power N pops the last N tiles of the run off and carries each of them N
+//     squares. One is one tile, one square. Two is two tiles, two squares
+//     each — and because they were touching before and all travel together,
+//     they arrive still touching, as a raft.
+//   …UNLESS IT IS A CANNON, and then it FIRES them. `blast` on a gust means
+//     the loose end is not carried N squares but shot: each tile travels until
+//     the square in front of it is occupied, however far away that is, so a
+//     raft crosses a strait it could never have crossed a square at a time,
+//     the leading tile going furthest and the ones behind piling up against
+//     it. One fired down a lane with NOTHING in it never stops, which is to
+//     say it falls out of the sky — the one thing the wind destroys. Only the
+//     tiles are fired; followers are carried as they always were, because a
+//     person is not a projectile.
 //   IT PICKS UP STRENGTH — AND ONLY FROM ITS OWN KIND. A gust that runs over a
 //     zephyr blowing the same way absorbs it and blows a square harder. It no
 //     longer stops at three: a lane packed with zephyrs is a lane that tears a
@@ -135,6 +140,15 @@ export function zephyrDirs(cell) {
 export function zephyrPush(cell) {
   return zephyrOn(cell)?.push || 1;
 }
+
+/**
+ * A GUST CANNON. It is a zephyr in every way the engine cares about — it has a
+ * direction, it is absorbed by wind blowing its way, it is woken by wind that
+ * isn't, and it chains — except in what it does at the loose end: it FIRES the
+ * tiles rather than carrying them, and a fired tile travels until the square in
+ * front of it is taken, however far away that is.
+ */
+export const isCannon = (cell) => !!zephyrOn(cell)?.blast;
 
 /** Weathervanes and straight roads: the wind decides which way they lie. */
 export const swings = (cell) => !!(cell.type.swing || cell.type.align);
@@ -280,11 +294,13 @@ function firingRange(board, cells, dx, dy, far) {
  *               downwind. Omit with `everywhere` for a mass event.
  * @param everywhere  every lane on the board at once
  * @param push   the power it opens at, before anything it absorbs
+ * @param blast  a GUST CANNON rather than a zephyr: the loose end is fired
+ *               until it hits something rather than carried `power` squares
  */
-export function gust(board, { dir, from = null, everywhere = false, push = 1, rooted = null }) {
+export function gust(board, { dir, from = null, everywhere = false, push = 1, rooted = null, blast = false }) {
   const [dx, dy] = SIDE_STEP[dir];
   const report = {
-    dir, from, everywhere, push, strength: push,
+    dir, from, everywhere, push, blast, strength: push,
     moved: [], fell: [], carried: [], homed: [], swung: [],
     turbines: [], reached: [], zephyrs: [], lifted: [],
   };
@@ -328,7 +344,7 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1, ro
           // back at us: the wind rebounds rather than bracing. Nothing runs
           // away, because a zephyr contributes each of its directions to a
           // storm exactly once (see `storm`).
-          report.zephyrs.push({ cell: c, dir: d, push: Math.min(MAX_STRENGTH, strength + 1) });
+          report.zephyrs.push({ cell: c, dir: d, push: Math.min(MAX_STRENGTH, strength + 1), blast: isCannon(c) });
         }
         if (absorbed) strength = Math.min(MAX_STRENGTH, strength + 1);
       }
@@ -416,15 +432,25 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1, ro
       continue;
     }
 
-    // The loose end: `power` tiles come off, and each of them is FIRED. It
-    // travels until the square in front of it is taken, however far that is —
-    // so the leading tile goes furthest and the ones behind pile up against it
-    // and arrive still a raft. Fired down a lane with nothing in it, it goes
-    // on for ever, which is to say out of the sky.
+    // The loose end of the mainland: `power` tiles come off, each travelling
+    // `power` squares — unless this is a CANNON, in which case each of them is
+    // FIRED and travels until the square in front of it is taken, however far
+    // that is. The leading tile goes furthest and the ones behind pile up
+    // against it, so a raft arrives still a raft. Fired down a lane with
+    // nothing in it, a tile goes on for ever, which is to say out of the sky.
     for (const cell of order) {
       if (immovable(cell)) continue;
-      const steps = firingRange(board, [cell], dx, dy, far);
-      if (steps === null) { fired.push(cell); continue; }
+      let steps = 0;
+      if (blast) {
+        const shot = firingRange(board, [cell], dx, dy, far);
+        if (shot === null) { fired.push(cell); continue; }
+        steps = shot;
+      } else {
+        for (let n = 1; n <= raft.power; n++) {
+          if (board.get(cell.x + dx * n, cell.y + dy * n)) break;   // pressed up against something
+          steps = n;
+        }
+      }
       if (!steps) continue;
       const was = { x: cell.x, y: cell.y };
       if (!board.shift(was, { x: was.x + dx * steps, y: was.y + dy * steps })) continue;
@@ -588,12 +614,14 @@ export function storm(board, first, { cap = MAX_GUSTS, rooted = null } = {}) {
   while (queue.length && out.length < cap) {
     const g = gust(board, { ...queue.shift(), rooted });
     out.push(g);
-    for (const { cell, dir, push } of g.zephyrs) {
+    for (const { cell, dir, push, blast } of g.zephyrs) {
       if (board.get(cell.x, cell.y) !== cell) continue;   // it fell, or was buried
       if (!once(cell, dir)) continue;
       // A woken zephyr opens at whichever is harder: the wind that woke it,
-      // plus the square it gains for turning, or its own breath.
-      queue.push({ dir, from: { x: cell.x, y: cell.y }, push: Math.max(push || 1, zephyrPush(cell)) });
+      // plus the square it gains for turning, or its own breath. A woken CANNON
+      // fires like a cannon — being set off by somebody else's weather does not
+      // make it a different piece of artillery.
+      queue.push({ dir, from: { x: cell.x, y: cell.y }, push: Math.max(push || 1, zephyrPush(cell)), blast });
     }
   }
   return out;

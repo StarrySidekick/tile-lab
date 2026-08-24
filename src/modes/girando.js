@@ -13,16 +13,26 @@
 // — the run of tiles downwind of the zephyr stops somewhere, at a gap or at
 // open sky, and the last tiles before that gap are the ones that come away.
 //
-// THE GUST IS A CANNON. Power says HOW MANY come off — a gust arriving at the
-// loose end with power N pops the last N tiles of the run — and then it FIRES
-// them. They do not travel N squares; they travel until the square in front of
-// them is occupied, however far away that is. The leading tile goes furthest
-// and the ones behind pile up against it, so a raft arrives still a raft, on
-// the far side of a strait it could never have crossed a square at a time.
-// And a tile fired down a lane with NOTHING in it goes on for ever, which is to
-// say it falls out of the sky. That is the one thing the wind destroys — and
-// whoever set the wind off may throw ONE of what fell straight back down, this
-// turn, while the hole is still open.
+// HOW MANY, AND HOW FAR, IS THE POWER. A gust arriving at the loose end with
+// power N pops the last N tiles off and carries each of them N squares. A row
+// of five with a zephyr on the right of it blowing west: power one, so the
+// leftmost tile alone goes one square west. Put a second west-blowing zephyr
+// in that row and the gust absorbs it, arrives at power two, and the leftmost
+// TWO tiles come away two squares each — as a raft, because they were touching
+// before and they all travel together.
+//
+// THE GUST CANNON is the other kind of wind, and six tiles in the deck carry
+// one. It is a zephyr in every way the engine cares about — direction,
+// absorption, chaining, and one that somebody else's gust WAKES still fires
+// like a cannon — except in what it does at the loose end. It does not carry
+// the tiles; it FIRES them, and a fired tile travels until the square in front
+// of it is occupied, however far away that is. So a raft crosses a strait it
+// could never have crossed a square at a time, the leading tile going furthest
+// and the ones behind piling up against it. And one fired down a lane with
+// NOTHING in it never stops, which is to say it falls out of the sky: that is
+// the one thing the wind destroys, and whoever set it off may throw ONE of what
+// fell straight back down, this turn, while the hole is still open. Followers
+// are unchanged by all of it — a person is not a projectile.
 //
 // AND IT BUILDS. Power used to stop at three; it doesn't any more. A gust that
 // runs over a zephyr blowing the SAME way absorbs it and blows a square harder
@@ -194,7 +204,7 @@ import {
 import { PLAYER_COLORS } from '../theme.js';
 import { claimableFeatures, citiesFed, hasMark } from '../mechanics.js';
 import {
-  storm, zephyrDirs, zephyrPush, worldDir, turbineOn, isTemple, MAX_STRENGTH,
+  storm, zephyrDirs, zephyrPush, isCannon, worldDir, turbineOn, isTemple, MAX_STRENGTH,
 } from '../wind.js';
 
 /**
@@ -513,12 +523,16 @@ export class Girando extends Mode {
     if (dirs.length) {
       this.game.say(dirs.length > 1
         ? `${this.game.player.name} lets the wind out ${dirs.length} ways at once.`
-        : `${this.game.player.name} lets the zephyr out.`);
+        : isCannon(cell)
+          ? `${this.game.player.name} touches off the gust cannon.`
+          : `${this.game.player.name} lets the zephyr out.`);
       const from = { x: cell.x, y: cell.y };
-      // …at its own strength: a double zephyr opens at two whether the wind
-      // that let it out was somebody else's gust or its owner's hand.
+      // …at its own strength, and as its own kind of weather: a double zephyr
+      // opens at two whether the wind that let it out was somebody else's gust
+      // or its owner's hand, and a gust cannon fires rather than pushes.
       const push = zephyrPush(cell);
-      this.weather(dirs.map((dir) => ({ dir, from, push })), this.game.current);
+      const blast = isCannon(cell);
+      this.weather(dirs.map((dir) => ({ dir, from, push, blast })), this.game.current);
     }
     this.joinSferas();
     // The flight is worked out after the weather, because the weather may have
@@ -1301,7 +1315,9 @@ export class Girando extends Mode {
     // and a silent nothing reads as a broken rule rather than as an empty lane.
     if (!r.moved.length && !r.swung.length && !r.homed.length && !r.lifted.length) {
       if (!r.reached.length) {
-        g.say(`The zephyr blows out over open sky and finds nothing to push.`);
+        g.say(r.blast
+          ? 'The cannon fires out over open sky and finds nothing to hit.'
+          : 'The zephyr blows out over open sky and finds nothing to push.');
       } else if (!r.fell.length) {
         g.say(`The zephyr blows, and the country in its lane is packed too tight to shift.`);
       }
@@ -1899,7 +1915,8 @@ Girando.spec = {
   tideStart: 5,
   opening: 'A first stone hangs in the cloud. Everything else is weather.',
   hint: 'A zephyr does nothing to the country it blows through — it tears the LOOSE END off it. '
-    + 'The run downwind ends at a gap, and the last tiles before it come away — and are FIRED: power N pops N tiles off and each flies until the square in front of it is taken, however far that is. One fired down an empty lane never stops, which is to say it falls out of the sky. '
+    + 'The run downwind ends at a gap, and the last tiles before it come away: power N pops N tiles off and carries each of them N squares. '
+    + 'A GUST CANNON — six in the deck — does not carry them, it FIRES them: each flies until the square in front of it is taken, however far that is, and one fired down an empty lane never stops, which is to say it falls out of the sky. '
     + 'It gains a power off every zephyr blowing its own way and off every corner it turns, and it no longer stops at three. '
     + 'A tile the wind shakes loose of everything HANGS THERE, and every fragment off the biggest landmass is an ISLAND, down to one tile. Anything that does fall goes back on top of the deck, and you may throw one of them straight back down — once a turn. '
     + 'The mainland is the only country too big for the wind to get under: everything else adrift sails whole, and slides until it comes to rest against something — so islands meet and merge. '

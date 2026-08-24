@@ -1231,26 +1231,43 @@ const MARK_ART = {
       ctx.stroke();
     }
 
-    // Hair and beard: a ring of curls round the head, drawn as overlapping
-    // lobes so the silhouette is scalloped the way an engraved head is.
+    MARK_ART.head(ctx);
+    ctx.lineWidth = 0.055;
+    ctx.lineCap = 'butt';
+  },
+
+  /**
+   * The wind-head itself, without whatever it happens to be blowing through.
+   * A ring of curls for hair and beard, a big face, cheeks full, a pursed
+   * mouth and two eyes screwed up with the effort. Shared, because the gust
+   * cannon is the same man with a horn to his lips and drawing him twice would
+   * mean two of him to keep in step.
+   */
+  head(ctx) {
+    const INK = 'rgba(52,36,22,0.95)';
+    const PAPER = '#f2e7cd';
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // Hair and beard: overlapping lobes, so the silhouette is scalloped the way
+    // an engraved head is. Filled first and outlined second, or the internal
+    // arcs cut the ones behind them.
     ctx.fillStyle = PAPER;
+    ctx.strokeStyle = INK;
     ctx.lineWidth = 0.05;
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * Math.PI * 2 + 0.35;
-      const [cx, cy] = [Math.cos(a) * 0.40, Math.sin(a) * 0.40 + 0.34];
-      ctx.beginPath(); ctx.arc(cx, cy, 0.17, 0, Math.PI * 2); ctx.fill();
-    }
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * Math.PI * 2 + 0.35;
-      const [cx, cy] = [Math.cos(a) * 0.40, Math.sin(a) * 0.40 + 0.34];
-      ctx.beginPath(); ctx.arc(cx, cy, 0.17, 0, Math.PI * 2); ctx.stroke();
+    for (const pass of ['fill', 'stroke']) {
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2 + 0.35;
+        const [cx, cy] = [Math.cos(a) * 0.40, Math.sin(a) * 0.40 + 0.34];
+        ctx.beginPath(); ctx.arc(cx, cy, 0.17, 0, Math.PI * 2); ctx[pass]();
+      }
     }
 
     // The face — big, because at a third of a tile there is only room for one
     // thing and the one thing has to be a person.
     ctx.beginPath(); ctx.arc(0, 0.34, 0.34, 0, Math.PI * 2);
     ctx.fillStyle = PAPER; ctx.fill();
-    ctx.lineWidth = 0.055; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.lineWidth = 0.055; ctx.stroke();
 
     // Cheeks blown out, and the mouth they are pushing the air through.
     ctx.lineWidth = 0.042;
@@ -1258,15 +1275,11 @@ const MARK_ART = {
     ctx.beginPath(); ctx.arc(0.19, 0.30, 0.13, Math.PI * 1.9, Math.PI * 1.4, true); ctx.stroke();
     ctx.fillStyle = INK;
     ctx.beginPath(); ctx.ellipse(0, 0.13, 0.075, 0.06, 0, 0, Math.PI * 2); ctx.fill();
-    // Eyes, screwed up with the effort, and a brow over each.
     ctx.beginPath(); ctx.arc(-0.12, 0.36, 0.042, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(0.12, 0.36, 0.042, 0, Math.PI * 2); ctx.fill();
     ctx.lineWidth = 0.04;
     ctx.beginPath(); ctx.arc(-0.12, 0.46, 0.10, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
     ctx.beginPath(); ctx.arc(0.12, 0.46, 0.10, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
-
-    ctx.lineWidth = 0.055;
-    ctx.lineCap = 'butt';
   },
 
   /**
@@ -1290,6 +1303,75 @@ const MARK_ART = {
       ctx.moveTo(-0.29, y + 0.20);
       ctx.lineTo(0, y);
       ctx.lineTo(0.29, y + 0.20);
+      ctx.stroke();
+    }
+    ctx.lineWidth = 0.055;
+    ctx.lineCap = 'butt';
+  },
+
+  /**
+   * A GUST CANNON. The same wind-head, blowing through a HORN — which is how a
+   * chart draws a wind that carries rather than a wind that blows, and is the
+   * one addition that reads at tile size without competing with the face.
+   * A zephyr shoves the loose end of its lane a square or two; this thing fires
+   * it out over the sky until it hits something, and the drawing has to say
+   * "artillery" from across the table.
+   */
+  cannon(ctx) {
+    const INK = 'rgba(52,36,22,0.95)';
+    const BRASS = '#c9a24d';
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // The shot: a hard ruled cone rather than the zephyr's soft one, with the
+    // ball leaving the muzzle.
+    ctx.beginPath();
+    ctx.moveTo(-0.16, -0.24); ctx.lineTo(-0.40, -0.92);
+    ctx.lineTo(0.40, -0.92); ctx.lineTo(0.16, -0.24);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(242,231,205,0.70)';
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.05;
+    for (const t of [-1, -0.33, 0.33, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(t * 0.16, -0.26);
+      ctx.lineTo(t * 0.40, -0.92);
+      ctx.stroke();
+    }
+
+    MARK_ART.head(ctx);
+
+    // The horn: a flared bell on the mouth, brass, with a hoop round its rim.
+    ctx.beginPath();
+    ctx.moveTo(-0.10, 0.16); ctx.lineTo(-0.24, -0.26);
+    ctx.lineTo(0.24, -0.26); ctx.lineTo(0.10, 0.16);
+    ctx.closePath();
+    ctx.fillStyle = BRASS; ctx.fill();
+    ctx.lineWidth = 0.055; ctx.strokeStyle = INK; ctx.stroke();
+    ctx.lineWidth = 0.06;
+    ctx.beginPath(); ctx.moveTo(-0.26, -0.24); ctx.lineTo(0.26, -0.24); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,244,214,0.45)';           // the lit side of the bell
+    ctx.beginPath();
+    ctx.moveTo(-0.10, 0.16); ctx.lineTo(-0.24, -0.26); ctx.lineTo(-0.13, -0.26);
+    ctx.lineTo(-0.03, 0.16); ctx.closePath(); ctx.fill();
+
+    ctx.lineWidth = 0.055;
+    ctx.lineCap = 'butt';
+  },
+
+  /** …and the double, which gets the chevrons like the double zephyr does. */
+  cannon2(ctx) {
+    MARK_ART.cannon(ctx);
+    ctx.strokeStyle = 'rgba(52,36,22,0.95)';
+    ctx.lineWidth = 0.11;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const y of [-0.50, -0.76]) {
+      ctx.beginPath();
+      ctx.moveTo(-0.30, y + 0.20);
+      ctx.lineTo(0, y);
+      ctx.lineTo(0.30, y + 0.20);
       ctx.stroke();
     }
     ctx.lineWidth = 0.055;
@@ -1886,7 +1968,7 @@ function drawRiver(ctx, f) {
  * a shaft of daylight has nothing to cast a shadow with, and giving them one
  * turns a spring into a coin sitting on the grass.
  */
-const FLAT_MARKS = new Set(['mouth', 'spring', 'ford', 'shaft', 'hill', 'zephyr', 'zephyr2', 'ship']);
+const FLAT_MARKS = new Set(['mouth', 'spring', 'ford', 'shaft', 'hill', 'zephyr', 'zephyr2', 'cannon', 'cannon2', 'ship']);
 
 /**
  * Draw a landmark centred at (x, y) in unit tile space.
@@ -2121,7 +2203,9 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
     // running into each other. One drawing, four facings, same as always.
     // A double zephyr borrows a drawing of its own — same wind, second
     // arrowhead — so "this one pushes twice" is legible on the tile.
-    const kind = m.kind === 'zephyr' && m.push > 1 ? 'zephyr2' : m.kind;
+    const kind = m.kind !== 'zephyr' ? m.kind
+      : m.blast ? (m.push > 1 ? 'cannon2' : 'cannon')
+        : (m.push > 1 ? 'zephyr2' : 'zephyr');
     if (m.dirs && m.dirs.length > 1) {
       for (const d of m.dirs) {
         const [vx, vy] = SIDE_VEC[d];

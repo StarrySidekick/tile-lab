@@ -65,7 +65,7 @@
       const feats = t.feats
         .map((f) => f.type[0].toUpperCase() + (f.sides.length ? f.sides.join('') : '') + (f.shield ? '+' : ''))
         .join(' ') || '—';
-      const marks = t.marks.map((m) => m.kind).join(', ');
+      const marks = t.marks.map((m) => (m.blast ? 'gust cannon' : m.kind)).join(', ');
       el.insertAdjacentHTML('beforeend', `
         <h3>${t.id} &times;${t.n}</h3>
         <p>${t.name}</p>

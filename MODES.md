@@ -517,14 +517,18 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > said nothing at all in the empty-lane case, and a silent nothing reads as a
 > broken rule. It says so now.
 >
-> **THE GUST IS A CANNON.** Power still says how many tiles come off the loose
-> end; it no longer says how far. They are *fired*, and they travel until the
-> square in front of them is occupied, however far away that is — so a raft
-> crosses a strait it could never have crossed a square at a time, the leading
-> tile going furthest and the ones behind piling up against it. Fired down a lane
-> with nothing in it, a tile never stops, which is to say it falls out of the sky.
-> That is the one thing the wind destroys, and it is what gives the empty-lane
-> case teeth: pointing a zephyr at open air is now a decision with a cost.
+> **THE GUST CANNON**, six tiles in the deck. A zephyr in every way the engine
+> cares about — direction, absorption, chaining, and one that somebody else's
+> gust *wakes* still fires like a cannon — except in what it does at the loose
+> end. It does not carry the tiles; it **fires** them, and a fired tile travels
+> until the square in front of it is occupied, however far away that is. So a
+> raft crosses a strait it could never have crossed a square at a time, the
+> leading tile going furthest and the ones behind piling up against it. Fired
+> down a lane with nothing in it, a tile never stops, which is to say it falls
+> out of the sky: that is the one thing the wind destroys, and it is what gives
+> the empty-lane case teeth. Followers are unchanged by all of it — a person is
+> not a projectile. The ordinary zephyr keeps carrying its loose end `power`
+> squares, exactly as before.
 >
 > **And what falls comes back — once.** Whatever the wind takes out of the sky
 > goes on top of the deck, and whoever set the wind off may throw **one** of them
@@ -577,32 +581,31 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > touching a curtain wall reads as standing *in* the city, which is the one claim
 > that spot cannot make.
 >
-> **And the cannon undid the archipelago, which has to be said plainly.** Twenty
-> bot games, against the pass before it:
+> **The cannon was built twice, and the first build is the interesting one.** It
+> went in as a redefinition of *every* gust, and that collapsed the archipelago
+> outright: islands 8.0 down to **1.4**, island tiles 24 down to 3.9, mainland up
+> from 57 to 68 of the board. The reason is structural and it is the opposite of
+> what it looks like. A fired tile travels *until it hits something*, which means
+> it almost always comes to rest **against** country — and the mainland is a blob
+> with bays, so the commonest shot on the board is one fired across a bay into
+> the far side of the same landmass. As a universal rule the cannon is a
+> filling-in machine: it makes the kingdom rounder, not more broken.
 >
-> | | slide by power | cannon |
-> |---|---|---|
-> | islands | 8.0 | **1.4** |
-> | island tiles | 24.0 | **3.9** |
-> | biggest island | 12.5 | 3.0 |
-> | mainland | 57.4 | 68.3 |
-> | tiles lost a game | 6.7 | 14.3 |
-> | top score | 104 | 118 |
+> As **six tiles** it is the opposite, and it is the best the archipelago has
+> ever been. Twenty bot games:
 >
-> The reason is structural rather than a tuning problem, and it is worth writing
-> down because it is the opposite of what it looks like. A fired tile travels
-> *until it hits something* — which means it almost always comes to rest
-> **against** country, and the mainland is a blob with bays, so the commonest
-> shot in the game is one fired across a bay into the far side of the same
-> landmass. The cannon is a filling-in machine. It makes the kingdom rounder,
-> not more broken. The extra losses do the rest: a shot down an empty lane is
-> gone, and the fragments are exactly the things sitting in empty lanes.
+> | | before cannons | 6 cannon tiles | cannon as every gust |
+> |---|---|---|---|
+> | islands | 8.0 | **9.9** | 1.4 |
+> | island tiles | 24.0 | **33.1** | 3.9 |
+> | biggest island | 12.5 | **14.4** | 3.0 |
+> | mainland, of ~85 | 57.4 | **52.4** | 68.3 |
+> | tiles lost a game | 6.7 | 8.6 | 14.3 |
+> | top score | 104 | 105 | 118 |
 >
-> Islands themselves are still lifted whole and still slide by the power — the
-> wind does not shoot places out of the world — so the machinery that built the
-> archipelago is all still there. It is being outrun. If the archipelago is worth
-> more than the cannon, the one-line lever is the nibble's distance in
-> `gust()`: `firingRange` back to `power` restores 8.0 islands exactly.
+> Rare artillery flings a loose end clear across the sky and seeds a colony out
+> there; constant artillery just posts the country back to itself. The rate is
+> the mechanic.
 
 
 **Question it answers:** is a small board you keep *editing* better than a big

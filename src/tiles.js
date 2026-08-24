@@ -118,6 +118,14 @@ const mark = (kind, on = null, dir = null) => ({ kind, on, dir });
  * that everything which only knows about single-facing marks still works.
  */
 const zephyr = (dirs = [N], push = 1) => ({ kind: 'zephyr', on: null, dir: dirs[0], dirs, push });
+/**
+ * A GUST CANNON. A zephyr in every way the wind engine cares about — direction,
+ * absorption, chaining — except in what it does at the loose end: it FIRES the
+ * tiles rather than carrying them, and a fired tile travels until the square in
+ * front of it is taken, however far away that is. One fired down an empty lane
+ * never stops, which is to say out of the sky.
+ */
+const cannon = (dirs = [N], push = 1) => ({ ...zephyr(dirs, push), blast: true });
 
 // --- World features ---------------------------------------------------------
 // Each spans tiles and merges like a city does, but scores its own way.
@@ -340,6 +348,19 @@ export const TILE_TYPES = [
   // happen twice a game rather than every other turn.
   { id: 'Kzz',  n: 1, group: 'cloud', name: 'Double zephyr',      feats: [],             marks: [zephyr([N], 2)], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
   { id: 'Kzzr', n: 1, group: 'cloud', name: 'Double zephyr road', feats: [road([E, W])], marks: [zephyr([N], 2)], fields: [[7, 0, 1, 2], [3, 4, 5, 6]] },
+
+  // THE GUST CANNONS. Six of them, and they are the artillery of the mode: an
+  // ordinary zephyr carries the loose end of its lane a square or two, and a
+  // cannon FIRES it — out across the open sky until it hits something, however
+  // far away that is, or out of the world if there was never anything there.
+  // Spread across four kinds of ground and one double, so a cannon is not
+  // something that only ever arrives on empty fields, and given the same
+  // chaining as everything else: a cannon a gust wakes fires like a cannon.
+  { id: 'Kg',  n: 2, group: 'cloud', name: 'Gust cannon',        feats: [],                 marks: [cannon([N])], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+  { id: 'Kgr', n: 1, group: 'cloud', name: 'Cannon road',        feats: [road([E, W])],     marks: [cannon([N])], fields: [[7, 0, 1, 2], [3, 4, 5, 6]] },
+  { id: 'Kgb', n: 1, group: 'cloud', name: 'Cannon bend',        feats: [road([S, E])],     marks: [cannon([N])], fields: [[3, 4], [5, 6, 7, 0, 1, 2]] },
+  { id: 'Kgc', n: 1, group: 'cloud', name: 'Cannon wall',        feats: [city([W])],        marks: [cannon([N])], fields: [[0, 1, 2, 3, 4, 5]] },
+  { id: 'Kgg', n: 1, group: 'cloud', name: 'Double gust cannon', feats: [],                 marks: [cannon([N], 2)], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
 
   // The Palazzo: the founding stone of the kingdom, and the only tile on the
   // board that was there before anybody played. Same connections as the base
@@ -681,6 +702,9 @@ export const CITY_TYPES = [
 ];
 
 /** What each mark is worth / does. Referenced by Expedition and by the art. */
+/** The note a mark shows, which is not always the note its `kind` names. */
+export const markNote = (m) => MARKS[m.kind === 'zephyr' && m.blast ? 'cannon' : m.kind];
+
 export const MARKS = {
   stable:  { label: 'Stable',   score: 1, note: 'Your pawn is mounted from now on — it moves 2 tiles.' },
   village: { label: 'Village',  score: 1, note: 'Rest here a turn to raise a second pawn.' },
@@ -775,6 +799,10 @@ export const MARKS = {
   turbine: { label: 'Windmill turbine', score: 0, note: 'Pays 1 to whoever holds its city for every gust through it, and 2 to whoever closes that city — kept even if the city blows open again.' },
   palazzo: { label: 'The Palazzo', score: 0, note: 'The seat of the kingdom: whatever it stands on is the mainland, and everything else adrift is an island. Blown by a gust, it tows every island one square with it.' },
   zephyr:  { label: 'Zephyr',  score: 0, note: 'Blows its lane when played — and does nothing to the country it passes through. It tears the LOOSE END off: the run downwind of it ends at a gap, and a gust arriving there at power N pops the last N tiles off and carries each of them N squares. It gains a power off every zephyr blowing its own way, and off every corner it turns. A gust that reaches a zephyr absorbs it if they agree and wakes it otherwise, and the storm turns down that zephyr’s own lane.' },
+  // Keyed 'cannon' although the mark's own kind is 'zephyr' — a cannon IS a
+  // zephyr to the wind engine, and only the art and this note tell them apart.
+  // `markNote` below is what resolves one to the other.
+  cannon:  { label: 'Gust cannon', score: 0, note: 'Fires rather than pushes. The loose end of its lane is shot out over the sky until it hits something, however far away that is — and one fired down an empty lane never stops, which is to say it falls out of the sky. Chained and absorbed like any other wind, and a cannon woken by somebody else’s gust still fires.' },
   abbazia: { label: 'Abbazia', score: 0, note: 'Caps every feature it touches — and un-caps them if the wind takes it away.' },
   flier:   { label: 'Flying machine', score: 0, note: 'Place it and a follower may fly out along it, riding any zephyr it crosses.' },
 };
