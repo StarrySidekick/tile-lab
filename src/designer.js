@@ -20,6 +20,7 @@
 // ---------------------------------------------------------------------------
 
 import { SPEC, DESIGN, setValue, apply, reset, changes } from './design.js';
+import { Wheel } from './wheel.js';
 
 const STORE = 'tilelab.design';
 
@@ -79,7 +80,12 @@ export class Designer {
         <span class="dim">every visual dial<span class="key"> · <kbd>Shift</kbd>+<kbd>D</kbd></span></span>
         <button data-act="close" title="Close">✕</button>
       </header>
+      <nav class="tabs">
+        <button data-view="rows" class="on">Dials</button>
+        <button data-view="wheel">Colour</button>
+      </nav>
       <div class="rows"></div>
+      <div class="wheelWrap" hidden></div>
       <footer>
         <button data-act="export" class="primary">Export JSON</button>
         <button data-act="import">Import…</button>
@@ -94,6 +100,27 @@ export class Designer {
       rows.appendChild(h);
       for (const s of items) rows.appendChild(this.control(s));
     }
+
+    // The wheel is the same book seen from the side: it reads and writes the
+    // very same values the sliders do, so a colour moved there moves the
+    // swatch here, and both repaint the board through the one change hook.
+    this.wheel = new Wheel({
+      swatches: () => SPEC.filter((s) => s.type === 'color')
+        .map((s) => ({ key: s.key, group: s.group, hex: read(s.key) })),
+      set: (key, hex) => { setValue(key, hex); this.syncOne(key); this.remember(); },
+      paper: () => read('paper.tint'),
+      ink: () => read('ink.tone'),
+    });
+    el.querySelector('.wheelWrap').appendChild(this.wheel.el);
+
+    el.querySelector('.tabs').addEventListener('click', (e) => {
+      const view = e.target.closest('button')?.dataset.view;
+      if (!view) return;
+      for (const b of el.querySelectorAll('.tabs button')) b.classList.toggle('on', b.dataset.view === view);
+      el.querySelector('.rows').hidden = view !== 'rows';
+      el.querySelector('.wheelWrap').hidden = view !== 'wheel';
+      if (view === 'wheel') this.wheel.refresh();
+    });
 
     el.addEventListener('click', (e) => {
       const act = e.target.closest('button')?.dataset.act;
@@ -151,12 +178,22 @@ export class Designer {
   /** Push the live values back into the controls, after a reset or an import. */
   sync() {
     if (!this.el) return;
-    for (const row of this.el.querySelectorAll('.dRow')) {
+    for (const row of this.el.querySelectorAll('.rows .dRow')) {
       const v = read(row.dataset.key);
       const input = row.querySelector('input');
       input.value = v;
       row.querySelector('output').textContent = v;
     }
+    if (!this.el.querySelector('.wheelWrap').hidden) this.wheel.refresh();
+  }
+
+  /** …or just the one, which is what the wheel needs when it moves a colour. */
+  syncOne(key) {
+    const row = this.el?.querySelector(`.rows .dRow[data-key="${key}"]`);
+    if (!row) return;
+    const v = read(key);
+    row.querySelector('input').value = v;
+    row.querySelector('output').textContent = v;
   }
 
   /**
