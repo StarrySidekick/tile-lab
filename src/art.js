@@ -10,7 +10,7 @@ import { SIDE_MID, SIDE_VEC } from './tiles.js';
 import { THEME, PLAYER_COLORS, PLAYER_NAMES } from './theme.js';
 import { LIGHT, spin, shadow, noShadow } from './light.js';
 import { featureShape } from './shape.js';
-import { DESIGN } from './design.js';
+import { DESIGN, rgba } from './design.js';
 
 export { PLAYER_COLORS, PLAYER_NAMES };
 
@@ -1213,7 +1213,7 @@ const MARK_ART = {
    * sprite owes it is a tower and a hub in the right place.
    */
   turbine(ctx) {
-    ctx.fillStyle = THEME.plaster;
+    ctx.fillStyle = DESIGN.turbine.tower;
     ctx.strokeStyle = THEME.timber;
     ctx.lineWidth = 0.05;
     ctx.beginPath();
@@ -1245,8 +1245,8 @@ const MARK_ART = {
    * whole point is that it reads as printed rather than modelled.
    */
   zephyr(ctx) {
-    const INK = 'rgba(52,36,22,0.95)';
-    const PAPER = '#f2e7cd';
+    const INK = rgba(DESIGN.zephyr.line, 0.95);
+    const PAPER = DESIGN.zephyr.face;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
@@ -1258,7 +1258,7 @@ const MARK_ART = {
     ctx.moveTo(-0.07, 0.06); ctx.lineTo(-0.34, -0.70);
     ctx.lineTo(0.34, -0.70); ctx.lineTo(0.07, 0.06);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(242,231,205,0.78)';
+    ctx.fillStyle = rgba(DESIGN.zephyr.breath, 0.78);
     ctx.fill();
     ctx.strokeStyle = INK;
     ctx.lineWidth = 0.045;
@@ -1282,8 +1282,8 @@ const MARK_ART = {
    * mean two of him to keep in step.
    */
   head(ctx) {
-    const INK = 'rgba(52,36,22,0.95)';
-    const PAPER = '#f2e7cd';
+    const INK = rgba(DESIGN.zephyr.line, 0.95);
+    const PAPER = DESIGN.zephyr.face;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
@@ -1332,7 +1332,7 @@ const MARK_ART = {
     // TWO CHEVRONS in the breath — the shorthand every chart uses for "and
     // again", and the one mark that survives being shrunk to a quarter tile
     // when a multi-way zephyr draws four of these.
-    ctx.strokeStyle = 'rgba(52,36,22,0.95)';
+    ctx.strokeStyle = rgba(DESIGN.zephyr.line, 0.95);
     ctx.lineWidth = 0.11;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -1356,8 +1356,8 @@ const MARK_ART = {
    * "artillery" from across the table.
    */
   cannon(ctx) {
-    const INK = 'rgba(52,36,22,0.95)';
-    const BRASS = '#c9a24d';
+    const INK = rgba(DESIGN.zephyr.line, 0.95);
+    const BRASS = DESIGN.zephyr.brass;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
@@ -1367,7 +1367,7 @@ const MARK_ART = {
     ctx.moveTo(-0.16, -0.24); ctx.lineTo(-0.40, -0.92);
     ctx.lineTo(0.40, -0.92); ctx.lineTo(0.16, -0.24);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(242,231,205,0.70)';
+    ctx.fillStyle = rgba(DESIGN.zephyr.breath, 0.70);
     ctx.fill();
     ctx.strokeStyle = INK;
     ctx.lineWidth = 0.05;
@@ -1401,7 +1401,7 @@ const MARK_ART = {
   /** …and the double, which gets the chevrons like the double zephyr does. */
   cannon2(ctx) {
     MARK_ART.cannon(ctx);
-    ctx.strokeStyle = 'rgba(52,36,22,0.95)';
+    ctx.strokeStyle = rgba(DESIGN.zephyr.line, 0.95);
     ctx.lineWidth = 0.11;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -1502,23 +1502,23 @@ const MARK_ART = {
 
   /** A flying machine on its strip, pointing the way a follower can leave. */
   flier(ctx) {
-    ctx.fillStyle = 'rgba(228,240,248,0.16)';         // the wind it launches into
+    ctx.fillStyle = rgba(DESIGN.flier.wind, 0.16);    // the wind it launches into
     ctx.beginPath();
     ctx.moveTo(0, -0.72); ctx.lineTo(0.30, -0.30); ctx.lineTo(-0.30, -0.30);
     ctx.closePath(); ctx.fill();
 
     ctx.save();
     ctx.translate(0, 0.06);
-    ctx.fillStyle = THEME.plaster;                    // wings
+    ctx.fillStyle = DESIGN.flier.wing;                // wings
     ctx.beginPath();
     ctx.ellipse(0, 0, 0.52, 0.17, 0, 0, Math.PI * 2);
     ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = THEME.timber;                   // ribs
+    ctx.strokeStyle = DESIGN.flier.frame;             // ribs
     ctx.lineWidth = 0.035;
     for (const x of [-0.32, -0.14, 0.14, 0.32]) {
       ctx.beginPath(); ctx.moveTo(x, -0.13); ctx.lineTo(x, 0.13); ctx.stroke();
     }
-    ctx.fillStyle = THEME.timber;                     // fuselage, nose forward
+    ctx.fillStyle = DESIGN.flier.frame;               // fuselage, nose forward
     ctx.beginPath();
     ctx.moveTo(0, -0.44); ctx.lineTo(0.11, 0.10); ctx.lineTo(-0.11, 0.10);
     ctx.closePath(); ctx.fill();

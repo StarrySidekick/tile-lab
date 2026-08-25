@@ -220,16 +220,30 @@ export class Wheel {
     ctx.drawImage(this.discCanvas, this.cx - r, this.cy - r, r * 2, r * 2);
   }
 
-  refresh() {
+  /**
+   * Settle on an anchor without drawing anything. The dials list asks for this
+   * too — the harmony chips beside every swatch are measured from the same one
+   * the wheel draws its spokes from, because two answers to "what is this
+   * palette built around" would be one too many.
+   *
+   * Left alone it is the most saturated colour in the book: the one a palette
+   * is in practice built around, because it is the one that will shout loudest
+   * if the others fight it.
+   */
+  ensureAnchor() {
     const swatches = this.io.swatches();
-    if (!swatches.length) return;
+    if (!swatches.length) return null;
     if (!this.anchor || !swatches.some((s) => s.key === this.anchor)) {
-      // Left alone, the anchor is the most saturated colour in the book: the
-      // one a palette is in practice built around, because it is the one that
-      // will shout loudest if the others fight it.
       this.anchor = swatches.reduce((a, b) =>
         (hexToLch(b.hex).c > hexToLch(a.hex).c ? b : a)).key;
     }
+    return this.anchor;
+  }
+
+  refresh() {
+    const swatches = this.io.swatches();
+    if (!swatches.length) return;
+    this.ensureAnchor();
     if (!this.selected || !swatches.some((s) => s.key === this.selected)) {
       this.selected = this.anchor;
     }

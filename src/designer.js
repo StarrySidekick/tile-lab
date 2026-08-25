@@ -21,6 +21,7 @@
 
 import { SPEC, DESIGN, setValue, apply, reset, changes } from './design.js';
 import { Wheel } from './wheel.js';
+import { hexToLch, lchToHex, hueDelta, SCHEMES } from './color.js';
 
 const STORE = 'tilelab.design';
 
@@ -94,6 +95,44 @@ export class Designer {
       </footer>`;
     const rows = el.querySelector('.rows');
 
+    // What the chips beside every swatch are measured from. Both controls
+    // drive the wheel's own anchor and scheme, so the two views can never
+    // disagree about what the palette is built around.
+    const bar = document.createElement('div');
+    bar.className = 'harmonyBar';
+    bar.innerHTML = `
+      <span>Harmony</span>
+      <select class="hScheme">${SCHEMES.map((s) =>
+        `<option value="${s.id}">${s.name}</option>`).join('')}</select>
+      <span>from</span>
+      <select class="hAnchor"></select>`;
+    rows.appendChild(bar);
+    this.hScheme = bar.querySelector('.hScheme');
+    this.hAnchor = bar.querySelector('.hAnchor');
+    this.hScheme.addEventListener('change', () => {
+      this.wheel.scheme = this.hScheme.value;
+      this.paintHarmony();
+      if (!el.querySelector('.wheelWrap').hidden) this.wheel.refresh();
+    });
+    this.hAnchor.addEventListener('change', () => {
+      this.wheel.anchor = this.hAnchor.value;
+      this.paintHarmony();
+      if (!el.querySelector('.wheelWrap').hidden) this.wheel.refresh();
+    });
+
+    // One handler for every chip: rotate this colour's hue to that angle and
+    // leave its lightness and chroma exactly where they were.
+    rows.addEventListener('click', (e) => {
+      const chip = e.target.closest('.hChip');
+      if (!chip) return;
+      const key = chip.closest('.dRow').dataset.key;
+      const was = hexToLch(read(key));
+      setValue(key, lchToHex({ l: was.l, c: was.c, h: Number(chip.dataset.hue) }));
+      this.syncOne(key);
+      this.paintHarmony(key);
+      this.remember();
+    });
+
     for (const [group, items] of groupsOf(SPEC)) {
       const h = document.createElement('h4');
       h.textContent = group;
@@ -107,7 +146,12 @@ export class Designer {
     this.wheel = new Wheel({
       swatches: () => SPEC.filter((s) => s.type === 'color')
         .map((s) => ({ key: s.key, group: s.group, hex: read(s.key) })),
-      set: (key, hex) => { setValue(key, hex); this.syncOne(key); this.remember(); },
+      set: (key, hex) => {
+        setValue(key, hex);
+        this.syncOne(key);
+        this.paintHarmony(key);
+        this.remember();
+      },
       paper: () => read('paper.tint'),
       ink: () => read('ink.tone'),
     });
@@ -139,6 +183,58 @@ export class Designer {
 
     document.body.appendChild(el);
     this.el = el;
+    this.paintHarmony();
+  }
+
+  /**
+   * The chips beside every colour swatch: where that colour would land on each
+   * arm of the current scheme, previewed in the colour it would become.
+   *
+   * This is the wheel's snapping, brought to the place you are already looking
+   * — a colour is nearly always edited from its own row, and having to leave
+   * for the other tab to ask "what would the complement be" is exactly the
+   * friction that stops anybody asking. The swatch itself is untouched, so a
+   * custom colour is still one tap away; the chips are a shortcut, not a cage.
+   *
+   * `only` repaints one row. Everything is repainted when the ANCHOR moves,
+   * because then every chip in the list is aiming somewhere new.
+   */
+  paintHarmony(only = null) {
+    if (!this.el) return;
+    const anchor = this.wheel.ensureAnchor();
+    if (!anchor) return;
+    if (only && only === anchor) only = null;
+
+    const scheme = SCHEMES.find((s) => s.id === this.wheel.scheme);
+    const anchorHue = hexToLch(read(anchor)).h;
+    this.hScheme.value = this.wheel.scheme;
+    if (this.hAnchor.dataset.built !== 'yes') {
+      this.hAnchor.innerHTML = SPEC.filter((s) => s.type === 'color')
+        .map((s) => `<option value="${s.key}">${s.key}</option>`).join('');
+      this.hAnchor.dataset.built = 'yes';
+    }
+    this.hAnchor.value = anchor;
+
+    const strips = only
+      ? [this.el.querySelector(`.rows .dRow[data-key="${only}"] .harmony`)].filter(Boolean)
+      : this.el.querySelectorAll('.rows .harmony');
+    for (const strip of strips) {
+      const key = strip.closest('.dRow').dataset.key;
+      if (key === anchor) {
+        strip.innerHTML = '<em>the anchor — every other chip is measured from this</em>';
+        continue;
+      }
+      const lch = hexToLch(read(key));
+      strip.innerHTML = [0, ...scheme.at].map((off) => {
+        const hue = (anchorHue + off + 360) % 360;
+        const hex = lchToHex({ l: lch.l, c: lch.c, h: hue });
+        const on = Math.abs(hueDelta(hue, lch.h)) < 3;
+        const what = off ? `${off > 0 ? '+' : ''}${off}° from the anchor` : 'the anchor’s own hue';
+        return `<button class="hChip${on ? ' on' : ''}" data-hue="${hue}"
+          title="${what} — ${hex}, keeping this colour's lightness and chroma"><span
+          style="background:${hex}"></span></button>`;
+      }).join('');
+    }
   }
 
   control(s) {
@@ -152,11 +248,13 @@ export class Designer {
       row.innerHTML = `<span class="dName">${name}</span>
         <span class="dCtl"><input type="color" value="${value}" />
         <output>${value}</output></span>
+        <span class="harmony"></span>
         <span class="dNote">${s.note}</span>`;
       const input = row.querySelector('input');
       input.addEventListener('input', () => {
         setValue(s.key, input.value);
         row.querySelector('output').textContent = input.value;
+        this.paintHarmony(s.key);
         this.remember();
       });
     } else {
@@ -184,6 +282,7 @@ export class Designer {
       input.value = v;
       row.querySelector('output').textContent = v;
     }
+    this.paintHarmony();
     if (!this.el.querySelector('.wheelWrap').hidden) this.wheel.refresh();
   }
 

@@ -877,7 +877,7 @@ export class Renderer {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(a);
-    ctx.strokeStyle = 'rgba(232,222,208,0.92)';
+    ctx.strokeStyle = rgba(DESIGN.turbine.sail, 0.92);
     ctx.lineWidth = Math.max(1.4, z * 0.028);
     ctx.lineCap = 'round';
     for (let i = 0; i < 4; i++) {
@@ -886,7 +886,7 @@ export class Renderer {
       ctx.moveTo(0, 0);
       ctx.lineTo(0, -z * 0.20);
       ctx.stroke();
-      ctx.fillStyle = 'rgba(232,222,208,0.55)';       // the canvas on each arm
+      ctx.fillStyle = rgba(DESIGN.turbine.sail, 0.55);  // the canvas on each arm
       ctx.beginPath();
       ctx.moveTo(0, -z * 0.07);
       ctx.lineTo(z * 0.055, -z * 0.19);

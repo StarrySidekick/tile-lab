@@ -113,6 +113,16 @@ export const SPEC = [
     note: 'Size of every stamp that sits on a tile — inns, cathedrals, shrines, and the wind-heads too.' },
   { key: 'mark.ink', group: 'What is built', type: 'range', def: 1, min: 0.2, max: 3, step: 0.05,
     note: 'Weight of the line those stamps are drawn in.' },
+  { key: 'turbine.tower', group: 'What is built', type: 'color', def: '#eee0c2',
+    note: 'The windmill’s tower.' },
+  { key: 'turbine.sail', group: 'What is built', type: 'color', def: '#e8ded0',
+    note: 'Its four turning sails — the arms and the canvas on them.' },
+  { key: 'flier.wing', group: 'What is built', type: 'color', def: '#eee0c2',
+    note: 'The flying machine’s wing.' },
+  { key: 'flier.frame', group: 'What is built', type: 'color', def: '#54402a',
+    note: 'Its ribs and fuselage.' },
+  { key: 'flier.wind', group: 'What is built', type: 'color', def: '#e4f0f8',
+    note: 'The wedge of air it launches into. Very faint — it is a hint of a direction, not a shape.' },
 
   // --- the weather ---------------------------------------------------------
   { key: 'storm.beat', group: 'The weather', type: 'range', def: 650, min: 120, max: 1600, step: 10,
@@ -131,6 +141,14 @@ export const SPEC = [
     note: 'Size of the wind-heads specifically — zephyrs and gust cannons — on top of the stamp size.' },
   { key: 'zephyr.ink', group: 'The weather', type: 'range', def: 1, min: 0.2, max: 3, step: 0.05,
     note: 'Weight of the line THEY are drawn in, again on top of the stamp weight.' },
+  { key: 'zephyr.line', group: 'The weather', type: 'color', def: '#342416',
+    note: 'The ink a wind-head is drawn in — hair, face, the ruled lines of moving air.' },
+  { key: 'zephyr.face', group: 'The weather', type: 'color', def: '#f2e7cd',
+    note: 'The paper he is made of: the bank of cloud round him and his face.' },
+  { key: 'zephyr.breath', group: 'The weather', type: 'color', def: '#f2e7cd',
+    note: 'The cone of air he is blowing. Laid at part opacity over whatever is under it.' },
+  { key: 'zephyr.brass', group: 'The weather', type: 'color', def: '#c9a24d',
+    note: 'The gust cannon’s horn — the one thing that tells a cannon from a zephyr at a glance.' },
 
   // --- the figures ---------------------------------------------------------
   { key: 'star.arm', group: 'The figures', type: 'range', def: 0.56, min: 0.3, max: 0.9, step: 0.01,
