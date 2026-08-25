@@ -20,7 +20,7 @@ import {
 import { Renderer } from './render.js';
 import { drawTile, drawMeeple, PLAYER_COLORS } from './art.js';
 import { roughen, WOBBLE, TOOTH } from './ink.js';
-import { DESIGN, onDesignChange, loadCommitted } from './design.js';
+import { DESIGN, onDesignChange, loadCommitted, apply, reset } from './design.js';
 import { Designer } from './designer.js';
 import { THEME, usePalette } from './theme.js';
 import { clearSprites, setSpriteCap } from './sprites.js';
@@ -47,10 +47,17 @@ const renderer = new Renderer(canvas);
 // defaults for a beat and then lurching — which is what happened when this was
 // loaded after the first frame. Your local draft goes on top of it, so the
 // file is a baseline rather than the last word.
-await loadCommitted();
+// …unless you are here to get out of trouble. `?design=off` boots the plain
+// defaults for one load; `?design=reset` also throws the local draft away.
+// Both exist because the console is the only other way to undo a look, and a
+// look bad enough to want undoing is exactly the kind that can leave you
+// unable to find it.
+const escape = new URLSearchParams(location.search).get('design');
+if (escape === 'reset') { try { localStorage.removeItem('tilelab.design'); } catch { /* denied */ } }
+const committed = escape ? null : await loadCommitted();
 
 const designer = new Designer();
-designer.restore();
+if (!escape) designer.restore();
 // Dragging one slider fires dozens of these a second, and each one throws the
 // whole sprite cache away. At the closest zoom a chart tile is a 1024px sprite
 // that costs about 20ms and several megabytes of scratch to redraw, so paying
@@ -936,6 +943,15 @@ $('hudExpand').onclick = () => setLean(false);
 // reachable from both states the page can be in.
 $('openDesign').onclick = () => designer.toggle();
 $('hudDesign').onclick = () => designer.toggle();
+// Reachable without opening the console, which matters when the look you want
+// rid of is the reason you cannot read anything.
+$('resetDesign').onclick = () => {
+  try { localStorage.removeItem('tilelab.design'); } catch { /* denied */ }
+  reset();
+  if (committed) apply(committed);
+  designer.sync();
+  console.log('design: back to the committed look.');
+};
 
 // On a phone the console is a bottom sheet over the lower half, so the board
 // has to move out from under it: fold the settings drawer away (the HUD covers
@@ -1549,6 +1565,39 @@ function signature() {
  * on, so a rendering bug degrades into a glitch instead of a freeze.
  */
 const drawFailures = new Set();
+let quarantined = false;
+
+/**
+ * A frame that throws is a frame you don't see — and if the reason it threw is
+ * a value that will still be there next frame, you don't see any of them. That
+ * is a black screen with a healthy game running behind it, which is the worst
+ * way for this to fail because there is nothing on screen to act on.
+ *
+ * So the first throw asks whether a local design draft is in play, and if one
+ * is, sets it aside and carries on from the committed look. A draft is the
+ * only part of this the renderer trusts and you can edit, so it is the first
+ * suspect; it is moved rather than deleted, in case it was worth keeping.
+ */
+function setAsideTheDraft() {
+  if (quarantined) return false;
+  quarantined = true;
+  let had = null;
+  try {
+    had = localStorage.getItem('tilelab.design');
+    if (had) {
+      localStorage.setItem('tilelab.design.setAside', had);
+      localStorage.removeItem('tilelab.design');
+    }
+  } catch { /* storage denied; nothing to set aside */ }
+  if (!had) return false;
+  reset();
+  if (committed) apply(committed);
+  designer.sync();
+  console.warn('The renderer threw with your design draft applied, so the draft has been '
+    + 'set aside (kept as tilelab.design.setAside) and the committed look restored.', had);
+  return true;
+}
+
 function frame(now = 0) {
   driveBots(now);
   const sig = signature();
@@ -1561,6 +1610,7 @@ function frame(now = 0) {
       drawFailures.add(key);
       console.error('The renderer threw; the frame is skipped and the game carries on.', err);
     }
+    setAsideTheDraft();
   }
   requestAnimationFrame(frame);
 }

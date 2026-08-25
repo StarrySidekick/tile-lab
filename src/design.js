@@ -191,16 +191,52 @@ const listeners = new Set();
 export function onDesignChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 function announce() { for (const fn of listeners) fn(); }
 
+const BOOK = new Map(SPEC.map((s) => [s.key, s]));
+const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+/**
+ * A value, or nothing.
+ *
+ * Everything that reaches DESIGN comes through here, because everything that
+ * reads DESIGN trusts it absolutely — and rightly, since checking a number is
+ * a number in the middle of a render loop is how you get a render loop full of
+ * checks. One `"x"` where a number belongs used to reach a gradient stop and
+ * throw; the frame loop caught it, skipped the frame, and every frame after
+ * it, and the board went black with nothing on screen to say why. A draft in
+ * localStorage or a hand-edited design.json is enough to do that, so the
+ * boundary is here: an unknown key, a NaN, a colour that isn't one, and the
+ * value is refused rather than believed.
+ */
+function coerce(key, value) {
+  const spec = BOOK.get(key);
+  if (!spec) return undefined;
+  if (spec.type === 'color') {
+    if (typeof value !== 'string' || !HEX.test(value.trim())) return undefined;
+    return value.trim().toLowerCase();
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.min(spec.max, Math.max(spec.min, n));
+}
+
 export function setValue(key, value) {
-  set(DESIGN, key, value);
+  const v = coerce(key, value);
+  if (v === undefined) return;
+  set(DESIGN, key, v);
   announce();
 }
 
 /** Take a flat `{ 'a.b': v }` bag — an exported file, or a saved session. */
 export function apply(flat) {
-  if (!flat) return;
+  if (!flat || typeof flat !== 'object' || Array.isArray(flat)) return;
+  const refused = [];
   for (const [k, v] of Object.entries(flat)) {
-    if (SPEC.some((s) => s.key === k)) set(DESIGN, k, v);
+    const use = coerce(k, v);
+    if (use === undefined) refused.push(k);
+    else set(DESIGN, k, use);
+  }
+  if (refused.length) {
+    console.warn(`design: ignored ${refused.length} value(s) that were not usable — ${refused.join(', ')}`);
   }
   announce();
 }
@@ -218,10 +254,11 @@ export function reset() {
 export async function loadCommitted() {
   try {
     const res = await fetch('./assets/design.json', { cache: 'no-store' });
-    if (!res.ok) return false;
-    apply(await res.json());
-    return true;
-  } catch { return false; }
+    if (!res.ok) return null;
+    const book = await res.json();
+    apply(book);
+    return book;                  // kept by the caller, to restore from
+  } catch { return null; }
 }
 
 /** rgba() from a hex swatch and an alpha, since most of these are both. */

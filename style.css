@@ -692,7 +692,7 @@ footer { font-size: 10.5px; line-height: 1.6; }
 #designer footer button { flex: 1; font-size: 11.5px; padding: 6px 4px; }
 
 /* The way in without a keyboard. */
-#openDesign { display: block; width: 100%; margin-top: 6px; text-align: center; }
+#openDesign, #resetDesign { display: block; width: 100%; margin-top: 6px; text-align: center; }
 #openDesign kbd { margin-left: 4px; opacity: 0.75; }
 
 /* On a narrow screen a 380px rail would cover the board, so the console becomes
