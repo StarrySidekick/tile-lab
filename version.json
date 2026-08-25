@@ -1,6 +1,6 @@
 {
-  "version": "0.33.0",
-  "build": 40,
-  "date": "2026-08-24",
-  "label": "Dials for roads, marks, whale; no laid lines, no computed shade"
+  "version": "0.33.1",
+  "build": 41,
+  "date": "2026-08-25",
+  "label": "The sheet is baked, not redrawn sixty times a second"
 }

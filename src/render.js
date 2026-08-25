@@ -309,6 +309,90 @@ export class Renderer {
    * stuck on it. Only then the ink: the graticule, the rhumbs and the rose are
    * drawn last because they were drawn last.
    */
+  /**
+   * The sheet, baked.
+   *
+   * Everything in the backdrop that is pinned to the SCREEN — the paper tone,
+   * the pattern, the sky wash, the grain coming back through it, the stain
+   * round the edge — is the same picture in every frame until the window or a
+   * dial changes. Drawing it live cost 117ms a frame at 2268x1800, which is
+   * the whole of the lag: four full-screen fills, two of them repeating
+   * patterns and two of them gradients, rasterised sixty times a second to
+   * produce an identical result each time.
+   *
+   * So it is drawn once into two layers and blitted. Two rather than one
+   * because the ink — rhumbs, graticule, rose — goes between them: it is drawn
+   * over the sheet and under the stain, which is the order a chart is made in
+   * and the order that keeps the stain reading as the page rather than as a
+   * shadow over the drawing.
+   *
+   * The key is the values themselves, so nothing has to remember to invalidate
+   * this: change a dial and the string changes and the sheet is remade.
+   */
+  sheet() {
+    const P = DESIGN.paper, S = DESIGN.sky;
+    const key = [this.canvas.width, this.canvas.height, !!this.paperPattern,
+      P.tint, P.grain, P.edge, P.edgeTone,
+      S.top, S.mid, S.low, S.alpha].join('|');
+    if (this.sheetKey === key) return this.sheetLayers;
+
+    const layer = () => {
+      const c = document.createElement('canvas');
+      c.width = this.canvas.width;
+      c.height = this.canvas.height;
+      const cx = c.getContext('2d');
+      cx.setTransform(this.canvas.width / this.w, 0, 0, this.canvas.height / this.h, 0, 0);
+      return [c, cx];
+    };
+
+    const [under, u] = layer();
+    if (this.paperPattern) {
+      u.fillStyle = P.tint;
+      u.fillRect(0, 0, this.w, this.h);
+      u.save();
+      u.globalCompositeOperation = 'multiply';
+      u.fillStyle = this.paperPattern;
+      u.fillRect(0, 0, this.w, this.h);
+      u.restore();
+    } else {
+      const paper = u.createLinearGradient(0, 0, this.w * 0.4, this.h);
+      paper.addColorStop(0, '#e9dcbd');
+      paper.addColorStop(0.45, '#e2d3b0');
+      paper.addColorStop(1, '#cfbc94');
+      u.fillStyle = paper;
+      u.fillRect(0, 0, this.w, this.h);
+    }
+    const a = S.alpha;
+    const sky = u.createLinearGradient(0, 0, 0, this.h);
+    sky.addColorStop(0, rgba(S.top, a * 1.08));
+    sky.addColorStop(0.42, rgba(S.mid, a));
+    sky.addColorStop(0.78, rgba(S.low, a * 0.84));
+    sky.addColorStop(1, rgba(S.low, a * 0.66));
+    u.fillStyle = sky;
+    u.fillRect(0, 0, this.w, this.h);
+    if (this.paperPattern && P.grain) {
+      u.save();
+      u.globalCompositeOperation = 'multiply';
+      u.globalAlpha = P.grain;
+      u.fillStyle = this.paperPattern;
+      u.fillRect(0, 0, this.w, this.h);
+      u.restore();
+    }
+
+    const [over, o] = layer();
+    const r = Math.hypot(this.w, this.h) * 0.62;
+    const v = o.createRadialGradient(this.w / 2, this.h / 2, r * 0.42, this.w / 2, this.h / 2, r);
+    v.addColorStop(0, rgba(P.edgeTone, 0));
+    v.addColorStop(0.72, rgba(P.edgeTone, P.edge * 0.25));
+    v.addColorStop(1, rgba(P.edgeTone, P.edge));
+    o.fillStyle = v;
+    o.fillRect(0, 0, this.w, this.h);
+
+    this.sheetKey = key;
+    this.sheetLayers = { under, over };
+    return this.sheetLayers;
+  }
+
   drawChart() {
     const ctx = this.ctx;
     const z = this.cam.zoom;
@@ -323,35 +407,22 @@ export class Renderer {
     if (!this.paperPattern && this.paper.complete && this.paper.naturalWidth) {
       this.paperPattern = ctx.createPattern(this.paper, 'repeat');
     }
-    if (this.paperPattern) {
-      ctx.fillStyle = DESIGN.paper.tint;          // the sheet's own tone, under the print
-      ctx.fillRect(0, 0, this.w, this.h);
-      ctx.save();
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = this.paperPattern;
-      ctx.fillRect(0, 0, this.w, this.h);
-      ctx.restore();
-    } else {
-      const paper = ctx.createLinearGradient(0, 0, this.w * 0.4, this.h);
-      paper.addColorStop(0, '#e9dcbd');
-      paper.addColorStop(0.45, '#e2d3b0');
-      paper.addColorStop(1, '#cfbc94');
-      ctx.fillStyle = paper;
-      ctx.fillRect(0, 0, this.w, this.h);
-    }
-
-    this.drawSkyWash();
-    this.drawGrain();
+    const { under, over } = this.sheet();
+    ctx.drawImage(under, 0, 0, this.w, this.h);
+    // The two that move with the camera stay live — they belong to the sheet
+    // you are travelling over, not to the glass, so they cannot be baked in.
+    this.drawPooling();
     this.drawFoxing();
 
     // The rhumb network and the rose are the expensive half and the half that
     // stops meaning anything when the squares get small, so both drop out with
     // the grid rather than piling detail into an unreadable zoom.
-    if (z < 26) return this.drawEdgeStain();
-    this.drawRhumbs();
-    this.drawGraticule();
-    if (z >= 40) this.drawRose();
-    this.drawEdgeStain();
+    if (z >= 26) {
+      this.drawRhumbs();
+      this.drawGraticule();
+      if (z >= 40) this.drawRose();
+    }
+    ctx.drawImage(over, 0, 0, this.w, this.h);
   }
 
   /**
@@ -365,19 +436,10 @@ export class Renderer {
    * they belong to the sheet rather than to the screen, and laid out from a
    * fixed table so they never reshuffle between frames.
    */
-  drawSkyWash() {
+  drawPooling() {
     const ctx = this.ctx;
+    if (!DESIGN.sky.pooling) return;
     ctx.save();
-    const a = DESIGN.sky.alpha;
-    const sky = ctx.createLinearGradient(0, 0, 0, this.h);
-    sky.addColorStop(0, rgba(DESIGN.sky.top, a * 1.08));
-    sky.addColorStop(0.42, rgba(DESIGN.sky.mid, a));
-    sky.addColorStop(0.78, rgba(DESIGN.sky.low, a * 0.84));
-    sky.addColorStop(1, rgba(DESIGN.sky.low, a * 0.66));
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, this.w, this.h);
-    if (!DESIGN.sky.pooling) { ctx.restore(); return; }
-
     const drift = this.cam.zoom * 0.10;
     for (const [ox, oy, r, pa] of POOLING) {
       const x = ox * this.w - this.cam.x * drift;
@@ -393,25 +455,6 @@ export class Renderer {
       ctx.ellipse(x, y, rad, rad * 0.66, 0, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.restore();
-  }
-
-  /**
-   * The paper's grain, brought back THROUGH the paint. The same synthesised
-   * sheet that lies under the wash is multiplied over it at low strength, so
-   * its laid lines and flecks darken the sky rather than vanish beneath it —
-   * paint under grain reads as pigment sunk into a sheet, and this is the half
-   * of the trick that sells it. Pinned to the screen: the sheet is what you
-   * are looking through, not a place on the board.
-   */
-  drawGrain() {
-    if (!this.paperPattern || !DESIGN.paper.grain) return;
-    const ctx = this.ctx;
-    ctx.save();
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = DESIGN.paper.grain;
-    ctx.fillStyle = this.paperPattern;
-    ctx.fillRect(0, 0, this.w, this.h);
     ctx.restore();
   }
 

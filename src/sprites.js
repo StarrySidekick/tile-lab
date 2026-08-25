@@ -120,6 +120,29 @@ function surface(px) {
   return c;
 }
 
+// A canvas the roughen passes happen on, reused, and never handed to anyone.
+//
+// This matters far more than it looks. `roughen` calls getImageData twice, and
+// a browser that sees a canvas read back like that stops keeping it on the
+// GPU. A demoted canvas has to be uploaded again every single time it is
+// drawn from — so a board of sixty tiles was re-uploading sixty textures a
+// frame, which cost a hundred times more than drawing them. Doing the reading
+// HERE and blitting the finished picture into a clean canvas means the thing
+// in the cache has only ever been written to, and stays where it belongs.
+let bench = null;
+let benchCtx = null;
+
+function workspace(px) {
+  if (!bench || bench.width !== px) {
+    bench = surface(px);
+    benchCtx = bench.getContext('2d', { willReadFrequently: true });
+  } else {
+    benchCtx.setTransform(1, 0, 0, 1, 0, 0);
+    benchCtx.clearRect(0, 0, px, px);
+  }
+  return benchCtx;
+}
+
 /**
  * A cached picture of one tile, or null if the tile is being drawn so large
  * that a sprite would be softer than just running the paths.
@@ -148,13 +171,17 @@ export function tileSprite(type, rot, terrain, px) {
     build = BUCKETS[0] < size ? BUCKETS[0] : size;
   }
 
+  const chart = THEME.paletteName === 'chart';
   const canvas = surface(build);
-  const ctx = canvas.getContext('2d');
+  // On the chart the art is drawn on the workbench, where it can be read back
+  // without costing anything, and copied over at the end. Everywhere else
+  // nothing reads the pixels, so draw straight into the sprite.
+  const ctx = chart ? workspace(build) : canvas.getContext('2d');
   ctx.scale(build, build);
   ctx.translate(0.5, 0.5);
   ctx.rotate((rot & 3) * Math.PI / 2);
   ctx.translate(-0.5, -0.5);
-  if (THEME.paletteName === 'chart') {
+  if (chart) {
     // The hand-drawn line, in two passes (see ink.js for the philosophy):
     //   1. the GROUND — country, roads, spheres, wind-heads — drawn and gently
     //      bent, because a meadow's edge and a cloud's curl should wander;
@@ -164,9 +191,12 @@ export function tileSprite(type, rot, terrain, px) {
     //      other half of what a nib does — straight lines stay straight but
     //      their edges take the grain of the paper.
     drawTile(ctx, type, { terrain, rot, only: 'ground' });
-    roughen(canvas, WOBBLE(build));
+    roughen(bench, WOBBLE(build));
     drawTile(ctx, type, { terrain, rot, only: 'built' });
-    roughen(canvas, TOOTH(build));
+    roughen(bench, TOOTH(build));
+    const out = canvas.getContext('2d');
+    out.setTransform(1, 0, 0, 1, 0, 0);
+    out.drawImage(bench, 0, 0);
   } else {
     drawTile(ctx, type, { terrain, rot });
   }
