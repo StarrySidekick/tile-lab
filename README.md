@@ -1,7 +1,7 @@
 # Tilemaker's Workshop
 
-**Play it: <https://starrysidekick.github.io/tile-lab/>**
-· [tile atlas](https://starrysidekick.github.io/tile-lab/atlas.html)
+**Play it: <https://starrysidekick.github.io/Tilemakers-Workshop/>**
+· [tile atlas](https://starrysidekick.github.io/Tilemakers-Workshop/atlas.html)
 
 A sandbox for experimenting with tile mechanics and game modes, built to be
 **fast to iterate on**. No build step, no dependencies, no image assets — plain
