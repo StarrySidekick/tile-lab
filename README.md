@@ -11,7 +11,9 @@ Twelve modes and a catalogue of 79 Carcassonne rules — 67 of them playable —
 all sharing one board engine. Each mode exists to answer a specific question
 about what makes tile-laying good; [MODES.md](MODES.md) is where that
 reasoning lives, and [docs/EDITIONS.md](docs/EDITIONS.md) is where the printed
-game's own edition history is kept.
+game's own edition history is kept. [docs/RELIEF.md](docs/RELIEF.md) scopes a
+question that keeps coming up — what it would take to make the tiles actually
+three-dimensional — against a working spike rather than a guess.
 
 ## Run it locally
 
@@ -717,6 +719,7 @@ src/interior.js    caves and city streets — a sub-map on the same loop
 src/render.js      camera, canvas painting, overlays, hit-testing
 src/main.js        DOM wiring
 tools/             headless and browser test harnesses
+tools/relief.html  a spike: the same tiles with actual height (docs/RELIEF.md)
 ```
 
 ### The core idea
@@ -813,6 +816,7 @@ node tools/harness.mjs              # every mode + modifier, headless
 node tools/harness.mjs marches 200  # one mode, 200 seeded games
 node tools/smoke.mjs                # each mode booted in a real browser
 node tools/smoke.mjs --shots        # …and screenshotted to tools/shots/
+node tools/relief.mjs --shots       # the 3D spike, posed and screenshotted
 node tools/train.mjs                # tune Girando's bot by self-play
 node tools/train.mjs --report       # …or just measure what it does now
 node tools/stamp.mjs -m "what's new"  # bump the build stamp before pushing
@@ -844,8 +848,8 @@ over seconds rather than in a single frame.
 
 `package.json` exists only so Node treats `src/` as ES modules for those two
 scripts. The game itself still has no build step and no dependencies.
-(`tools/smoke.mjs` wants Playwright, which is the one dev-only exception:
-`npm install --no-save playwright`.)
+(`tools/smoke.mjs` and `tools/relief.mjs` want Playwright, which is the one
+dev-only exception: `npm install --no-save playwright`.)
 
 ### Re-vibing the look
 

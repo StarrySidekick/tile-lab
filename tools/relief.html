@@ -1,0 +1,509 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Relief — tiles with actual height</title>
+<style>
+ html,body{margin:0;height:100%;background:#17141d;font:12px/1.5 system-ui;color:#9a9089;overflow:hidden}
+ canvas{display:block;width:100%;height:100%;cursor:grab}
+ canvas.dragging{cursor:grabbing}
+ #bar{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+      padding:9px 14px;background:rgba(31,27,37,0.92);border-top:1px solid rgba(212,175,95,0.18)}
+ #bar label{display:flex;gap:6px;align-items:center;white-space:nowrap}
+ #bar input[type=range]{width:110px}
+ #bar b{color:#d4af5f;font-weight:600}
+ #note{position:fixed;top:0;left:0;right:0;padding:8px 14px;color:#7d7468;
+       background:linear-gradient(#17141d,rgba(23,20,29,0))}
+ #note b{color:#d4af5f}
+ #fail{position:fixed;inset:0;display:grid;place-items:center;padding:40px;text-align:center;color:#c46850}
+</style>
+<body>
+<canvas id="gl"></canvas>
+<div id="note"><b>Relief</b> — the same tiles, the same art, extruded. Drag to orbit, scroll to zoom.</div>
+<div id="bar">
+  <label>Height <input id="lift" type="range" min="0" max="3" step="0.05" value="1" /><b id="liftV">1.00</b></label>
+  <label>Tiles <input id="count" type="range" min="4" max="60" step="1" value="24" /><b id="countV">24</b></label>
+  <label>Seed <input id="seed" type="number" value="5" style="width:56px" /></label>
+  <label><input id="silh" type="checkbox" /> Silhouettes only</label>
+  <label><input id="spin" type="checkbox" /> Turntable</label>
+  <button id="again">Re-deal</button>
+  <span id="stat"></span>
+</div>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// RELIEF — a spike, not a mode.
+//
+// The question this page exists to answer is whether "make the tiles actually
+// 3D" is a rewrite or an afternoon, and the answer turns on one thing: does
+// the corner-to-corner rule in shape.js survive being pushed into a third
+// dimension?
+//
+// It does, and for the same reason it works in 2D. An area covers every side
+// it reaches, corner to corner, so two tiles sharing a city edge share the
+// whole seam with nothing left over. Extrude those outlines to a fixed height
+// per feature type and the two prisms share the whole seam too — no neighbour
+// lookup, no negotiation, nothing to keep in sync. The wall only appears on
+// the RIM, which featureShape already defines as "the outline minus the tile
+// edges", so a city that continues into the next tile has no cliff at the join
+// and a block of city reads as one raised town behind one wall.
+//
+// Everything here imports the real thing: the real tile table, the real board
+// with the real edge matching, the real silhouettes, the real art. Nothing is
+// re-authored for 3D. The only new information is a table of heights.
+//
+// Turn on "Silhouettes only" to see what is actually being tested. The texture
+// is off, so what is left is the geometry: if the extrusion is right, a city
+// crossing a seam is one unbroken plateau and the wall runs round the outside
+// of the whole thing rather than round each tile.
+// ---------------------------------------------------------------------------
+
+import { TILES, buildDeck, rotPoint } from '../src/tiles.js';
+import { Board } from '../src/board.js';
+import { featureShape } from '../src/shape.js';
+import { drawTile } from '../src/art.js';
+import { LIGHT } from '../src/light.js';
+import { THEME } from '../src/theme.js';
+
+// --- how high things stand ---------------------------------------------------
+//
+// The whole 3D model, in six lines. `tex` picks which pass of the art the top
+// face is textured with: a city's plateau wants the ARCHITECTURE drawn on it,
+// a wood's canopy wants the country. `wall` is the colour of the cut face —
+// deliberately flat and unlit-looking, because the shading comes from the
+// geometry now and painting it in as well is the doubling this whole exercise
+// is meant to remove.
+//
+// Point features are the gap: a monastery, a garden and a temple have no sides
+// and so no silhouette, and featureShape hands back null for them. They are
+// buildings, and a building needs a model rather than an extrusion. That is
+// the one piece of genuinely new authoring 3D would ask for.
+const RELIEF = {
+  city:     { h:  0.17, tex: 'full',   wall: THEME.cityWall },
+  forest:   { h:  0.11, tex: 'ground', wall: THEME.forestDark },
+  mountain: { h:  0.30, tex: 'ground', wall: THEME.rockDark },
+  lake:     { h: -0.05, tex: 'ground', wall: THEME.waterDeep },
+};
+
+const TEX_PX = 256;          // one tile picture, in pixels
+const BEZ = 14;              // straight segments per cubic in a silhouette
+
+// --- small maths -------------------------------------------------------------
+
+const mul = (a, b) => {
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+    o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1]
+                 + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+  }
+  return o;
+};
+
+const perspective = (fovy, aspect, near, far) => {
+  const f = 1 / Math.tan(fovy / 2), d = near - far;
+  return new Float32Array([f / aspect, 0, 0, 0, 0, f, 0, 0,
+                           0, 0, (far + near) / d, -1, 0, 0, 2 * far * near / d, 0]);
+};
+
+const norm = (v) => { const n = Math.hypot(...v) || 1; return v.map((x) => x / n); };
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+const lookAt = (eye, at, up) => {
+  const z = norm(sub(eye, at)), x = norm(cross(up, z)), y = cross(z, x);
+  return new Float32Array([x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0,
+                           -dot(x, eye), -dot(y, eye), -dot(z, eye), 1]);
+};
+
+/** Deterministic RNG, so a seed always deals the same board. */
+function rng32(seed) {
+  let a = (seed >>> 0) || 1;
+  return () => {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// --- turning a silhouette into points ----------------------------------------
+//
+// featureShape draws through a canvas context, which is exactly the interface
+// needed to read it back: hand it something that records instead of painting.
+// Doing it this way rather than re-deriving the outline in 3D is the point —
+// the prism is guaranteed to stand on precisely the curve the 2D art is drawn
+// against, because it IS that curve, flattened.
+
+function recorder() {
+  const subs = [];
+  let cur = null, cx = 0, cy = 0;
+  const push = (x, y) => {
+    if (cur.length) {
+      const [px, py] = cur[cur.length - 1];
+      if (Math.abs(px - x) < 1e-9 && Math.abs(py - y) < 1e-9) { cx = x; cy = y; return; }
+    }
+    cur.push([x, y]); cx = x; cy = y;
+  };
+  return {
+    subs,
+    moveTo(x, y) { cur = [[x, y]]; subs.push(cur); cx = x; cy = y; },
+    lineTo(x, y) { push(x, y); },
+    bezierCurveTo(x1, y1, x2, y2, x3, y3) {
+      const x0 = cx, y0 = cy;
+      for (let i = 1; i <= BEZ; i++) {
+        const t = i / BEZ, u = 1 - t;
+        push(u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+             u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3);
+      }
+    },
+    closePath() {},          // a recorded loop closes itself
+    beginPath() {}, save() {}, restore() {}, rect() {}, clip() {},
+  };
+}
+
+const area2 = (p) => {
+  let s = 0;
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) s += p[j][0] * p[i][1] - p[i][0] * p[j][1];
+  return s / 2;
+};
+
+function inside(pt, poly) {
+  let hit = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > pt[1]) !== (yj > pt[1])
+        && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+}
+
+/** Ear clipping. The silhouettes are simple closed curves, so this is enough. */
+function triangulate(poly) {
+  const v = poly.map((_, i) => i);
+  if (area2(poly) < 0) v.reverse();
+  const out = [];
+  let guard = v.length * v.length;
+  while (v.length > 3 && guard-- > 0) {
+    let cut = false;
+    for (let i = 0; i < v.length; i++) {
+      const a = poly[v[(i + v.length - 1) % v.length]], b = poly[v[i]], c = poly[v[(i + 1) % v.length]];
+      const cr = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      if (cr <= 0) continue;                                  // reflex, not an ear
+      let clear = true;
+      for (let k = 0; k < v.length && clear; k++) {
+        if (k === i || k === (i + v.length - 1) % v.length || k === (i + 1) % v.length) continue;
+        if (inside(poly[v[k]], [a, b, c])) clear = false;
+      }
+      if (!clear) continue;
+      out.push(a, b, c);
+      v.splice(i, 1);
+      cut = true;
+      break;
+    }
+    if (!cut) break;                                          // degenerate; take what we have
+  }
+  if (v.length === 3) out.push(poly[v[0]], poly[v[1]], poly[v[2]]);
+  return out;
+}
+
+/**
+ * The outline of one feature on one placed tile, in TILE space with the tile's
+ * rotation already applied.
+ *
+ * Rotating the points here rather than rotating a matrix later is what keeps
+ * the texture honest: the art is drawn unrotated and the canvas is turned to
+ * place it, so a point's position after rotation is also its coordinate in the
+ * finished picture. One transform, used for the geometry and the UV both.
+ */
+function outlineOf(feat, rot) {
+  const sh = featureShape(feat.sides);
+  if (!sh) return null;
+  const cap = recorder(); sh.path(cap);
+  const rim = recorder(); if (sh.hasRim) sh.rim(rim);
+  const turn = (subs) => subs.map((s) => s.map((p) => rotPoint(p, rot)));
+  return { cap: turn(cap.subs)[0], rim: turn(rim.subs) };
+}
+
+// --- the board ---------------------------------------------------------------
+
+function deal(seed, want) {
+  const rand = rng32(seed);
+  const board = new Board();
+  board.place(0, 0, TILES.D, 0);
+  // All four relief types need to be on the table for the spike to prove
+  // anything: base alone has no wood, no rock and no water.
+  const deck = buildDeck(['base', 'forests', 'mountains', 'lakes'], rand);
+  while (board.size < want && deck.length) {
+    const type = TILES[deck.pop()];
+    const spots = board.legalPlacements(type);
+    if (!spots.length) continue;
+    const { x, y, rot } = spots[Math.floor(rand() * spots.length)];
+    board.place(x, y, type, rot);
+  }
+  return board;
+}
+
+// --- tile pictures -----------------------------------------------------------
+
+const textures = new Map();
+
+function picture(gl, type, rot, pass) {
+  const key = `${type.id}|${rot & 3}|${pass}`;
+  const had = textures.get(key);
+  if (had) return had;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = TEX_PX;
+  const ctx = cv.getContext('2d');
+  ctx.scale(TEX_PX, TEX_PX);
+  ctx.translate(0.5, 0.5); ctx.rotate((rot & 3) * Math.PI / 2); ctx.translate(-0.5, -0.5);
+  drawTile(ctx, type, { rot, ...(pass === 'ground' ? { only: 'ground' } : {}) });
+
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  textures.set(key, tex);
+  return tex;
+}
+
+// --- geometry ----------------------------------------------------------------
+//
+// Batched by the picture they are drawn with, so a board of sixty tiles is a
+// handful of draw calls rather than sixty. Tile space maps to world space as
+// x -> X and y -> Z, with height on Y, so north stays north and the art's
+// y-down convention needs no thinking about anywhere else.
+
+function build(gl, board) {
+  const batches = new Map();
+  const into = (key, make) => {
+    let b = batches.get(key);
+    if (!b) { b = { pos: [], nrm: [], uv: [], ...make() }; batches.set(key, b); }
+    return b;
+  };
+  const vert = (b, x, y, z, n, u, v) => {
+    b.pos.push(x, y, z); b.nrm.push(n[0], n[1], n[2]); b.uv.push(u, v);
+  };
+
+  let prisms = 0;
+  for (const cell of board.cells.values()) {
+    const { x: ox, y: oy, type, rot } = cell;
+
+    // The ground: the country only. Whatever stands up is drawn standing up,
+    // so drawing it flat here as well would put a wall in two places at once.
+    const g = into(`g:${type.id}|${rot}`, () => ({ kind: 'ground', tex: picture(gl, type, rot, 'ground') }));
+    for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 0], [1, 1], [0, 1]]) {
+      vert(g, ox + u, 0, oy + v, [0, 1, 0], u, v);
+    }
+
+    for (const feat of type.feats) {
+      const r = RELIEF[feat.type];
+      if (!r || !feat.sides?.length) continue;
+      const shape = outlineOf(feat, rot);
+      if (!shape) continue;
+      prisms++;
+
+      // The top face, textured with the same picture from directly above.
+      const top = into(`t:${type.id}|${rot}|${r.tex}`, () => ({ kind: 'cap', tex: picture(gl, type, rot, r.tex) }));
+      for (const [px, py] of triangulate(shape.cap)) vert(top, ox + px, r.h, oy + py, [0, 1, 0], px, py);
+
+      // The cut face, on the rim and nowhere else — which is the whole trick.
+      const side = into(`s:${feat.type}`, () => ({ kind: 'wall', color: r.wall }));
+      for (const line of shape.rim) {
+        for (let i = 1; i < line.length; i++) {
+          const [ax, ay] = line[i - 1], [bx, by] = line[i];
+          const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+          if (len < 1e-7) continue;
+          let n = [dy / len, -dx / len];
+          const mid = [(ax + bx) / 2 + n[0] * 0.004, (ay + by) / 2 + n[1] * 0.004];
+          if (inside(mid, shape.cap)) n = [-n[0], -n[1]];      // point away from the town
+          const N = [n[0], 0, n[1]];
+          vert(side, ox + ax, r.h, oy + ay, N, 0, 0);
+          vert(side, ox + bx, r.h, oy + by, N, 1, 0);
+          vert(side, ox + bx, 0, oy + by, N, 1, 1);
+          vert(side, ox + ax, r.h, oy + ay, N, 0, 0);
+          vert(side, ox + bx, 0, oy + by, N, 1, 1);
+          vert(side, ox + ax, 0, oy + ay, N, 0, 1);
+        }
+      }
+    }
+  }
+  return { batches: [...batches.values()], prisms };
+}
+
+// --- GL ----------------------------------------------------------------------
+
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl2', { antialias: true });
+if (!gl) {
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="fail">No WebGL2 here, so there is nothing to look at. That is itself a finding: ' +
+    'a 3D board would need a fallback, and the fallback is the board we already have.</div>');
+  throw new Error('no webgl2');
+}
+
+const VS = `#version 300 es
+in vec3 aPos; in vec3 aNrm; in vec2 aUv;
+uniform mat4 uMvp; uniform float uLift;
+out vec3 vNrm; out vec2 vUv;
+void main() {
+  gl_Position = uMvp * vec4(aPos.x, aPos.y * uLift, aPos.z, 1.0);
+  vNrm = aNrm; vUv = aUv;
+}`;
+
+const FS = `#version 300 es
+precision highp float;
+in vec3 vNrm; in vec2 vUv;
+uniform sampler2D uTex;
+uniform vec3 uColor;
+uniform float uUseTex;
+uniform vec3 uSun;
+out vec4 outColor;
+void main() {
+  vec3 base = mix(uColor, texture(uTex, vUv).rgb, uUseTex);
+  // One sun, the same one the flat board has had all along: north-west and
+  // low. In 2D that direction was painted on; here it is simply where the
+  // light is, and every face works it out for itself.
+  float d = max(dot(normalize(vNrm), uSun), 0.0);
+  outColor = vec4(base * (0.58 + 0.42 * d), 1.0);
+}`;
+
+function compile(src, kind) {
+  const s = gl.createShader(kind);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(VS, gl.VERTEX_SHADER));
+gl.attachShader(prog, compile(FS, gl.FRAGMENT_SHADER));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+gl.useProgram(prog);
+
+const U = Object.fromEntries(['uMvp', 'uLift', 'uTex', 'uColor', 'uUseTex', 'uSun']
+  .map((n) => [n, gl.getUniformLocation(prog, n)]));
+
+const white = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, white);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+
+function upload(batch) {
+  batch.vao = gl.createVertexArray();
+  gl.bindVertexArray(batch.vao);
+  [['aPos', batch.pos, 3], ['aNrm', batch.nrm, 3], ['aUv', batch.uv, 2]].forEach(([name, data, n]) => {
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, name);
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, n, gl.FLOAT, false, 0, 0);
+  });
+  batch.count = batch.pos.length / 3;
+  batch.rgb = batch.color ? hex(batch.color) : [0.6, 0.6, 0.6];
+  return batch;
+}
+
+// --- the scene ---------------------------------------------------------------
+
+const ui = Object.fromEntries(['lift', 'liftV', 'count', 'countV', 'seed', 'silh', 'spin', 'again', 'stat']
+  .map((id) => [id, document.getElementById(id)]));
+
+let scene = null, centre = [0, 0];
+
+function reseat() {
+  const board = deal(+ui.seed.value, +ui.count.value);
+  let sx = 0, sy = 0;
+  for (const c of board.cells.values()) { sx += c.x + 0.5; sy += c.y + 0.5; }
+  centre = [sx / board.size, sy / board.size];
+  const made = build(gl, board);
+  scene = made.batches.map(upload);
+  ui.stat.textContent = `${board.size} tiles · ${made.prisms} prisms · ${scene.length} draws`;
+}
+
+const cam = { yaw: 0.62, pitch: 0.86, dist: 9 };
+let drag = null;
+
+canvas.addEventListener('pointerdown', (e) => {
+  drag = { x: e.clientX, y: e.clientY };
+  canvas.setPointerCapture(e.pointerId);
+  canvas.classList.add('dragging');
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  cam.yaw -= (e.clientX - drag.x) * 0.007;
+  cam.pitch = Math.max(0.06, Math.min(1.5, cam.pitch - (e.clientY - drag.y) * 0.006));
+  drag = { x: e.clientX, y: e.clientY };
+});
+const stop = () => { drag = null; canvas.classList.remove('dragging'); };
+canvas.addEventListener('pointerup', stop);
+canvas.addEventListener('pointercancel', stop);
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  cam.dist = Math.max(2, Math.min(40, cam.dist * (e.deltaY > 0 ? 1.1 : 0.9)));
+}, { passive: false });
+
+ui.lift.addEventListener('input', () => { ui.liftV.textContent = (+ui.lift.value).toFixed(2); });
+ui.count.addEventListener('input', () => { ui.countV.textContent = ui.count.value; });
+for (const el of [ui.count, ui.seed]) el.addEventListener('change', reseat);
+ui.again.addEventListener('click', () => { ui.seed.value = Math.floor(Math.random() * 9999); reseat(); });
+
+const BARE = { ground: [0.29, 0.31, 0.30], cap: [0.76, 0.73, 0.66], wall: [0.64, 0.35, 0.27] };
+
+const sun = norm([-LIGHT.x, 0.62, -LIGHT.y]);   // toward the light: north-west, low
+const back = hex(THEME.night);
+
+function frame(t) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  gl.viewport(0, 0, w, h);
+  gl.enable(gl.DEPTH_TEST);
+  gl.clearColor(back[0], back[1], back[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  if (ui.spin.checked) cam.yaw = t * 0.00016;
+  const eye = [centre[0] + Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist,
+               Math.sin(cam.pitch) * cam.dist,
+               centre[1] + Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist];
+  const mvp = mul(perspective(0.72, w / h, 0.1, 200), lookAt(eye, [centre[0], 0, centre[1]], [0, 1, 0]));
+
+  gl.useProgram(prog);
+  gl.uniformMatrix4fv(U.uMvp, false, mvp);
+  gl.uniform1f(U.uLift, +ui.lift.value);
+  gl.uniform3fv(U.uSun, sun);
+  gl.uniform1i(U.uTex, 0);
+  gl.activeTexture(gl.TEXTURE0);
+
+  const bare = ui.silh.checked;
+  for (const b of scene) {
+    gl.bindVertexArray(b.vao);
+    // Silhouette mode strips the pictures off and leaves the shape: ground in
+    // slate, the raised tops in bone, the cut faces in rust. If the extrusion
+    // is right, a city crossing a seam is ONE bone plateau with rust round the
+    // outside of the whole thing and none at all down the join.
+    if (bare) {
+      gl.bindTexture(gl.TEXTURE_2D, white);
+      gl.uniform1f(U.uUseTex, 0);
+      gl.uniform3fv(U.uColor, BARE[b.kind]);
+    } else if (b.tex) {
+      gl.bindTexture(gl.TEXTURE_2D, b.tex);
+      gl.uniform1f(U.uUseTex, 1);
+    } else {
+      gl.bindTexture(gl.TEXTURE_2D, white);
+      gl.uniform1f(U.uUseTex, 0);
+      gl.uniform3fv(U.uColor, b.rgb);
+    }
+    gl.drawArrays(gl.TRIANGLES, 0, b.count);
+  }
+  requestAnimationFrame(frame);
+}
+
+reseat();
+requestAnimationFrame(frame);
+window.relief = { reseat, cam, ui };      // so tools/relief.mjs can pose it
+</script>
