@@ -17,7 +17,7 @@
 </style>
 <body>
 <canvas id="gl"></canvas>
-<div id="note"><b>Relief</b> — the same tiles, the same art, extruded. Drag to orbit, scroll to zoom.</div>
+<div id="note"><b>Relief</b> — the same tiles extruded, with the towns, towers and cloisters standing up. Drag to orbit, scroll to zoom.</div>
 <div id="bar">
   <label>Height <input id="lift" type="range" min="0" max="3" step="0.05" value="1" /><b id="liftV">1.00</b></label>
   <label>Tiles <input id="count" type="range" min="4" max="60" step="1" value="24" /><b id="countV">24</b></label>
@@ -176,18 +176,42 @@ function inside(pt, poly) {
   return hit;
 }
 
-/** Ear clipping. The silhouettes are simple closed curves, so this is enough. */
-function triangulate(poly) {
+/**
+ * Ear clipping. The silhouettes are simple closed curves, but they arrive
+ * with two kinds of degenerate vertex the classic algorithm chokes on: the
+ * closing point (a side that runs corner to corner ends exactly where the
+ * path began, and a duplicated vertex means no ear ever passes the convexity
+ * test again) and near-collinear runs from the flattened beziers. Both used
+ * to make it quietly give up mid-polygon — "take what we have" was a hole in
+ * the cap with the grass showing through, and on a full square it dropped
+ * half the tile. So: dedupe first, and when no ear can be found, remove the
+ * flattest vertex and carry on — a flat vertex changes no area, and taking
+ * it out is what un-sticks the clip.
+ */
+function triangulate(raw) {
+  const poly = [];
+  for (const p of raw) {
+    const q = poly[poly.length - 1];
+    if (q && Math.abs(q[0] - p[0]) < 1e-9 && Math.abs(q[1] - p[1]) < 1e-9) continue;
+    poly.push(p);
+  }
+  while (poly.length > 1
+         && Math.abs(poly[0][0] - poly[poly.length - 1][0]) < 1e-9
+         && Math.abs(poly[0][1] - poly[poly.length - 1][1]) < 1e-9) poly.pop();
+  if (poly.length < 3) return [];
+
   const v = poly.map((_, i) => i);
   if (area2(poly) < 0) v.reverse();
+  const crossAt = (i) => {
+    const a = poly[v[(i + v.length - 1) % v.length]], b = poly[v[i]], c = poly[v[(i + 1) % v.length]];
+    return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  };
   const out = [];
-  let guard = v.length * v.length;
-  while (v.length > 3 && guard-- > 0) {
+  while (v.length > 3) {
     let cut = false;
     for (let i = 0; i < v.length; i++) {
       const a = poly[v[(i + v.length - 1) % v.length]], b = poly[v[i]], c = poly[v[(i + 1) % v.length]];
-      const cr = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-      if (cr <= 0) continue;                                  // reflex, not an ear
+      if (crossAt(i) <= 1e-12) continue;                      // reflex or flat, not an ear
       let clear = true;
       for (let k = 0; k < v.length && clear; k++) {
         if (k === i || k === (i + v.length - 1) % v.length || k === (i + 1) % v.length) continue;
@@ -199,9 +223,16 @@ function triangulate(poly) {
       cut = true;
       break;
     }
-    if (!cut) break;                                          // degenerate; take what we have
+    if (!cut) {
+      let flattest = 0, best = Infinity;
+      for (let i = 0; i < v.length; i++) {
+        const cr = Math.abs(crossAt(i));
+        if (cr < best) { best = cr; flattest = i; }
+      }
+      v.splice(flattest, 1);
+    }
   }
-  if (v.length === 3) out.push(poly[v[0]], poly[v[1]], poly[v[2]]);
+  out.push(poly[v[0]], poly[v[1]], poly[v[2]]);
   return out;
 }
 
@@ -220,7 +251,15 @@ function outlineOf(feat, rot) {
   const cap = recorder(); sh.path(cap);
   const rim = recorder(); if (sh.hasRim) sh.rim(rim);
   const turn = (subs) => subs.map((s) => s.map((p) => rotPoint(p, rot)));
-  return { cap: turn(cap.subs)[0], rim: turn(rim.subs) };
+  // Cap vertices on the tile boundary (only ever the corners) get pushed a
+  // hair PAST it, so two caps meeting across a seam overlap by 4/1000 of a
+  // tile instead of abutting. Two abutting triangulations that merely share
+  // coordinates can still drop the odd pixel along the shared edge — the same
+  // hairline the flat renderer covers with half a pixel of sprite overlap.
+  const E = 0.004;
+  const out = (v) => (v < 1e-6 ? -E : v > 1 - 1e-6 ? 1 + E : v);
+  const capPts = turn(cap.subs)[0].map(([x, y]) => [out(x), out(y)]);
+  return { cap: capPts, rim: turn(rim.subs), towersRot: sh.towers.map((p) => rotPoint(p, rot)) };
 }
 
 // --- the board ---------------------------------------------------------------
@@ -286,8 +325,130 @@ function build(gl, board) {
   const vert = (b, x, y, z, n, u, v) => {
     b.pos.push(x, y, z); b.nrm.push(n[0], n[1], n[2]); b.uv.push(u, v);
   };
+  // A quad with its normal worked out from the winding, and one with the
+  // normal handed in — the second is for faces whose outward direction is
+  // already known from the 2D rim (see the parapet), where re-deriving it
+  // from winding would just be a second chance to get the sign wrong.
+  const quad = (b, p0, p1, p2, p3) => {
+    const n = norm(cross(sub(p1, p0), sub(p3, p0)));
+    for (const p of [p0, p1, p2, p0, p2, p3]) vert(b, p[0], p[1], p[2], n, 0, 0);
+  };
+  const tri = (b, p0, p1, p2) => {
+    const n = norm(cross(sub(p1, p0), sub(p2, p0)));
+    for (const p of [p0, p1, p2]) vert(b, p[0], p[1], p[2], n, 0, 0);
+  };
+  const faceN = (b, n, p0, p1, p2, p3) => {
+    for (const p of [p0, p1, p2, p0, p2, p3]) vert(b, p[0], p[1], p[2], n, 0, 0);
+  };
 
-  let prisms = 0;
+  // --- the standing architecture ---------------------------------------------
+  //
+  // Modelled from the reference tile sheet, not traced from it: the reference
+  // teaches the VOCABULARY — a town is a cluster of small gabled houses at
+  // jostled angles behind a stone wall with square towers, a cloister is a
+  // tower with a pyramid cap and a long gabled nave — and the proportions.
+  // The colours are the theme's own, so the props re-vibe with everything
+  // else, and the shading comes from the one sun rather than being painted on.
+
+  const prop = (color) => into(`p:${color}`, () => ({ kind: 'prop', color }));
+
+  /** One gabled house: four walls, two gable ends, two roof slopes. */
+  function house(cx, cz, y0, w, d, wallH, roofH, yaw, wallC, roofC) {
+    const walls = prop(wallC), roof = prop(roofC);
+    const c = Math.cos(yaw), sn = Math.sin(yaw);
+    const P = (x, y, z) => [cx + x * c - z * sn, y, cz + x * sn + z * c];
+    const hw = w / 2, hd = d / 2, y1 = y0 + wallH, yr = y1 + roofH;
+    quad(walls, P(-hw, y0, hd), P(hw, y0, hd), P(hw, y1, hd), P(-hw, y1, hd));
+    quad(walls, P(hw, y0, -hd), P(-hw, y0, -hd), P(-hw, y1, -hd), P(hw, y1, -hd));
+    quad(walls, P(hw, y0, hd), P(hw, y0, -hd), P(hw, y1, -hd), P(hw, y1, hd));
+    quad(walls, P(-hw, y0, -hd), P(-hw, y0, hd), P(-hw, y1, hd), P(-hw, y1, -hd));
+    tri(walls, P(hw, y1, hd), P(hw, y1, -hd), P(hw, yr, 0));
+    tri(walls, P(-hw, y1, -hd), P(-hw, y1, hd), P(-hw, yr, 0));
+    const o = 0.008, hwo = hw + o, hdo = hd + o;      // eaves past the walls
+    quad(roof, P(-hwo, y1, hdo), P(hwo, y1, hdo), P(hwo, yr, 0), P(-hwo, yr, 0));
+    quad(roof, P(hwo, y1, -hdo), P(-hwo, y1, -hdo), P(-hwo, yr, 0), P(hwo, yr, 0));
+  }
+
+  /** A square tower with a pyramid cap — the wall towers and the church tower. */
+  function tower(cx, cz, y0, w, bodyH, roofH, yaw, wallC, roofC) {
+    const walls = prop(wallC), roof = prop(roofC);
+    const c = Math.cos(yaw), sn = Math.sin(yaw);
+    const P = (x, y, z) => [cx + x * c - z * sn, y, cz + x * sn + z * c];
+    const h = w / 2, y1 = y0 + bodyH;
+    quad(walls, P(-h, y0, h), P(h, y0, h), P(h, y1, h), P(-h, y1, h));
+    quad(walls, P(h, y0, -h), P(-h, y0, -h), P(-h, y1, -h), P(h, y1, -h));
+    quad(walls, P(h, y0, h), P(h, y0, -h), P(h, y1, -h), P(h, y1, h));
+    quad(walls, P(-h, y0, -h), P(-h, y0, h), P(-h, y1, h), P(-h, y1, -h));
+    const o = h + 0.008, apex = P(0, y1 + roofH, 0);
+    tri(roof, P(-o, y1, o), P(o, y1, o), apex);
+    tri(roof, P(o, y1, o), P(o, y1, -o), apex);
+    tri(roof, P(o, y1, -o), P(-o, y1, -o), apex);
+    tri(roof, P(-o, y1, -o), P(-o, y1, o), apex);
+  }
+
+  /**
+   * The cloister: a tower with a pyramid cap, a long gabled nave off its
+   * shoulder, and a low side chapel. Sits a touch north of centre so tile A's
+   * road can still arrive from the south, and turns with the tile plus a few
+   * degrees so it never sits dead square to the grid — nothing in the
+   * reference does.
+   */
+  function cloister(ox, oy, rot) {
+    const [px, pz] = rotPoint([0.5, 0.44], rot);
+    const cx = ox + px, cz = oy + pz;
+    const yaw = (rot & 3) * Math.PI / 2 + 0.32;
+    const c = Math.cos(yaw), sn = Math.sin(yaw);
+    const at = (x, z) => [cx + x * c - z * sn, cz + x * sn + z * c];
+    const [tx, tz] = at(-0.15, 0);
+    tower(tx, tz, 0, 0.13, 0.30, 0.10, yaw, THEME.city, THEME.roof);
+    const [nx, nz] = at(0.06, 0);
+    house(nx, nz, 0, 0.30, 0.15, 0.09, 0.065, yaw, THEME.city, THEME.roof);
+    const [ax, az] = at(0.10, 0.13);
+    house(ax, az, 0, 0.12, 0.09, 0.055, 0.04, yaw, THEME.city, THEME.roofDark);
+  }
+
+  // Point-to-boundary distance, for keeping houses off the parapet.
+  const segD = (p, a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const L2 = dx * dx + dy * dy || 1e-12;
+    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+    return Math.hypot(a[0] + dx * t - p[0], a[1] + dy * t - p[1]);
+  };
+  const distToPoly = (p, poly) => {
+    let m = Infinity;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) m = Math.min(m, segD(p, poly[j], poly[i]));
+    return m;
+  };
+
+  let prisms = 0, houses = 0;
+
+  /**
+   * Fill a town with houses. Deterministic per cell, so the same board always
+   * builds the same town. Houses keep clear of the cap boundary by more than
+   * their own half-diagonal, so nothing pokes through the parapet — but the
+   * margin is small enough that two towns joining across a seam read as one
+   * continuous huddle rather than two clusters with a firebreak.
+   */
+  function settle(cap, ox, oy, capH) {
+    const rand = rng32(((ox * 73856093) ^ (oy * 19349663) ^ 0x2545f) >>> 0);
+    const want = Math.max(2, Math.min(11, Math.round(Math.abs(area2(cap)) * 26)));
+    const placed = [];
+    for (let tries = 0; tries < 70 && placed.length < want; tries++) {
+      const p = [rand(), rand()];
+      if (!inside(p, cap) || distToPoly(p, cap) < 0.10) continue;
+      if (placed.some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 0.115)) continue;
+      placed.push(p);
+      // Mostly grid-ish with a jostle, the way the reference towns sit: no two
+      // roofs quite agree, but the town is not a scatter either.
+      const yaw = (rand() < 0.5 ? 0 : Math.PI / 2) + (rand() - 0.5) * 0.55;
+      const w = 0.075 + rand() * 0.04;
+      const pale = rand() < 0.18;
+      house(ox + p[0], oy + p[1], capH, w * 1.35, w, 0.045 + rand() * 0.025, 0.05,
+            yaw, THEME.plaster, pale ? '#c9b795' : THEME.roof);
+      houses++;
+    }
+  }
+
   for (const cell of board.cells.values()) {
     const { x: ox, y: oy, type, rot } = cell;
 
@@ -299,18 +460,33 @@ function build(gl, board) {
     }
 
     for (const feat of type.feats) {
+      // The point features have no silhouette to extrude — they are buildings,
+      // and a building gets a model. This is the gap the first spike named.
+      if (feat.type === 'monastery') { cloister(ox, oy, rot); continue; }
+
       const r = RELIEF[feat.type];
       if (!r || !feat.sides?.length) continue;
       const shape = outlineOf(feat, rot);
       if (!shape) continue;
       prisms++;
+      const town = feat.type === 'city';
 
-      // The top face, textured with the same picture from directly above.
-      const top = into(`t:${type.id}|${rot}|${r.tex}`, () => ({ kind: 'cap', tex: picture(gl, type, rot, r.tex) }));
+      // The top face. A town's plateau is packed earth with modelled houses
+      // standing on it, so the painted picture — which has the houses drawn
+      // flat, lying on their backs — must NOT be projected onto it. Everything
+      // else keeps its picture: a canopy and a rock face read fine from above.
+      const top = town
+        ? into('cap:town', () => ({ kind: 'cap', color: THEME.cityGround }))
+        : into(`t:${type.id}|${rot}|${r.tex}`, () => ({ kind: 'cap', tex: picture(gl, type, rot, r.tex) }));
       for (const [px, py] of triangulate(shape.cap)) vert(top, ox + px, r.h, oy + py, [0, 1, 0], px, py);
 
       // The cut face, on the rim and nowhere else — which is the whole trick.
-      const side = into(`s:${feat.type}`, () => ({ kind: 'wall', color: r.wall }));
+      // For a town the cut face IS the curtain wall, so it rises past the
+      // plateau into a parapet with an inner face, instead of stopping flush.
+      const lipH = r.h + 0.05, lipT = 0.03;
+      const side = town
+        ? into('wall:town', () => ({ kind: 'wall', color: THEME.city }))
+        : into(`s:${feat.type}`, () => ({ kind: 'wall', color: r.wall }));
       for (const line of shape.rim) {
         for (let i = 1; i < line.length; i++) {
           const [ax, ay] = line[i - 1], [bx, by] = line[i];
@@ -320,18 +496,36 @@ function build(gl, board) {
           const mid = [(ax + bx) / 2 + n[0] * 0.004, (ay + by) / 2 + n[1] * 0.004];
           if (inside(mid, shape.cap)) n = [-n[0], -n[1]];      // point away from the town
           const N = [n[0], 0, n[1]];
-          vert(side, ox + ax, r.h, oy + ay, N, 0, 0);
-          vert(side, ox + bx, r.h, oy + by, N, 1, 0);
-          vert(side, ox + bx, 0, oy + by, N, 1, 1);
-          vert(side, ox + ax, r.h, oy + ay, N, 0, 0);
-          vert(side, ox + bx, 0, oy + by, N, 1, 1);
-          vert(side, ox + ax, 0, oy + ay, N, 0, 1);
+          const hTop = town ? lipH : r.h;
+          faceN(side, N,
+            [ox + ax, hTop, oy + ay], [ox + bx, hTop, oy + by],
+            [ox + bx, 0, oy + by], [ox + ax, 0, oy + ay]);
+          if (town) {
+            const Ai = [ox + ax - n[0] * lipT, oy + ay - n[1] * lipT];
+            const Bi = [ox + bx - n[0] * lipT, oy + by - n[1] * lipT];
+            faceN(side, [0, 1, 0],
+              [ox + ax, lipH, oy + ay], [ox + bx, lipH, oy + by],
+              [Bi[0], lipH, Bi[1]], [Ai[0], lipH, Ai[1]]);
+            faceN(side, [-N[0], 0, -N[2]],
+              [Bi[0], lipH, Bi[1]], [Ai[0], lipH, Ai[1]],
+              [Ai[0], r.h, Ai[1]], [Bi[0], r.h, Bi[1]]);
+          }
         }
+      }
+
+      // Square towers where featureShape already says a tower belongs: the
+      // middle of each stretch of wall, well clear of every seam.
+      if (town) {
+        for (const t of shape.towersRot) {
+          tower(ox + t[0], oy + t[1], 0, 0.085, lipH + 0.045, 0.055, (rot & 3) * Math.PI / 2, THEME.city, THEME.roof);
+        }
+        settle(shape.cap, ox, oy, r.h);
       }
     }
   }
-  return { batches: [...batches.values()], prisms };
+  return { batches: [...batches.values()], prisms, houses };
 }
+
 
 // --- GL ----------------------------------------------------------------------
 
@@ -415,14 +609,29 @@ const ui = Object.fromEntries(['lift', 'liftV', 'count', 'countV', 'seed', 'silh
 
 let scene = null, centre = [0, 0];
 
+let lastBoard = null;
+
 function reseat() {
-  const board = deal(+ui.seed.value, +ui.count.value);
+  const board = lastBoard = deal(+ui.seed.value, +ui.count.value);
   let sx = 0, sy = 0;
   for (const c of board.cells.values()) { sx += c.x + 0.5; sy += c.y + 0.5; }
   centre = [sx / board.size, sy / board.size];
   const made = build(gl, board);
   scene = made.batches.map(upload);
-  ui.stat.textContent = `${board.size} tiles · ${made.prisms} prisms · ${scene.length} draws`;
+  ui.stat.textContent = `${board.size} tiles · ${made.prisms} prisms · ${made.houses} houses · ${scene.length} draws`;
+}
+
+/** Aim the camera at the first tile carrying a feature of this kind. */
+function focus(kind, minSides = 0) {
+  for (const c of lastBoard.cells.values()) {
+    for (const f of c.type.feats) {
+      if (f.type === kind && (f.sides?.length ?? 0) >= minSides) {
+        centre = [c.x + 0.5, c.y + 0.5];
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 const cam = { yaw: 0.62, pitch: 0.86, dist: 9 };
@@ -452,7 +661,7 @@ ui.count.addEventListener('input', () => { ui.countV.textContent = ui.count.valu
 for (const el of [ui.count, ui.seed]) el.addEventListener('change', reseat);
 ui.again.addEventListener('click', () => { ui.seed.value = Math.floor(Math.random() * 9999); reseat(); });
 
-const BARE = { ground: [0.29, 0.31, 0.30], cap: [0.76, 0.73, 0.66], wall: [0.64, 0.35, 0.27] };
+const BARE = { ground: [0.29, 0.31, 0.30], cap: [0.76, 0.73, 0.66], wall: [0.64, 0.35, 0.27], prop: [0.55, 0.52, 0.48] };
 
 const sun = norm([-LIGHT.x, 0.62, -LIGHT.y]);   // toward the light: north-west, low
 const back = hex(THEME.night);
@@ -505,5 +714,5 @@ function frame(t) {
 
 reseat();
 requestAnimationFrame(frame);
-window.relief = { reseat, cam, ui };      // so tools/relief.mjs can pose it
+window.relief = { reseat, focus, cam, ui };      // so tools/relief.mjs can pose it
 </script>

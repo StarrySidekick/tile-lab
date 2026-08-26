@@ -68,12 +68,15 @@ const stat = await page.textContent('#stat');
 console.log(`\n  ${stat}`);
 const prisms = +(stat.match(/(\d+) prisms/)?.[1] ?? 0);
 check(prisms > 0, `the deal extruded something (${prisms} prisms)`);
+const houses = +(stat.match(/(\d+) houses/)?.[1] ?? 0);
+check(houses > 0, `the towns got settled (${houses} houses)`);
 
 /** Pose the camera, let a couple of frames land, and read the canvas back. */
 async function pose(name, patch) {
   const spread = await page.evaluate(async (p) => {
     Object.assign(window.relief.cam, p.cam);
     window.relief.ui.silh.checked = !!p.silhouettes;
+    if (p.focus) window.relief.focus(p.focus.kind, p.focus.min ?? 0);
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     // How much variety is on screen. A single flat colour means nothing drew.
     const gl = document.getElementById('gl');
@@ -96,6 +99,10 @@ async function pose(name, patch) {
 await pose('overhead', { cam: { yaw: 0.0, pitch: 1.35, dist: 8 } });
 await pose('orbit', { cam: { yaw: 0.62, pitch: 0.55, dist: 8 } });
 await pose('silhouettes', { cam: { yaw: 0.62, pitch: 0.55, dist: 8 }, silhouettes: true });
+// The close-ups the modelling is judged against: a walled town with its
+// houses and towers, and the cloister that the extrusion could never make.
+await pose('town', { cam: { yaw: 0.9, pitch: 0.62, dist: 2.4 }, focus: { kind: 'city', min: 2 } });
+await pose('cloister', { cam: { yaw: 2.0, pitch: 0.46, dist: 1.35 }, focus: { kind: 'monastery' } });
 
 check(errors.length === 0, `no console errors${errors.length ? `: ${errors[0]}` : ''}`);
 

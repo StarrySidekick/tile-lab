@@ -82,24 +82,59 @@ no GPU at all. And straight overhead through an orthographic camera the whole
 thing degenerates back to the board we already have — the ground quad *is* the
 sprite — which means relief could be a camera, not a fork.
 
-**Didn't.** Four honest gaps, in order of how much they cost:
+**Didn't, at first.** Four honest gaps — two of which the second round (below)
+has since closed:
 
-- **Point features get nothing.** A monastery, a garden and a temple have no
-  sides, so `featureShape` returns null and they stay painted flat on the
-  ground. They are buildings, and a building needs a model rather than an
-  extrusion. This is the one piece of genuinely new authoring 3D asks for, and
-  there are maybe a dozen of them.
+- **Point features get nothing.** ~~A monastery, a garden and a temple have no
+  sides, so `featureShape` returns null and they stay painted flat.~~ CLOSED:
+  the cloister is now a modelled church — see *Modelling from reference*.
+- **The art already fakes height, and now it doubles.** ~~Roofs are a flat
+  picture lying on a raised floor.~~ CLOSED for towns: the plateau is packed
+  earth with modelled houses standing on it, and the painted picture is no
+  longer projected onto the top at all. Still true for the mountain's rock
+  shading, which remains painted.
 - **A mountain is not a mesa.** Uniform extrusion gives rock a flat top, which
   reads as a plateau. Rock wants a peaked profile — a height *function* over
   the silhouette rather than a constant — which is a per-type generator, not a
-  bigger number.
-- **The art already fakes height, and now it doubles.** `art.js` earns its
-  relief by drawing the thing itself: the wall has a shaded foot and a lit
-  walkway, roofs have a sunward slope and a shaded one. On a real plateau under
-  a real sun that painted shading fights the geometry. Roofs in particular are
-  now a flat picture lying on a raised floor. Making them geometry too is a
-  second, much larger job — and it would delete a lot of careful drawing.
+  bigger number. Still open.
 - **Roads stay flat**, which on inspection is correct. A cart track is a track.
+
+## Modelling from reference
+
+The second round took the classic tile sheet as a *reference* — not traced,
+not imported, no generator — and modelled the structures that repeat on it,
+in the theme's own colours, lit by the one sun. The reference teaches the
+vocabulary and the proportions; the geometry is original and procedural:
+
+- **A town** is a cluster of small gabled houses at jostled angles — mostly
+  grid-ish, no two roofs quite agreeing — behind a stone curtain wall. The
+  wall is the plateau's own cut face, risen past the top into a parapet with
+  an inner face, so it still follows the rim and still vanishes at every seam.
+  Square towers with pyramid caps stand at the points `featureShape` already
+  nominates (`towers`: the middle of each stretch of rim, clear of any seam).
+  Settlement is deterministic per cell, houses keep off the parapet by more
+  than their own half-diagonal, and towns joining across a seam read as one
+  huddle because the margin is small and the ground is shared.
+- **The cloister** is a tower with a pyramid cap, a taller-than-the-nave
+  proportion taken straight from the reference, a long gabled nave off its
+  shoulder and a low side chapel, set a touch north of centre so tile A's
+  road still arrives, and turned a few degrees off the grid because nothing
+  in the reference sits square.
+
+The whole vocabulary is three generators — `house`, `tower`, `cloister` —
+plus a `settle` pass, maybe 120 lines. The loop that made it work was not the
+modelling but the *looking*: render, screenshot through `tools/relief.mjs`,
+compare against the reference, adjust proportions, again. Two rounds got the
+cloister's massing right; no round would have got it right blind.
+
+The round also caught a real bug the textures had been hiding since the first
+spike: the ear-clipping triangulator silently dropped area on five of the
+fifteen silhouettes — half the polygon, in the worst case — because a
+corner-to-corner side closes the path exactly where it began and the
+duplicated vertex deadlocks the classic algorithm. The fix (dedupe, and when
+no ear is found remove the flattest vertex rather than giving up) was proved
+by measuring triangulated area against polygon area for all fifteen
+silhouettes: exact to five decimals, all of them.
 
 ## What shipping it would cost
 
