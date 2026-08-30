@@ -127,7 +127,7 @@ export class Bot {
   decide() {
     const g = this.game;
     // Some modes offer a move that replaces the turn rather than decorating it
-    // — Girando sends the Balena instead of putting a follower down. Only the
+    // — Soffiando sends the Balena instead of putting a follower down. Only the
     // mode can price that, so it gets asked before we start pricing squares.
     if ((g.phase === 'market' || g.phase === 'place' || g.phase === 'meeple')
       && this.level.verbs && g.m.botAction?.(this.seat)) return;
@@ -400,13 +400,13 @@ export class Bot {
     // A MODE THAT PRICES THIS FEATURE ITSELF IS THE AUTHORITY ON IT. What
     // follows is Carcassonne's own reasoning — how likely is this to close,
     // how much will it grow first — and it is only reasoning at all in a mode
-    // where closing is what pays. Girando pays for what is standing where at
+    // where closing is what pays. Soffiando pays for what is standing where at
     // the moment somebody closes a sphere, so its own numbers are the answer
     // and none of the odds below mean anything.
     //
     // The farm branch is why this guard has to come first. It priced a field
     // by the completed cities touching it, hard-coded, without ever asking the
-    // mode — so Girando's fields, which pay by the TILE, were valued by a rule
+    // mode — so Soffiando's fields, which pay by the TILE, were valued by a rule
     // that has nothing to do with them, and the weight meant to tune that was
     // measurably doing nothing at all. A sweep of one weight at a time found
     // it: halved and doubled came back byte-identical.

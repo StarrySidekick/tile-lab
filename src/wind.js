@@ -5,7 +5,7 @@
 // direction, shoves what it can, and hands back a report of everything that
 // happened; deciding what any of it is worth belongs to the mode. No game, no
 // scores, no DOM — which is what makes it testable and what would let a second
-// mode blow on a board without inheriting Girando's rules.
+// mode blow on a board without inheriting Soffiando's rules.
 //
 // A GUST has a direction and a reach. A zephyr reaches down one lane — the row
 // or column it sits in, downwind of itself. (`everywhere` blows every lane at
@@ -26,7 +26,7 @@
 //     strength carries across — it is the same wind on both sides of a strait.
 //     One gust is one nibble per run, not one nibble.
 //   WHAT THE WIND CAN GET UNDER GOES WHOLE. A mode may name the country too
-//     big to lift (`rooted` — in Girando, the Palazzo's mainland). Everything
+//     big to lift (`rooted` — in Soffiando, the Palazzo's mainland). Everything
 //     else the gust reaches is small enough that the wind takes ALL of it,
 //     perpendicular arms and all, and sets it down downwind as one thing —
 //     sliding until it comes to rest ALONGSIDE whatever stops it, rather than
@@ -67,7 +67,7 @@
 //     frozen in place stops being weather, and a board of stuck zephyrs is a
 //     board where the engine has quietly switched itself off.
 //   ONLY THE WHALE STOPS THE WIND. A run that ends against a BLOCKER — in
-//     Girando that is the Balena, and nothing else — has no loose end at all,
+//     Soffiando that is the Balena, and nothing else — has no loose end at all,
 //     and the lane ENDS there: nothing comes off it, and everything in the
 //     whale's lee, gaps and all, is untouched.
 //   NOTHING FALLS FOR BEING ALONE. A tile touching nothing at all hangs there
@@ -355,7 +355,7 @@ export function gust(board, { dir, from = null, everywhere = false, push = 1, ro
       const power = force.get(last);
 
       // WHAT THE WIND CAN GET UNDER GOES WHOLE. A mode may name the country
-      // that is too big to lift — in Girando that is the Palazzo's mainland,
+      // that is too big to lift — in Soffiando that is the Palazzo's mainland,
       // and nothing else. Everything else adrift in the sky is small enough
       // that the wind takes ALL of it, perpendicular arms and all, and sets it
       // down further downwind rather than nibbling a tile off its end. That is

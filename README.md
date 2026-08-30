@@ -63,7 +63,7 @@ earn stone, covering spends it, and you can't cover something that already
 scored. Buried tiles still pay 1 to whoever laid them at the end — **covering
 an opponent freezes them rather than erasing them**.
 
-**Girando** — the cloud kingdom, where the board itself is weather. You draw
+**Soffiando** — the cloud kingdom, where the board itself is weather. You draw
 one tile and claim as in Carcassonne; the difference is that the country won't
 hold still, and neither will the people standing on it. **Nothing crystallises**
 — every tile on the board can be pushed, finished or not, and the only thing
@@ -489,8 +489,8 @@ the point of it.
 
 Reading the board is one thing; knowing what to *care* about is another, and
 for a mode whose rules were invented last week nobody knows the answer —
-including whoever wrote the mode. Girando's advice is therefore a block of
-plain numbers, `GIRANDO_WEIGHTS`, and `tools/train.mjs` improves them by
+including whoever wrote the mode. Soffiando's advice is therefore a block of
+plain numbers, `SOFFIANDO_WEIGHTS`, and `tools/train.mjs` improves them by
 playing the mode against itself:
 
 ```bash
@@ -559,7 +559,7 @@ just looking at — and lands slightly oversized, settling. In Strata it keeps
 going and rises onto the stack it covered. A follower hops in on an arc and
 hops back off when it's recalled; one that walks on (the wagon) crosses to its
 new feature rather than reappearing there. Pawns and companies walk their move.
-Tiles that leave do it visibly too: a gust in Girando tumbles them off the edge,
+Tiles that leave do it visibly too: a gust in Soffiando tumbles them off the edge,
 and the rising tide slides them under with the water going over them.
 
 **Territory.** In The Marches a banner running out through a region shows you
@@ -688,7 +688,7 @@ Tiles are grouped, and each group toggles on and off independently:
 - **Cloud kingdom** — zephyrs (including four that blow more than one way at
   once, and two that push twice as hard), sferas in green, blue, red and yellow,
   temples, windmill turbines, Abbazias, flying machines, windvanes and city end
-  caps (Girando's pool)
+  caps (Soffiando's pool)
 - **Mountains** — spurs, ridges, bends, massifs, passes, and one peak
 - **Forests** — edges, corners, deep forest and old growth, some with logs
 - **Lakes** — shores, corners, narrows, headlands
@@ -710,7 +710,7 @@ src/art.js         procedural tile + landmark drawing (no assets)
 src/light.js       where the light comes from — one sun for the whole board
 src/shape.js       area silhouettes — the corner-to-corner rule that makes tiles match
 src/sprites.js     tile sprite cache, so the art is drawn once and then blitted
-src/wind.js        Girando's weather: one gust, and everything it moved
+src/wind.js        Soffiando's weather: one gust, and everything it moved
 src/game.js        the host: turn flow, deck, players, modifiers
 src/modes/         one file per mode, behind a small set of hooks
 src/ai.js          the computer player — one class, one action at a time
@@ -753,7 +753,7 @@ to be: `cells` is the source of truth and connectivity is **recomputable**.
 `Board.rebuild()` throws the components away and replays every visible cell in
 placement order — O(n) with n in the low hundreds, which is free at this scale.
 
-That one primitive is what lets tiles be **lifted** (Girando), **covered**
+That one primitive is what lets tiles be **lifted** (Soffiando), **covered**
 (Strata), **flipped** (two-faced) and **drowned** (rising tide). Two pieces of
 state have to survive a rebuild, so neither lives on the component: meeples live
 on their cell, and "already scored" lives in `scoredParts` as a set of
@@ -817,7 +817,7 @@ node tools/harness.mjs marches 200  # one mode, 200 seeded games
 node tools/smoke.mjs                # each mode booted in a real browser
 node tools/smoke.mjs --shots        # …and screenshotted to tools/shots/
 node tools/relief.mjs --shots       # the 3D spike, posed and screenshotted
-node tools/train.mjs                # tune Girando's bot by self-play
+node tools/train.mjs                # tune Soffiando's bot by self-play
 node tools/train.mjs --report       # …or just measure what it does now
 node tools/stamp.mjs -m "what's new"  # bump the build stamp before pushing
 ```
@@ -843,7 +843,7 @@ leave a tile behind, because a gesture read as a tap is the bug you'd ship.
 The motion block asks each effect to happen in the one mode where it can: a
 closure puts a number and a flash on the board and bumps the panel row, the
 tide takes a tile under, The Marches lights up a region as it counts it,
-Girando's wind actually shoves the board, and the endgame pays its features out
+Soffiando's wind actually shoves the board, and the endgame pays its features out
 over seconds rather than in a single frame.
 
 `package.json` exists only so Node treats `src/` as ES modules for those two

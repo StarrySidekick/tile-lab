@@ -40,7 +40,7 @@ const browser = await chromium.launch(
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
 await page.goto(`http://localhost:${PORT}/index.html`);
 await page.waitForTimeout(1100);
-await page.selectOption('#mode', 'girando');
+await page.selectOption('#mode', 'soffiando');
 await page.fill('#seed', 'frames');
 await page.click('#newGame');
 await page.waitForTimeout(300);

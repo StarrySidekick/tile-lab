@@ -54,7 +54,7 @@ export class Board {
      * Bumped by every mutation — placing, shifting, removing, replacing. It
      * exists so that anything deriving an expensive answer FROM the board can
      * cache it against a single integer instead of re-deriving it or hashing
-     * the cells. Girando asks "which piece of country is this tile on" once
+     * the cells. Soffiando asks "which piece of country is this tile on" once
      * per visible tile per frame and once per candidate square per turn, and
      * without this that question walks every cell on the board every time.
      */
@@ -116,7 +116,7 @@ export class Board {
    *   free   ignore edge matching entirely (sandbox)
    *   cover  the cell may already be occupied (Strata builds on top)
    *   onto   a set of cell keys the placement must touch orthogonally. This is
-   *          how Girando says "you may only build on the mainland": everything
+   *          how Soffiando says "you may only build on the mainland": everything
    *          adrift is still on the board, still blowable, still scoring — it
    *          just can't be reached with a tile in your hand.
    */
@@ -592,7 +592,7 @@ export class Board {
   /**
    * The board as separate pieces of country, biggest first. Orthogonal only:
    * two tiles touching at a corner are held up by each other but are not the
-   * same island, which is exactly the distinction Girando scores on.
+   * same island, which is exactly the distinction Soffiando scores on.
    */
   groups() {
     return this.regions(() => true).sort((a, b) => b.length - a.length);

@@ -5,10 +5,10 @@
 //   node tools/train.mjs --rounds 40 --games 16
 //   node tools/train.mjs --report             just measure the current weights
 //
-// Girando's bot reads the board perfectly well — what is standing where, who
+// Soffiando's bot reads the board perfectly well — what is standing where, who
 // holds it, what it would pay. What it cannot read is how much to CARE about a
 // farm against a temple, or whether shoving a rival's follower into open sky is
-// worth a placement. Those judgements live in `GIRANDO_WEIGHTS` as fifteen
+// worth a placement. Those judgements live in `SOFFIANDO_WEIGHTS` as fifteen
 // numbers, and in a mode this young every one of them is a guess.
 //
 // This replaces the guesses with a measurement.
@@ -23,7 +23,7 @@
 //     rate against the champion is the only signal that separates "this is
 //     good play" from "this makes big numbers happen".
 //
-//   EVERY MATCH IS PLAYED TWICE, SEATS SWAPPED. The first player in Girando
+//   EVERY MATCH IS PLAYED TWICE, SEATS SWAPPED. The first player in Soffiando
 //     lays the tile that starts the weather, and over sixteen games that is
 //     worth more than most of the weights are. Playing each seed from both
 //     seats cancels it exactly, and halves the number of games needed to see
@@ -39,7 +39,7 @@
 //     draws level is noise wearing a hat.
 //
 // The result is written to tools/brains/<name>.json and printed as a block you
-// can paste straight into GIRANDO_WEIGHTS.
+// can paste straight into SOFFIANDO_WEIGHTS.
 // ---------------------------------------------------------------------------
 
 import { fork } from 'node:child_process';
@@ -47,7 +47,7 @@ import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { cpus } from 'node:os';
-import { GIRANDO_WEIGHTS } from '../src/modes/girando.js';
+import { SOFFIANDO_WEIGHTS } from '../src/modes/soffiando.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, 'brains');
@@ -210,7 +210,7 @@ function report(r) {
   }
 }
 
-function show(w, base = GIRANDO_WEIGHTS) {
+function show(w, base = SOFFIANDO_WEIGHTS) {
   return Object.keys(w).map((k) => {
     const drift = base[k] === 0 ? 0 : (w[k] - base[k]) / Math.abs(base[k] || 1);
     const mark = Math.abs(drift) < 0.08 ? ' ' : (drift > 0 ? '↑' : '↓');
@@ -234,15 +234,15 @@ async function main() {
     // set somebody is still writing. Embarrassingly parallel, and immune to
     // the path-dependence that makes a climb hard to read.
     if (flag('sweep')) {
-      const keys = Object.keys(GIRANDO_WEIGHTS);
+      const keys = Object.keys(SOFFIANDO_WEIGHTS);
       console.log(`Sweeping ${keys.length} weights x2 directions, `
         + `${GAMES * 2} games each, ${JOBS} workers.`);
       const rows = [];
       for (const k of keys) {
         for (const [label, mul] of [['halved', 0.5], ['doubled', 2]]) {
-          const w = { ...GIRANDO_WEIGHTS, [k]: round(GIRANDO_WEIGHTS[k] * mul) };
-          if (w[k] === GIRANDO_WEIGHTS[k]) continue;
-          const r = await match(pool, w, GIRANDO_WEIGHTS, GAMES, 50001);
+          const w = { ...SOFFIANDO_WEIGHTS, [k]: round(SOFFIANDO_WEIGHTS[k] * mul) };
+          if (w[k] === SOFFIANDO_WEIGHTS[k]) continue;
+          const r = await match(pool, w, SOFFIANDO_WEIGHTS, GAMES, 50001);
           // Dead level on BOTH counts is the signature of a weight that
           // changed nothing at all: with the seats swapped, two identical
           // players give every pair a margin of +x and −x, which sums to
@@ -275,17 +275,17 @@ async function main() {
       const name = process.argv[process.argv.indexOf('--report') + 1];
       const brain = name && existsSync(join(OUT, `${name}.json`))
         ? JSON.parse(readFileSync(join(OUT, `${name}.json`), 'utf8')).weights
-        : GIRANDO_WEIGHTS;
+        : SOFFIANDO_WEIGHTS;
       console.log(`Measuring against the shipped weights, ${GAMES * 2} games…`);
-      const r = await match(pool, brain, GIRANDO_WEIGHTS, GAMES, 90001, true);
+      const r = await match(pool, brain, SOFFIANDO_WEIGHTS, GAMES, 90001, true);
       report(r);
       return;
     }
 
-    let champ = { ...GIRANDO_WEIGHTS };
+    let champ = { ...SOFFIANDO_WEIGHTS };
     let accepted = 0;
     let bestTop = 0;
-    console.log(`Training Girando: ${ROUNDS} rounds x ${GAMES * 2} games, `
+    console.log(`Training Soffiando: ${ROUNDS} rounds x ${GAMES * 2} games, `
       + `${JOBS} workers, ${TRIALS} trials/turn.`);
 
     for (let round = 1; round <= ROUNDS; round++) {
@@ -307,12 +307,12 @@ async function main() {
     // and broken down by where the points came from — which is the answer to
     // "what strategy is this", stated in the mode's own units.
     console.log('\nValidating against the shipped weights on unseen seeds…');
-    const check = await match(pool, champ, GIRANDO_WEIGHTS, Math.max(GAMES, 16), 90001, true);
+    const check = await match(pool, champ, SOFFIANDO_WEIGHTS, Math.max(GAMES, 16), 90001, true);
     report(check);
 
-    const name = `girando-${new Date(t0).toISOString().slice(0, 10)}`;
+    const name = `soffiando-${new Date(t0).toISOString().slice(0, 10)}`;
     writeFileSync(join(OUT, `${name}.json`), `${JSON.stringify({
-      mode: 'girando', rounds: ROUNDS, games: GAMES * 2, trials: TRIALS,
+      mode: 'soffiando', rounds: ROUNDS, games: GAMES * 2, trials: TRIALS,
       accepted, validation: check, weights: champ,
     }, null, 2)}\n`);
     console.log(`\n${accepted} of ${ROUNDS} challengers taken. Written to tools/brains/${name}.json`);

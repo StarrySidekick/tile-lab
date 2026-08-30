@@ -67,7 +67,7 @@ await page.evaluate(async () => {
 
   const SIZES = [24, 40, 64, 240];
   const ids = TILE_TYPES.filter((t) => t.group === 'cloud').map((t) => t.id);
-  // …plus the base tiles Girando actually deals.
+  // …plus the base tiles Soffiando actually deals.
   for (const id of ['D', 'E', 'N', 'U', 'V', 'B', 'Gw', 'Gl']) ids.push(id);
 
   const sheet = document.createElement('div');

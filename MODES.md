@@ -16,7 +16,7 @@ interesting part.
 | | Shipped as | Question it answers |
 |---|---|---|
 | 1. The Marches | mode | Is the board better as a contested surface than a scoring one? |
-| 2. Cirrus → **Girando** | mode | Is a small board you keep *editing* better than a big one you keep *growing*? — and then: is it better still if the board edits *itself*? |
+| 2. Cirrus → **Soffiando** | mode | Is a small board you keep *editing* better than a big one you keep *growing*? — and then: is it better still if the board edits *itself*? |
 | 3. Sprawl | mode | Does the board get more interesting when the *holes* matter? |
 | 4. Descent | mode | Does exploration hold up with a real fail state? |
 | 5. The Chronicle | mode | Are the tiles good *prompts*? |
@@ -116,11 +116,11 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 
 ## 2. Cirrus — the cloud kingdom, where tiles can be lifted
 
-> **Built, played, and rebuilt as GIRANDO** — `src/modes/girando.js`, with the weather engine in `src/wind.js`. The original is below, unchanged, because the reason it was replaced is the interesting part.
+> **Built, played, and rebuilt as SOFFIANDO** — `src/modes/soffiando.js`, with the weather engine in `src/wind.js`. The original is below, unchanged, because the reason it was replaced is the interesting part.
 >
 > Cirrus worked and it answered its question: a board you keep editing *is* better than one you only grow. But the editing was all yours. Every change to the board was a player deciding to make it, which made the mode a puzzle with a fidget attached rather than a place with weather in it. The drift was the only thing the board did on its own, and once you learned to keep everything at degree 2 it stopped happening.
 >
-> **Girando moves the verb from the player to the sky.** You place and claim as in Carcassonne — meeples are back, majority scoring is back — and the churn comes from the tiles themselves:
+> **Soffiando moves the verb from the player to the sky.** You place and claim as in Carcassonne — meeples are back, majority scoring is back — and the churn comes from the tiles themselves:
 >
 > - **Zephyrs** blow their whole lane one square downwind when played. Tiles that land touching nothing (corners count) fall out of the sky and go back in the deck. A zephyr caught by the wind fires in its turn, so a line of them is a chain.
 > - **Temples** replace monasteries: nobody claims them, they score nothing, and when the country closes around one it exhales — *every* lane on the board moves the way it faces. Shoving one with a gust pays 2.
@@ -251,13 +251,13 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 
 > **Eleventh pass: teach the computer player the rules, and find out what winning looks like.**
 >
-> Girando's rules were four passes old and nobody had ever played it well — including the harness, which was reading the board correctly and then valuing what it saw by Carcassonne's assumptions. So the mode's advice to the bot became a block of fifteen plain numbers, `GIRANDO_WEIGHTS`, and `tools/train.mjs` plays the mode against itself to improve them. Three things about how it is built are worth writing down, because each is a trap:
+> Soffiando's rules were four passes old and nobody had ever played it well — including the harness, which was reading the board correctly and then valuing what it saw by Carcassonne's assumptions. So the mode's advice to the bot became a block of fifteen plain numbers, `SOFFIANDO_WEIGHTS`, and `tools/train.mjs` plays the mode against itself to improve them. Three things about how it is built are worth writing down, because each is a trap:
 >
 > - **It selects on WINNING, not on scoring.** "Make the bot's score as large as possible" is the obvious objective and it is badly wrong: both seats play the same mode, so anything that inflates the board inflates both scores. A weight set that closes spheres constantly scores enormously and hands the same enormous score to its opponent.
 > - **Every match is played twice with the seats swapped.** The first player lays the tile that starts the weather, and over sixteen games that is worth more than most of the weights are.
 > - **A challenger has to beat a margin.** Forty games puts the standard error on a win rate at about eight points, and a hill-climb that accepts noise walks away from a good answer as happily as it walks toward one.
 >
-> **It found a real bug in ten minutes, and the bug is the interesting part.** The trainer has a sweep mode that moves one weight at a time, halved and doubled. The `farm` weight came back at exactly 50% and a mean margin of exactly zero in BOTH directions — which, with the seats swapped, is the signature of two players behaving identically. The weight was not wired to anything: `Bot.expectedValue` had a hard-coded branch pricing a field by the completed cities touching it, Carcassonne's own farm rule, without ever asking the mode. Girando's farms pay by the TILE. The bot had been valuing the biggest income in the game by a rule that has nothing to do with it, for four passes, and nothing else would ever have caught it. The fix is one guard: a mode that prices a feature type itself is the authority on it. The bot's mean score went from 158 to 195 on that line alone.
+> **It found a real bug in ten minutes, and the bug is the interesting part.** The trainer has a sweep mode that moves one weight at a time, halved and doubled. The `farm` weight came back at exactly 50% and a mean margin of exactly zero in BOTH directions — which, with the seats swapped, is the signature of two players behaving identically. The weight was not wired to anything: `Bot.expectedValue` had a hard-coded branch pricing a field by the completed cities touching it, Carcassonne's own farm rule, without ever asking the mode. Soffiando's farms pay by the TILE. The bot had been valuing the biggest income in the game by a rule that has nothing to do with it, for four passes, and nothing else would ever have caught it. The fix is one guard: a mode that prices a feature type itself is the authority on it. The bot's mean score went from 158 to 195 on that line alone.
 >
 > The same signature caught two dead weights. `whale` was a pure positive scale on a value used only in an argmax and a sign test, so it could not change a decision; it is a THRESHOLD now — how good the shelter has to be before the Balena is worth a follower placement. `turbineFree` guarded a branch nothing reaches, and is gone.
 >
@@ -438,7 +438,7 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > ends a lane.
 >
 > **What the wind can get under goes whole.** `gust()` takes a `rooted` set from
-> the mode — the country too big to lift, which in Girando is the Palazzo's
+> the mode — the country too big to lift, which in Soffiando is the Palazzo's
 > mainland and nothing else. Everything else adrift that the gust reaches travels
 > *entire*: perpendicular arms, followers and all, set down downwind as one
 > thing, sliding until it comes to rest **alongside** what stops it rather than
@@ -620,7 +620,7 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 > noise for cockle, wire and chain lines, pulp flecks — into a tileable
 > `assets/paper.png`. Deterministic, seeded, no generator anywhere near it.
 >
-> **The chart palette.** Girando's country is recoloured to the measured
+> **The chart palette.** Soffiando's country is recoloured to the measured
 > reference tones — sage wash on buff land, bare-paper roads inside ink edges,
 > vermillion roofs, the portolan's near-grey sea — as a palette overlay in
 > theme.js that `usePalette()` swaps in per frame. The sprite cache keys on the
@@ -702,7 +702,7 @@ kingmakes badly, and you'd blame the mechanic instead of the count.
 >
 > Every visual constant in the game was a literal buried three files deep,
 > tuned by guesswork and rediscovered by grepping — the foxing table in
-> render.js, the wobble amplitude in ink.js, the storm beat in girando.js, the
+> render.js, the wobble amplitude in ink.js, the storm beat in soffiando.js, the
 > chart palette in theme.js, the parchment variables in style.css. They are now
 > ONE table in `src/design.js`: 56 entries, each with a name, a type, a range,
 > a default and a sentence saying what it does.
@@ -975,7 +975,7 @@ difficulty setting.
 
 ## 8. Market — a drafting layer (best ratio on the list)
 
-> **Built as a modifier** — `Drafting market`, and it works everywhere. Duel's open pool reuses the same row and the same picker with the discard rule switched off; Girando did too, until the eighth pass took the hand out and went back to a single drawn tile.
+> **Built as a modifier** — `Drafting market`, and it works everywhere. Duel's open pool reuses the same row and the same picker with the discard rule switched off; Soffiando did too, until the eighth pass took the hand out and went back to a single drawn tile.
 
 **Question:** how much of the game is the randomness of the draw?
 
@@ -1158,7 +1158,7 @@ rebuild() {
 ```
 
 O(n) per removal with n ≈ 100. Free at this scale, and the same call now
-supports **lifting** (Girando), **covering** (Strata), **flipping** (two-faced)
+supports **lifting** (Soffiando), **covering** (Strata), **flipping** (two-faced)
 and **flooding** (rising tide) — one primitive, four features, which is the
 best ratio anything in this document achieved.
 
@@ -1252,7 +1252,7 @@ A few things the harness noticed that are worth watching for at the table:
   is healthy — it means the draft and the bounded board are doing work. If it's
   *not* fun, that's the single most useful negative result in the whole
   document, because everything else assumes it is.
-- **Girando** scored *low* at first — a mean of 3 across random play, 10 across
+- **Soffiando** scored *low* at first — a mean of 3 across random play, 10 across
   bot games, where Classic runs 28 and 45. That was the thesis working (nothing
   pays until it closes, and the wind keeps things from closing) but it sat close
   to the edge: if a game can end with everyone on 4, the wind is winning too

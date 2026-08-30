@@ -79,7 +79,7 @@ function playOut(opts) {
  * that a move changed nothing at all.
  *
  * `board.seq` is the load-bearing field. Board SIZE is not enough in a mode
- * where the country moves: Girando can lay a tile, have the wind blow a
+ * where the country moves: Soffiando can lay a tile, have the wind blow a
  * different one out of the sky, put that one back in the deck and deal it
  * straight back — a real move, a completely rearranged board, and every coarse
  * counter back where it started. The placement counter only ever goes up.
@@ -117,7 +117,7 @@ function step(game, rng) {
       }
       return;
     }
-    // Girando: walking a follower on down a road after the sky has paid it.
+    // Soffiando: walking a follower on down a road after the sky has paid it.
     case 'stroll': {
       const spots = game.m.stroll?.targets || [];
       if (!spots.length || rng() < 0.25) return void game.m.skipStroll();
@@ -133,7 +133,7 @@ function step(game, rng) {
       if (!game.cellClick(t.x, t.y)) game.m.cancelFlat();
       return;
     }
-    // Girando's flying machine, fetching a follower back off its own lane.
+    // Soffiando's flying machine, fetching a follower back off its own lane.
     case 'flight': {
       const spots = game.m.flightLifts();
       if (!spots.length) return void game.m.cancelLift();
@@ -141,7 +141,7 @@ function step(game, rng) {
       if (!game.cellClick(t.x, t.y)) game.m.cancelLift();
       return;
     }
-    // Girando's whale: three squares, instead of a follower.
+    // Soffiando's whale: three squares, instead of a follower.
     case 'balena': {
       const spots = game.m.balenaTargets();
       if (!spots.length) return void game.m.cancelSwim();
@@ -153,7 +153,7 @@ function step(game, rng) {
     case 'rob': { if (rng() < 0.5) game.robAuto(); else game.robSkip(); return; }
     case 'crop': { game.cropChoose(rng() < 0.5 ? 'add' : 'remove'); return; }
     case 'meeple': {
-      // A mode may offer something INSTEAD of a follower; Girando's whale is
+      // A mode may offer something INSTEAD of a follower; Soffiando's whale is
       // the only one, and it never gets exercised unless something picks it.
       if (game.m.canLieDown?.() && rng() < 0.3) return void game.m.beginFlat();
       if (game.m.canLift?.() && rng() < 0.25) return void game.m.beginLift();
@@ -367,9 +367,9 @@ function checkPieces(n = 300) {
 // --- the wind ----------------------------------------------------------------
 
 /**
- * Girando's engine, on boards built by hand. Every one of these is a rule you
+ * Soffiando's engine, on boards built by hand. Every one of these is a rule you
  * can state in a sentence, and every one of them is a rule that a game of
- * Girando is unplayable without — which is exactly the set worth asserting
+ * Soffiando is unplayable without — which is exactly the set worth asserting
  * rather than hoping a random playthrough happens to cover.
  *
  * `B` and `Kz` are the two all-field tiles in the pool, so a board built out of
@@ -907,17 +907,17 @@ function checkWind() {
 }
 
 /**
- * Girando's own rules, which the wind engine knows nothing about: what the
+ * Soffiando's own rules, which the wind engine knows nothing about: what the
  * mainland is, what a city pays and un-pays, what a road pays other people,
  * when the farms are harvested, and the whale. Every one of these is cheap to
  * assert and expensive to notice missing — the city clawback in particular is
  * invisible until somebody's score goes down for the wrong reason.
  */
-function checkGirando() {
-  console.log('girando');
+function checkSoffiando() {
+  console.log('soffiando');
 
   const fresh = (seed) => {
-    const h = new Game({ mode: 'girando', players: 2, seed });
+    const h = new Game({ mode: 'soffiando', players: 2, seed });
     for (const c of [...h.board.cells.values()]) h.board.remove(c.x, c.y);
     h.players[0].score = 0;
     h.players[1].score = 0;
@@ -2317,7 +2317,7 @@ function main() {
   checkBoard();
   checkPieces();
   checkWind();
-  checkGirando();
+  checkSoffiando();
 
   console.log('\nmodes');
   for (const spec of MODES) {
@@ -2340,7 +2340,7 @@ function main() {
     checkBridges();
     checkBots(Math.max(4, games / 2));
     botVsRandom(Math.max(10, games * 2));
-    // Classic is the plain case, Girando moves tiles around under you, and
+    // Classic is the plain case, Soffiando moves tiles around under you, and
     // Sprawl places several at once — between them they cover the ways a
     // modifier can go wrong.
     console.log('\nmechanics, against a plain mode, a removing one and a piece one');
@@ -2350,7 +2350,7 @@ function main() {
     for (const mech of LIVE_MECHANICS) {
       if (mech.id === 'fog') continue;                // purely a render flag
       if (mech.on) continue;                          // base layer, tested below
-      for (const host of ['classic', 'girando', 'sprawl']) {
+      for (const host of ['classic', 'soffiando', 'sprawl']) {
         runMode(MODE_OF(host), Math.max(4, games / 2), { options: { [mech.id]: true } }, `+${mech.id}`);
       }
     }

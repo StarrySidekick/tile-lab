@@ -63,26 +63,26 @@ export class Mode {
 
   /**
    * Price a feature your own way, or return null to use the board's rules.
-   * Girando pays a city 1 per tile, like a road.
+   * Soffiando pays a city 1 per tile, like a road.
    */
   valueOf() { return null; }
 
   /**
    * Extra squares a follower may be put on this turn, beyond the tile just
-   * laid: `{x, y, i, f, flying}`. Girando's flying machine is the only user.
+   * laid: `{x, y, i, f, flying}`. Soffiando's flying machine is the only user.
    */
   flightTargets() { return []; }
 
   /**
    * May a follower be put on this feature at all? The host has already checked
    * that it is claimable and unheld; this is the mode's veto on top of that.
-   * Girando uses it twice over — roads are nobody's to claim any more, and an
+   * Soffiando uses it twice over — roads are nobody's to claim any more, and an
    * island is somewhere you have to be blown or flown to.
    */
   claimAllowed() { return true; }
 
   /**
-   * Do the farms pay at the very end, the way the base game's do? Girando says
+   * Do the farms pay at the very end, the way the base game's do? Soffiando says
    * no: its fields are harvested when a sphere closes and the farmers walk
    * home, so there is nothing left to count when the wind drops.
    */
@@ -91,7 +91,7 @@ export class Mode {
   /**
    * Keep the follower step open even when there is nothing to claim. The host
    * skips straight past an empty claim step, which is right everywhere except
-   * where the mode offers something INSTEAD of a follower — Girando's whale is
+   * where the mode offers something INSTEAD of a follower — Soffiando's whale is
    * moved in place of putting one down, and most turns there is nothing on the
    * tile to claim anyway.
    */

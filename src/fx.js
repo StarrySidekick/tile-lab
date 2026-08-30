@@ -192,7 +192,7 @@ export class Effects {
         // at a time is the difference between a number changing and a result.
         const wait = game?.phase === 'over' ? this.tally++ * TALLY_STEP : 0;
         const winners = data.players?.length ? data.players : [data.player ?? game?.current ?? 0];
-        // Points can go DOWN: Girando takes a city's payment back when the wind
+        // Points can go DOWN: Soffiando takes a city's payment back when the wind
         // blows it open again. A clawback wants its own sign and its own
         // colour, or "+-4" flashes up in the colour of a reward.
         const back = data.points < 0;

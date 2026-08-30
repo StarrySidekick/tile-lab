@@ -545,7 +545,7 @@ export class Game {
   placeAt(x, y) {
     if (this.phase !== 'place') return false;
     // A mode that owns placement says so by answering. Returning `undefined`
-    // means "not mine this time" — Girando only intercepts when the thing in
+    // means "not mine this time" — Soffiando only intercepts when the thing in
     // your hand is a ship rather than a tile, and wants the ordinary path for
     // everything else.
     if (this.m.placeAt && !this.usingAbbey && !this.riverActive) {
@@ -746,7 +746,7 @@ export class Game {
   /**
    * Where a follower may go this turn. Normally that's the unclaimed features
    * on the tile you just laid — but a mode may offer somewhere else entirely
-   * (Girando's flying machine sends one down a lane), so every option carries
+   * (Soffiando's flying machine sends one down a lane), so every option carries
    * the square it belongs to rather than assuming `lastPlaced`.
    */
   meepleOptions() {

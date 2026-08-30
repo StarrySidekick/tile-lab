@@ -25,7 +25,7 @@ const STREAM = [
 ];
 
 process.on('message', ({ seed, trials, weights, hero, breakdown }) => {
-  const game = new Game({ players: weights.length, seed, mode: 'girando' });
+  const game = new Game({ players: weights.length, seed, mode: 'soffiando' });
   // Where each seat's points came from — only when asked for, because it means
   // wrapping the payout path for the whole game.
   const streams = weights.map(() => ({}));

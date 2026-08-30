@@ -1,5 +1,5 @@
 {
-  "mode": "girando",
+  "mode": "soffiando",
   "rounds": 60,
   "games": 40,
   "trials": 60,
@@ -37,5 +37,5 @@
     "gustBlow": 1,
     "whale": 1.61
   },
-  "note": "The self-play climb that produced this ran before the shipped weights were updated, so it is a record of the session rather than the current defaults. The set actually shipped is composed from this and the sensitivity sweep, and validated at 62.5% over 120 games \u2014 see GIRANDO_WEIGHTS."
+  "note": "The self-play climb that produced this ran before the shipped weights were updated, so it is a record of the session rather than the current defaults. The set actually shipped is composed from this and the sensitivity sweep, and validated at 62.5% over 120 games \u2014 see SOFFIANDO_WEIGHTS."
 }

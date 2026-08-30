@@ -2115,7 +2115,7 @@ export function drawTile(ctx, type, { cave = false, terrain = cave ? 'cave' : 's
       ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(1, i); ctx.stroke();
     }
   } else if (terrain === 'sky') {
-    // Girando is a kingdom in the air. Nothing mechanical hangs on this — the
+    // Soffiando is a kingdom in the air. Nothing mechanical hangs on this — the
     // rules don't care what colour the ground is — but "field" was doing real
     // damage to the fiction, because a tile blown off the edge of a green
     // meadow is a nonsense and a tile blown off the edge of the sky is the

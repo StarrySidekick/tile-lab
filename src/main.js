@@ -858,6 +858,10 @@ function loadSettings() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch { /* ignore */ }
   if (!saved) return false;
+  // The cloud kingdom used to be called Girando. A saved mode that no longer
+  // exists would quietly fall back to Classic, which is the wrong greeting
+  // for the one player most invested in the renamed mode.
+  if (saved.fields?.mode === 'girando') saved.fields.mode = 'soffiando';
   for (const [id, v] of Object.entries(saved.fields || {})) {
     const el = $(id);
     if (!el) continue;

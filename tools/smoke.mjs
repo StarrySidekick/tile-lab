@@ -446,12 +446,12 @@ for (const [what, mode, mech, kind] of [
   } else console.log(`  ✓ ${what.padEnd(17)} ${mode}`);
 }
 
-// Girando's wind, which is the one effect driven by the rules rather than by
+// Soffiando's wind, which is the one effect driven by the rules rather than by
 // a score: a zephyr has to actually shove the board, and the tiles it shoved
 // have to be drawn sliding rather than teleporting.
 {
   errors.length = 0;
-  await page.selectOption('#mode', 'girando');
+  await page.selectOption('#mode', 'soffiando');
   await page.click('#newGame');
   const wind = await page.evaluate(async () => {
     const g = window.LAB.game;
@@ -502,12 +502,12 @@ for (const [what, mode, mech, kind] of [
   });
   const problems = [];
   if (errors.length) problems.push(errors[0].split('\n')[0]);
-  if (wind.mode !== 'girando') problems.push(`the mode was ${wind.mode}`);
+  if (wind.mode !== 'soffiando') problems.push(`the mode was ${wind.mode}`);
   else if (!wind.gusts) {
     problems.push(`no zephyr in ${wind.steps} steps (${JSON.stringify(wind.seen)}, ended in "${wind.phase}")`);
   } else if (!wind.moved) problems.push('the wind did nothing at all');
-  if (problems.length) { failures++; console.log(`  ✗ girando wind: ${problems.join(' · ')}`); }
-  else console.log(`  ✓ girando wind      ${wind.gusts} gust(s), ${wind.moved} tiles moved or lost`);
+  if (problems.length) { failures++; console.log(`  ✗ soffiando wind: ${problems.join(' · ')}`); }
+  else console.log(`  ✓ soffiando wind      ${wind.gusts} gust(s), ${wind.moved} tiles moved or lost`);
 }
 
 // The endgame tally: many features settle in one frame, and they have to be

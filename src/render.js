@@ -269,7 +269,7 @@ export class Renderer {
 
   /**
    * What's between the tiles. In every mode but one it's the night the board
-   * hangs in; in Girando it's open sky, because there the gaps are the point —
+   * hangs in; in Soffiando it's open sky, because there the gaps are the point —
    * a tile blown off the edge falls into that, and islands are pieces of
    * country with it running between them. The tiles themselves stay ordinary
    * countryside: the sky is the SPACE, not the ground.
@@ -737,7 +737,7 @@ export class Renderer {
       ctx.lineWidth = 2;
       ctx.strokeRect(sx + 1, sy + 1, z - 2, z - 2);
     }
-    // Girando: country adrift from the mainland. You cannot build onto it and
+    // Soffiando: country adrift from the mainland. You cannot build onto it and
     // you cannot walk a follower onto it — and everything that closes out
     // there is worth half again as much. That is the single most consequential
     // thing about a square in the mode, so it gets a rim of its own.
@@ -1235,7 +1235,7 @@ export class Renderer {
 
   /**
    * Where a follower may go. Usually the tile just laid, but an option carries
-   * its own square — Girando's flying machine offers features halfway across
+   * its own square — Soffiando's flying machine offers features halfway across
    * the board, drawn in the flight's own colour so you can tell the two kinds
    * of claim apart before you commit one.
    */

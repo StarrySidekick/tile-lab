@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Girando — the cloud kingdom, where the board itself is weather.
+// Soffiando — the cloud kingdom, where the board itself is weather.
 //
 // You place tiles and claim features like Carcassonne, and then the wind
 // rearranges the country underneath you. Nothing in the sky is nailed down:
@@ -249,7 +249,7 @@ const TURBINE = 2;           // to the feature's holder, per gust through it
  * a distance), temples come second, roads are worth about half what they look
  * like, and a windmill in a city you hold is worth twice the guess.
  */
-export const GIRANDO_WEIGHTS = {
+export const SOFFIANDO_WEIGHTS = {
   ahead: 2,          // firings a claim is priced over — and claim eagerness
   farm: 4,           // …scaled per feature type, because the four colours pay
   city: 1,           //    over different numbers of tiles and the bot has no
@@ -267,7 +267,7 @@ export const GIRANDO_WEIGHTS = {
 };
 
 /** A seat's own weights, or the defaults. */
-const weightsFor = (mode, seat) => mode.brains?.[seat] || GIRANDO_WEIGHTS;
+const weightsFor = (mode, seat) => mode.brains?.[seat] || SOFFIANDO_WEIGHTS;
 const WINDMILL = 2;          // …and per windmill, to whoever HOLDS the feature it finishes
 const REOPENED = 1;          // per tile, off a held city the wind blows open again
 const MAX_CHAIN = 6;         // storms raised while a storm is still landing
@@ -326,7 +326,7 @@ const listTally = (things, label = (t) => t) =>
   listOf(tallyOf(things).map(([t, n]) => `${label(t)}${n > 1 ? ` ×${n}` : ''}`));
 
 /**
- * What Girando plays instead of parts of the base set. The three-way junctions
+ * What Soffiando plays instead of parts of the base set. The three-way junctions
  * become junctions with a village on them; there are no cloisters in the sky,
  * so every one is a temple; and the four-sided city is out, because a city
  * that can only be entered and never capped is one the weather never lets you
@@ -341,7 +341,7 @@ const isPalazzo = (cell) => cell?.type.id === 'Kpz';
 const hasPalazzo = (cells) => cells.some(isPalazzo);
 const key = (c) => `${c.x},${c.y}`;
 
-export class Girando extends Mode {
+export class Soffiando extends Mode {
   /** The kingdom starts with a seat, and the seat is as blowable as anything. */
   seeds() { return [{ x: 0, y: 0, id: 'Kpz', rot: 0 }]; }
 
@@ -557,7 +557,7 @@ export class Girando extends Mode {
   }
 
   /**
-   * What a feature is worth to a computer player. Everything in Girando is
+   * What a feature is worth to a computer player. Everything in Soffiando is
    * paid by the sferas, over the whole board, several times a game — so the
    * price of standing in something is what its colour pays TIMES the number of
    * times that colour is still likely to fire. Without this the bot reads the
@@ -665,7 +665,7 @@ export class Girando extends Mode {
 
   /**
    * One half-sphere going off: a scoring pass over one kind of thing, over the
-   * whole board, paying whoever holds each one. Nothing in Girando is paid for
+   * whole board, paying whoever holds each one. Nothing in Soffiando is paid for
    * being finished any more — finishing a city changes what it is worth when a
    * blue sphere next closes, and that is all. Which means the question every
    * turn is not "can I close this" but "will a sphere close while I am still
@@ -870,7 +870,7 @@ export class Girando extends Mode {
   // A follower whose feature just finished is on its way back to the supply.
   // Instead, it may WALK: out along a road connected to where it was standing,
   // as far as the road goes, and take up whatever it finds at the end. It is
-  // the only way a figure moves anywhere in Girando under its own steam, and
+  // the only way a figure moves anywhere in Soffiando under its own steam, and
   // it is what stops a scored feature from simply being an eviction.
   //
   // The road it walks is a road COMPONENT, which is why sky bridges matter
@@ -1937,10 +1937,10 @@ export class Girando extends Mode {
   }
 }
 
-Girando.spec = {
-  id: 'girando',
-  name: 'Girando (cloud kingdom)',
-  Mode: Girando,
+Soffiando.spec = {
+  id: 'soffiando',
+  name: 'Soffiando (cloud kingdom)',
+  Mode: Soffiando,
   groups: ['base', 'cloud'],
   // Ink on aged paper rather than twilight: the whole mode is a chart, the
   // zephyrs are the wind-heads drawn in its corners, and the panel has to be

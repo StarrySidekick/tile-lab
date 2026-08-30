@@ -7,7 +7,7 @@
 // hardcoded next to the dial that was supposed to set it. Those look fine in
 // review and are invisible until somebody drags the slider and nothing moves.
 //
-// So: start a seeded Girando game, stop while there are still followers on
+// So: start a seeded Soffiando game, stop while there are still followers on
 // the board, then for every entry in the book push it to an extreme and
 // redraw. The picture is captured with the clock stopped and the sprite cache
 // settled, so the only thing that can move a pixel is the dial. A dial that leaves the hash
@@ -42,7 +42,7 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(`http://localhost:${PORT}/index.html`);
 await page.waitForTimeout(900);
-await page.selectOption('#mode', 'girando');
+await page.selectOption('#mode', 'soffiando');
 await page.fill('#seed', 'dials');      // the same board every run, or a dial
 await page.click('#newGame');           // that fails is just a board that varied
 await page.waitForTimeout(300);

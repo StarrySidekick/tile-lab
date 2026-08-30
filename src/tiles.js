@@ -313,7 +313,7 @@ export const TILE_TYPES = [
 
   // --- cloud: the sky kingdom, and the weather that runs it -----------------
   //
-  // Girando's pool. Most of these exist to make the board MOVE rather than to
+  // Soffiando's pool. Most of these exist to make the board MOVE rather than to
   // score: the zephyr blows a lane, the windvane re-points itself in the wind
   // and re-cuts what runs through it, and the turbine is paid for every gust
   // that arrives. Nothing here is ever nailed down — the only thing in the
@@ -321,7 +321,7 @@ export const TILE_TYPES = [
   //
   // Every one of them carries FIELDS, worked out the same way the base set's
   // are: the ground between the roads and the walls. They matter because the
-  // farm is the one thing in Girando that scores for where the country IS
+  // farm is the one thing in Soffiando that scores for where the country IS
   // rather than for what closed on it, and a pool where half the tiles had no
   // ground on them would be a pool where farms stopped at the weather.
   // Gusts, pointing north on the tile and wherever you turn it in the world.
@@ -438,9 +438,9 @@ export const TILE_TYPES = [
   // the way it points, riding any zephyr it crosses.
   { id: 'Kfl', n: 5, group: 'cloud', name: 'Flying machine', feats: [road([S])], marks: [mark('flier', null, N)], fields: [[0, 1, 2, 3, 4, 5, 6, 7]] },
 
-  // Not dealt: Girando swaps these in for the base 3-way junctions. They END
+  // Not dealt: Soffiando swaps these in for the base 3-way junctions. They END
   // the three roads that run into them, the way the base set's do, and they
-  // carry the village that grew up at the junction. Girando tried the opposite
+  // carry the village that grew up at the junction. Soffiando tried the opposite
   // for two passes — junctions that carried a road straight through, to stop
   // things closing — and the mode did not need the help.
   { id: 'Gw', n: 0, group: 'cloud', name: 'Road 3-way + village',    feats: [road([E]), road([S]), road([W])],            marks: [mark('village')], fields: [[3, 4], [5, 6], [7, 0, 1, 2]] },

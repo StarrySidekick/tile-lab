@@ -1,6 +1,6 @@
 # Reference dossier — the antique chart look
 
-The five images Girando's art is measured against. "Match the reference" is a
+The five images Soffiando's art is measured against. "Match the reference" is a
 number here, not a vibe: the palettes and ink densities below were sampled from
 the files in this directory (`tools/art.mjs --measure` re-runs the sampling).
 

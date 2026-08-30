@@ -84,7 +84,7 @@ export const THEME = {
 };
 
 /**
- * THE CHART PALETTE — Girando's, and measured rather than invented. The
+ * THE CHART PALETTE — Soffiando's, and measured rather than invented. The
  * reference scans in docs/refs sample to a gold-buff paper (#e8c888 family),
  * near-grey sea washes, vermillion accents and a warm near-black ink; the
  * values here are those samples, adjusted only far enough apart to stay
