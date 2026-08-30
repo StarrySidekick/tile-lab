@@ -42,6 +42,12 @@ if (shots) mkdirSync(join(ROOT, 'tools/shots'), { recursive: true });
 const browser = await chromium.launch(
   process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
 const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+// The harness is a fresh browser, which would otherwise be greeted by the
+// first-visit welcome card sitting over the board it is about to click on.
+// It has read the instructions; mark it as a returning player.
+await page.addInitScript(() => {
+  try { localStorage.setItem('tilemakers-workshop/welcomed', '1'); } catch { /* fine */ }
+});
 
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));

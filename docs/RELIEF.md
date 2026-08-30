@@ -1,11 +1,12 @@
 # Relief — what it would take to make the tiles actually 3D
 
 A scoping note and a working spike. Nothing in `src/` changed; the experiment
-lives in `tools/relief.html` and can be thrown away without leaving a mark.
+grew up: it lives at `relief.html` in the repo root, and the game can hand it
+a real board (the **View the board in relief** button in the panel).
 
 ```
 node tools/relief.mjs --shots     # boots it, checks it, writes tools/shots/relief-*.png
-open tools/relief.html            # or just look at it, and drag it about
+open relief.html                  # or just look at it, and drag it about
 ```
 
 ## The question that actually mattered
@@ -36,8 +37,7 @@ with rust round the outside of the whole thing and none at all down the seams.
 
 ## What the spike is
 
-Two hundred lines of WebGL2 and no dependencies, in the same spirit as
-`tools/seams.html`. It imports the real tile table, the real `Board` with the
+A page of WebGL2 and no dependencies, in the same spirit as `tools/seams.html`. It imports the real tile table, the real `Board` with the
 real edge matching, the real silhouettes and the real `drawTile`. Nothing was
 re-authored for 3D. The only new information in the whole file is a table of
 six numbers:
@@ -140,10 +140,12 @@ silhouettes: exact to five decimals, all of them.
 
 Three rungs, and they are very different sizes.
 
-**Rung one — the spike, kept.** Leave `tools/relief.html` as a viewer, wire it
-to a real game's board, and use it to look at a finished map. No rules, no
-input, no UI. Days, and nothing in `src/` moves. This is the honest value of
-what exists today.
+**Rung one — the spike, kept.** Leave `relief.html` as a viewer, wire it to a
+real game's board, and use it to look at a finished map. No rules, no input,
+no UI. DONE: the game's panel has a **View the board in relief** button that
+hands the current board over through localStorage, mid-game or finished, any
+mode. The snapshot carries only `{x, y, tile id, rotation}` per cell, so a
+mode's derived tile types are skipped rather than fatal.
 
 **Rung two — relief as a camera in the real game.** This is where the cost
 actually lives, and it is not in the art. `render.js` is 1,739 lines, 28

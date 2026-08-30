@@ -25,6 +25,7 @@
   <label><input id="silh" type="checkbox" /> Silhouettes only</label>
   <label><input id="spin" type="checkbox" /> Turntable</label>
   <button id="again">Re-deal</button>
+  <button id="mine" hidden>Your board</button>
   <span id="stat"></span>
 </div>
 
@@ -56,12 +57,12 @@
 // of the whole thing rather than round each tile.
 // ---------------------------------------------------------------------------
 
-import { TILES, buildDeck, rotPoint } from '../src/tiles.js';
-import { Board } from '../src/board.js';
-import { featureShape } from '../src/shape.js';
-import { drawTile } from '../src/art.js';
-import { LIGHT } from '../src/light.js';
-import { THEME } from '../src/theme.js';
+import { TILES, buildDeck, rotPoint } from './src/tiles.js';
+import { Board } from './src/board.js';
+import { featureShape } from './src/shape.js';
+import { drawTile } from './src/art.js';
+import { LIGHT } from './src/light.js';
+import { THEME } from './src/theme.js';
 
 // --- how high things stand ---------------------------------------------------
 //
@@ -263,6 +264,27 @@ function outlineOf(feat, rot) {
 }
 
 // --- the board ---------------------------------------------------------------
+
+// The game can hand its board over: main.js writes a snapshot to localStorage
+// and opens this page, and the page shows THAT map instead of dealing one.
+// This is what makes the viewer a monument rather than a demo — the map you
+// spent a game building, standing up. Unknown tile ids (a mode's derived
+// types) are skipped rather than fatal: a monument with a gap beats no
+// monument.
+const SNAP_KEY = 'tilemakers-workshop/relief';
+
+function snapshotBoard() {
+  let snap = null;
+  try { snap = JSON.parse(localStorage.getItem(SNAP_KEY) || 'null'); } catch { /* private window */ }
+  if (!snap?.cells?.length) return null;
+  const board = new Board();
+  for (const c of snap.cells) {
+    const type = TILES[c.id];
+    if (!type) continue;
+    board.place(c.x, c.y, type, c.rot & 3);
+  }
+  return board.size ? { board, label: snap.label || 'your board' } : null;
+}
 
 function deal(seed, want) {
   const rand = rng32(seed);
@@ -604,21 +626,33 @@ function upload(batch) {
 
 // --- the scene ---------------------------------------------------------------
 
-const ui = Object.fromEntries(['lift', 'liftV', 'count', 'countV', 'seed', 'silh', 'spin', 'again', 'stat']
+const ui = Object.fromEntries(['lift', 'liftV', 'count', 'countV', 'seed', 'silh', 'spin', 'again', 'mine', 'stat']
   .map((id) => [id, document.getElementById(id)]));
 
 let scene = null, centre = [0, 0];
 
 let lastBoard = null;
 
-function reseat() {
-  const board = lastBoard = deal(+ui.seed.value, +ui.count.value);
+function show(board, label) {
+  lastBoard = board;
   let sx = 0, sy = 0;
   for (const c of board.cells.values()) { sx += c.x + 0.5; sy += c.y + 0.5; }
   centre = [sx / board.size, sy / board.size];
   const made = build(gl, board);
   scene = made.batches.map(upload);
-  ui.stat.textContent = `${board.size} tiles · ${made.prisms} prisms · ${made.houses} houses · ${scene.length} draws`;
+  ui.stat.textContent = `${label ? label + ' · ' : ''}${board.size} tiles · ${made.prisms} prisms · ${made.houses} houses · ${scene.length} draws`;
+}
+
+function reseat() {
+  show(deal(+ui.seed.value, +ui.count.value));
+}
+
+/** The handed-over board, if the game left one; falls back to a random deal. */
+function boot() {
+  const snap = snapshotBoard();
+  ui.mine.hidden = !snap;
+  if (snap) show(snap.board, snap.label);
+  else reseat();
 }
 
 /** Aim the camera at the first tile carrying a feature of this kind. */
@@ -660,6 +694,7 @@ ui.lift.addEventListener('input', () => { ui.liftV.textContent = (+ui.lift.value
 ui.count.addEventListener('input', () => { ui.countV.textContent = ui.count.value; });
 for (const el of [ui.count, ui.seed]) el.addEventListener('change', reseat);
 ui.again.addEventListener('click', () => { ui.seed.value = Math.floor(Math.random() * 9999); reseat(); });
+ui.mine.addEventListener('click', boot);
 
 const BARE = { ground: [0.29, 0.31, 0.30], cap: [0.76, 0.73, 0.66], wall: [0.64, 0.35, 0.27], prop: [0.55, 0.52, 0.48] };
 
@@ -712,7 +747,7 @@ function frame(t) {
   requestAnimationFrame(frame);
 }
 
-reseat();
+boot();
 requestAnimationFrame(frame);
 window.relief = { reseat, focus, cam, ui };      // so tools/relief.mjs can pose it
 </script>

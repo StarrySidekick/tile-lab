@@ -1519,6 +1519,27 @@ function bumpScores() {
   shownScores = game.players.map((p) => p.score);
 }
 
+// --- the monument ------------------------------------------------------------
+//
+// Hand the board to the relief viewer: every placed tile, standing up, in a
+// new tab. The snapshot goes through localStorage rather than a URL because a
+// long game is a few hundred cells, and because the viewer should survive a
+// refresh. Works mid-game too — a map does not have to be finished to be
+// worth looking at.
+$('relief').onclick = () => {
+  try {
+    const cells = [...game.board.cells.values()]
+      .filter((c) => c.type?.id)
+      .map((c) => ({ x: c.x, y: c.y, id: c.type.id, rot: c.rot }));
+    localStorage.setItem('tilemakers-workshop/relief', JSON.stringify({
+      cells,
+      label: `your ${spec(game.mode)?.name || 'game'}, turn ${game.turn}`,
+      when: Date.now(),
+    }));
+  } catch { /* private window: the viewer will deal itself a board instead */ }
+  window.open('./relief.html');
+};
+
 $('export').onclick = () => {
   if (!game.m.toMarkdown) return;
   const blob = new Blob([game.m.toMarkdown()], { type: 'text/markdown' });
@@ -1645,6 +1666,19 @@ buildBots();
 syncPanel();
 paintCss();
 frame();
+
+// First visit: say what this is. Anyone with saved settings has played, so
+// only a genuinely fresh browser sees it — and the footer's "how to play"
+// brings it back on purpose.
+const WELCOME_KEY = 'tilemakers-workshop/welcomed';
+try {
+  if (!restored && !localStorage.getItem(WELCOME_KEY)) $('welcome').hidden = false;
+} catch { /* private window: skip the card rather than show it every time */ }
+$('welcomePlay').onclick = () => {
+  $('welcome').hidden = true;
+  try { localStorage.setItem(WELCOME_KEY, '1'); } catch { /* ignore */ }
+};
+$('about').onclick = (e) => { e.preventDefault(); $('welcome').hidden = false; };
 
 // Handy for poking at state from the devtools console while iterating.
 window.LAB = {

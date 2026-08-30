@@ -740,3 +740,49 @@ footer { font-size: 10.5px; line-height: 1.6; }
   #designer footer button { padding: 11px 4px; }
   #openDesign kbd, #designer header .key { display: none; }
 }
+
+/* --- the welcome card -------------------------------------------------------
+   Shown once, to a first visitor, over the empty board. It reads like the
+   claim panel — same sheet, same gold — because it IS part of the game, not a
+   marketing splash bolted on the front. */
+
+#welcome {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(13, 11, 17, 0.55);
+  z-index: 30;
+}
+#welcome[hidden] { display: none; }
+.welcomeCard {
+  max-width: 430px;
+  background: var(--panel);
+  border: 1px solid var(--accent-dim);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.welcomeCard h2 {
+  margin: 0;
+  font-size: 17px;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+.welcomeLede { margin: 0; font-size: 13px; line-height: 1.5; }
+.welcomeHow {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.welcomeHow b { color: var(--accent); font-weight: 600; }
+.welcomeDim { margin: 0; font-size: 11.5px; color: var(--dim); }
+#welcomePlay { align-self: flex-start; margin-top: 4px; }

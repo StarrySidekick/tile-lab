@@ -28,6 +28,23 @@
         <div id="hudActions" class="btns"></div>
       </div>
 
+      <!-- First visit only: what this is and how to play, in four lines.
+           Dismissed once, it stays dismissed; the ? in the footer brings it back. -->
+      <div id="welcome" hidden>
+        <div class="welcomeCard">
+          <h2>Tilemaker&rsquo;s Workshop</h2>
+          <p class="welcomeLede">A Carcassonne-style sandbox. Lay one tile a turn; edges must
+            agree &mdash; road meets road, city meets city, field meets field.</p>
+          <ul class="welcomeHow">
+            <li><b>Place</b> &mdash; drag the tile from the panel onto a glowing square, or click one. <kbd>R</kbd> rotates.</li>
+            <li><b>Claim</b> &mdash; after placing, put a meeple on a road, city or field to score it.</li>
+            <li><b>Score</b> &mdash; finished roads and cities pay out; the biggest map wins nothing, the smartest one does.</li>
+          </ul>
+          <p class="welcomeDim">Drag to pan &middot; scroll to zoom &middot; everything else is in the panel on the right.</p>
+          <button id="welcomePlay" class="primary">Lay the first tile</button>
+        </div>
+      </div>
+
       <!-- The meeple step, up close: the tile you just laid, big, with a spot
            for every feature you could claim. -->
       <div id="claim" hidden>
@@ -91,6 +108,7 @@
         </label>
         <button id="newGame" class="primary">New game</button>
         <button id="export">Export the chronicle</button>
+        <button id="relief" title="The board you have built, standing up: every town, wall and cloister in 3D. Opens in a new tab.">View the board in relief</button>
         <p class="hint" id="modeHint"></p>
       </section>
 
@@ -153,7 +171,7 @@
 
       <footer class="dim">
         drag to pan · scroll to zoom · <kbd>R</kbd> rotate · <kbd>F</kbd> flip · <kbd>1</kbd>–<kbd>4</kbd> pick
-        · <kbd>C</kbd> recenters · <kbd>Tab</kbd> hides the panel · <kbd>Enter</kbd> confirms · <a href="./atlas.html">tile atlas</a>
+        · <kbd>C</kbd> recenters · <kbd>Tab</kbd> hides the panel · <kbd>Enter</kbd> confirms · <a href="./atlas.html">tile atlas</a> · <a href="#" id="about">how to play</a>
       </footer>
     </aside>
   </main>

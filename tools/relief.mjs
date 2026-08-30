@@ -3,7 +3,7 @@
 //
 //   node tools/relief.mjs [--shots]
 //
-// tools/relief.html is the experiment; this is how it gets checked without a
+// relief.html (repo root) is the experiment; this is how it gets checked without a
 // pair of eyes. It boots the page in a real browser, waits for the board to be
 // dealt, and asserts the three things that would make the spike a lie:
 //
@@ -61,7 +61,7 @@ const check = (ok, what) => {
   if (!ok) failed++;
 };
 
-await page.goto(`http://localhost:${PORT}/tools/relief.html`, { waitUntil: 'load' });
+await page.goto(`http://localhost:${PORT}/relief.html`, { waitUntil: 'load' });
 await page.waitForFunction(() => window.relief && document.getElementById('stat').textContent, null, { timeout: 30000 });
 
 const stat = await page.textContent('#stat');

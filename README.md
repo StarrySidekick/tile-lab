@@ -719,7 +719,7 @@ src/interior.js    caves and city streets — a sub-map on the same loop
 src/render.js      camera, canvas painting, overlays, hit-testing
 src/main.js        DOM wiring
 tools/             headless and browser test harnesses
-tools/relief.html  a spike: the same tiles with actual height (docs/RELIEF.md)
+relief.html        the board in 3D — a monument view of any game (docs/RELIEF.md)
 ```
 
 ### The core idea
