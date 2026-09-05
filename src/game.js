@@ -25,6 +25,7 @@ import {
 import { PLAYER_NAMES } from './theme.js';
 import { MODES, MODE_BY_ID } from './modes/index.js';
 import { AGENDAS } from './modes/agendas.js';
+import { POWERS } from './modes/powers.js';
 import {
   MECHANICS, MECHANIC_GROUPS, MECHANIC_BY_ID, LAYERS, LIVE_MECHANICS,
   RULESETS, RULESET_BY_ID, DEFAULT_RULESET, defaultMechanics,
@@ -93,6 +94,11 @@ export class Game {
       name: spec.playerName ? spec.playerName(i) : PLAYER_NAMES[i],
       score: 0,
       meeples: RULES.meeplesPerPlayer,
+      // What this player STARTED with, which is not always the printed
+      // number — the Recruiter has two more. The score row draws its pips
+      // against this rather than against RULES, because `repeat()` throws
+      // on a negative count and took the whole panel down with it.
+      meepleMax: RULES.meeplesPerPlayer,
       big: this.has('bigMeeple') ? 1 : 0,
       mayors: this.has('mayor') ? 1 : 0,
       abbots: this.has('abbot') ? 1 : 0,
@@ -159,6 +165,7 @@ export class Game {
     }
 
     if (this.has('agendas')) this.dealAgendas();
+    if (this.has('powers')) this.dealPowers();
     if (this.has('tide')) this.setWaterline(spec.tideStart ?? 6);
 
     this.m.setup();
@@ -1961,6 +1968,36 @@ export class Game {
     if (this.board.size === 0) this.finish();
   }
 
+  // --- asymmetric powers ----------------------------------------------------
+
+  /**
+   * One power each, no two the same, and everyone can see them. Dealt from the
+   * seeded rng like everything else, so a seed still reproduces the whole game.
+   * A table larger than the list wraps, which is the same answer `dealAgendas`
+   * gives — six powers and seven players is a shape nobody plays.
+   */
+  dealPowers() {
+    const pool = POWERS.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    this.players.forEach((p, i) => {
+      p.power = pool[i % pool.length];
+      // Supply is set in the constructor, and setup runs before the first
+      // turn, so adding here is the whole of it.
+      if (p.power.meeples) { p.meeples += p.power.meeples; p.meepleMax += p.power.meeples; }
+      this.say(`${p.name} is ${p.power.name}. ${p.power.note}`);
+    });
+  }
+
+  /** What this player's power adds to a feature they have just won. */
+  powerBonus(seat, d, final, value) {
+    const power = this.players[seat]?.power;
+    if (!power?.bonus) return 0;
+    return power.bonus(d, { final, value, game: this }) || 0;
+  }
+
   // --- hidden agendas -------------------------------------------------------
 
   dealAgendas() {
@@ -2096,8 +2133,22 @@ export class Game {
     if (this.useMeeples) winners = this.board.majority(d, { hills: this.has('hills') });
     else winners = final || closer == null ? [] : [closer];
 
+    /* The Steward takes a tie outright. Applied here rather than inside
+       `board.majority()` because it is a fact about a player, and the board
+       knows about followers and hills, not about who is holding which power. */
+    if (winners.length > 1 && this.has('powers')) {
+      const steward = winners.filter((p) => this.players[p]?.power?.tiebreak);
+      if (steward.length === 1) winners = steward;
+    }
+
     if (winners.length && pts > 0) {
-      for (const p of winners) this.players[p].score += pts;
+      for (const p of winners) {
+        const extra = this.has('powers') ? this.powerBonus(p, d, final, pts) : 0;
+        this.players[p].score += pts + extra;
+        if (extra) {
+          this.say(`${this.players[p].power.name} — ${this.players[p].name}: +${extra}`);
+        }
+      }
       // The teacher: rides whoever last earned him, pays 2 on their next
       // scored feature, and retires to the schoolhouse.
       if (!final && this.has('school') && this.teacher != null && winners.includes(this.teacher)) {

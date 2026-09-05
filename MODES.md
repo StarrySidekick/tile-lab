@@ -1122,7 +1122,7 @@ be better as switches than as places.
 | **Trade goods** | Wine / grain / cloth, 10 for each majority | ✔ |
 | **Oracle dice** | Uncertainty the table resolves narratively | ✔, inside The Chronicle |
 | **Hand of tiles** | Choice instead of fate | ✔, as the `Drafting market` modifier |
-| **Asymmetric powers** | Each player breaks one rule | not built |
+| **Asymmetric powers** | Each player breaks one rule | ✔ (six of them) |
 | **Turn timer** | Kills analysis paralysis, changes the whole feel | not built |
 | **Co-op vs the deck** | The deck plays events against the table | not built |
 
@@ -1135,8 +1135,20 @@ auto-spends muster chits, the builder uses any of your followers rather than
 its own figure, and only the active player is offered a wagon walk. Each is one
 dialog away from the real rule.
 
-The three unbuilt ones are all small. Asymmetric powers is the one I'd do next,
-because it's the cheapest way to make any of the twelve replayable.
+Asymmetric powers is built — six of them, dealt at the start and **public**,
+because hidden agendas already occupy the bluffing space and a hidden power
+would only be an agenda you cannot plan around. The interest is in everyone
+knowing the Mason wants the cathedral and racing him for it anyway.
+
+Every one of them resolves at one of two places the engine already asks a
+question: `Game.award()`, where a closed feature pays its winners, and the
+follower supply at setup. That is why it was cheap. The Mason, the Wayfarer and
+the Abbot pay more for a feature type; the Hermit is paid in full for what he
+never finished; the Recruiter gets two more followers; the Steward takes a tie
+outright. A seventh power that needed a third hook would want the dialog work
+below built first.
+
+**The two still unbuilt are the turn timer and co-op vs the deck.**
 
 ---
 

@@ -1418,17 +1418,28 @@ function mirrorActions(btns) {
 
 function scoreRow(p, i) {
   const active = i === game.current && game.phase !== 'over';
+  /* Against the player's OWN starting supply, not the printed seven: the
+     Recruiter starts with nine, and `repeat(-2)` throws and takes the whole
+     score panel with it. Clamped as well, because a power that hands out
+     followers mid-game would hit the same edge from the other side. */
+  const cap = Math.max(p.meepleMax ?? 7, p.meeples);
   const extra = (bots.has(i) ? '<span class="dim">cpu</span> ' : '') + (game.useMeeples
-    ? '●'.repeat(p.meeples) + `<span class="dim">${'○'.repeat(7 - p.meeples)}</span>`
+    ? '●'.repeat(Math.max(0, p.meeples)) + `<span class="dim">${'○'.repeat(Math.max(0, cap - p.meeples))}</span>`
     : '');
   const agendas = (p.agendas || []).map((a) => `<div class="quest"><span>◆ ${a.text}</span><span class="dim">${a.points}</span></div>`).join('');
+  /* A power shows on EVERY row, not just the active one. An agenda is secret
+     and only yours is drawn; a power is public, and racing the mason for the
+     cathedral is the whole point of him. */
+  const power = p.power
+    ? `<div class="quest"><span>✦ ${p.power.name}</span><span class="dim">${p.power.note}</span></div>`
+    : '';
   return `
     <div class="player ${active ? 'active' : ''}">
       <span class="swatch" style="background:${PLAYER_COLORS[i]}"></span>
       <span class="pname">${p.name}</span>
       <span class="pmeta">${extra}</span>
       <span class="pscore">${p.score}</span>
-    </div>${active && agendas ? agendas : ''}`;
+    </div>${power}${active && agendas ? agendas : ''}`;
 }
 
 function syncPanel() {

@@ -682,6 +682,12 @@ export const MECHANICS = [
     status: 'live', wiki: null, since: null,
   },
   {
+    id: 'powers', layer: 'lab', pack: 'Play', name: 'Asymmetric powers',
+    note: 'One power each, dealt at the start and visible to everyone. What a '
+      + 'road is worth stops being the same question for the whole table.',
+    status: 'live', wiki: null, since: null,
+  },
+  {
     id: 'tide', layer: 'lab', pack: 'Scoring', name: 'Rising tide',
     note: 'A waterline climbs the board every three rounds, drowning whatever '
       + 'it reaches.',
